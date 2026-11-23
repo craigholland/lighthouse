@@ -2,10 +2,12 @@
 
 ## Current scope
 
-The project currently contains governing documentation and bootstrap instructions.
-There is no production package, application test suite, or CI pipeline. This
-contract describes checks that can actually run at this stage; it does not approve
-a future runtime architecture or dependency-management policy.
+The project currently contains governing documentation, bootstrap instructions,
+and adopted architecture/planning documents with conditional integration
+candidates. There is no production package,
+application test suite, or CI pipeline. This contract describes checks that can
+actually run at this stage; it does not approve a future runtime architecture or
+dependency-management policy.
 
 Run the following commands from the repository root in PowerShell. A failed
 command is a failed check. Record the checked commit and working-tree state in
@@ -59,9 +61,10 @@ Write-Output ('Markdown file targets: PASS ({0} documents)' -f $markdownFiles.Co
 ```
 
 For standards adoption or later standards updates, compare the complete change
-with the approved source. This adoption preserves four documents verbatim and
-changes only the Python supplement's verification-contract label and target.
-Review that document as a whole to confirm its meaning remains intact.
+with the approved source and explicitly authorized adaptations. Review each
+affected document as a whole to confirm its meaning remains intact. Architecture
+and planning documents must preserve the distinction between observed capability,
+approved design, unproven candidates and bounded implementation authority.
 
 ## Local environment readiness
 

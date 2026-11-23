@@ -4,7 +4,7 @@ Multi-Project AI Development Orchestrator.
 
 Lighthouse coordinates development handoffs between AI collaborators through
 GitHub, while preserving independent review and human ownership. It is a reusable
-platform; Koios Cold will be its first configured project.
+platform; Koios Cold will be its first real configured project.
 
 ## Governing architecture
 
@@ -16,8 +16,32 @@ and its four supplements on 2026-11-23:
 - [AI contributor guidance](docs/architecture/standards/AI_Guidance/Craig-Architecture-AI-Guidance.md).
 - [Local contract standard](docs/architecture/standards/Craig-Architecture-__ai__-Template.md).
 
-These documents live in Lighthouse and use internal links. The detailed system
-architecture and initial implementation plan still require Craig's approval.
+These documents live in Lighthouse and use internal links. Craig also approved
+the [system architecture](docs/architecture/proposal.md) and
+[T00–T09 initial development plan](docs/development/initial-plan.md), including
+the plan's bounded delegation to Codex, on 2026-11-23.
+
+Craig approved the baseline of one local Python process, TOML project profiles,
+and a SQLite workflow ledger on 2026-11-23. GitHub remains authoritative for
+repository facts. The five policy decisions and remaining approval gates are in
+the [review register](docs/decisions/open-questions.md).
+
+Craig also approved the work-admission policy and delegated exact labels and
+Issue fields to Codex. The [work intake contract](docs/development/work-intake.md)
+records those conventions. He approved a feasibility-first stage for the initial
+plan: foundation, Codex review proof and Dot handoff proof before production
+orchestration. Integration capabilities remain unproven; execution and concrete
+live activation still require their applicable approvals.
+
+The approved rollout uses controlled Lighthouse work for integration proofs and
+keeps Koios as the first real project, inactive until its profile is verified and
+approved for activation. Concrete live targets require separate approval.
+
+The [architecture and initial-plan package](docs/README.md) is approved. Codex may
+define and publish bounded task Issues and select compatible project-local
+versions and dependency pins within that plan. Implementation starts from the
+approved baseline on `development` after the planning PR merges; live execution
+retains its explicit task gates. The approved design has not yet been implemented.
 
 ## Development profile
 
