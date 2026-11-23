@@ -27,6 +27,17 @@ def observed_run(payload: object, run: Run) -> Outcome:
     matches = [turn for turn in note.thread.turns if turn.id == run.turn]
     if note.thread.id != run.thread or len(matches) != 1:
         return "unknown"
+    status = note.thread.status.root
+    if status.type == "systemError":
+        return "unavailable"
+    if status.type == "active" and any(
+        flag.value == "waitingOnApproval" for flag in status.active_flags
+    ):
+        return "permission"
+    if matches[0].status == TurnStatus.in_progress and (
+        status.type != "active" or status.active_flags
+    ):
+        return "unknown"
     return _outcome(matches[0].status, terminal=False)
 
 

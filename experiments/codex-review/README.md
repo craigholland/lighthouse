@@ -40,7 +40,9 @@ configuration is accepted.
   not a production ledger or a power-loss/concurrent writer guarantee.
 - `sdk_schema.py` checks SDK response data without creating a client.
   It reads `openai_codex.types.TurnCompletedNotification` and
-  `ThreadReadResponse`, correlates synthetic IDs and maps typed states.
+  `ThreadReadResponse`, correlates synthetic IDs and maps typed states. Thread-level approval and
+  system errors hold for the owner or Lead, respectively. In-progress turns
+  do not clear a hold unless their thread is actively running without flags.
   Raw provider text, payloads and paths do not become audit output.
 - The CLI safety tests place import and audit fences around import/help/dry-run
   and disallowed live arguments; this is regression coverage, not an OS sandbox.
