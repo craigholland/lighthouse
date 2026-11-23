@@ -132,3 +132,89 @@ def test_late_scheduler_tick_still_signals_owned_job() -> None:
     now[0] = 900
     assert supervisor.tick() == Action.SHUTDOWN_UNCONFIRMED
     assert jobs.forced == [Role.REVIEW]
+
+
+@pytest.mark.parametrize("failure", ["start", "snapshot", "interrupt"])
+def test_control_failure_still_cleans_up_without_advancing(failure: str) -> None:
+    """An owned worker survives the control error until force and both observations."""
+    class FailingJobs(FakeJobs):
+        def start(self, role: Role) -> None:
+            super().start(role)
+            if role == Role.REVIEW and failure == "start":
+                raise OSError
+
+        def snapshot(self, role: Role) -> Observation:
+            if role == Role.REVIEW and failure == "snapshot" and not self.forced:
+                raise OSError
+            return super().snapshot(role)
+
+        def request_interrupt(self, role: Role) -> None:
+            super().request_interrupt(role)
+            if failure == "interrupt":
+                raise OSError
+
+    now = [0.0]
+    jobs = FailingJobs()
+    runner = Supervisor(lambda: now[0], jobs)
+    runner.start()
+    jobs.states[Role.VERIFIER] = Observation(True, 0, True)
+    runner.tick()
+    now[0] = 780
+    runner.tick(known_active_turn=True)
+    now[0] = 810
+    runner.tick()
+    assert jobs.forced == [Role.REVIEW]
+    jobs.states[Role.REVIEW] = Observation(True, 1, True)
+    assert runner.tick() != Action.ADVANCE
+    jobs.states[Role.REVIEW] = Observation(True, 0, True)
+    assert runner.tick() == Action.HOLD
+    assert jobs.started == [Role.VERIFIER, Role.REVIEW]
+
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Requires the Windows Job Object API")
+def test_native_interrupt_error_still_stops_owned_fixture_tree() -> None:
+    """An interrupt signal error cannot leave the harmless native tree running."""
+    tree = FixtureJob()
+
+    class NativeReview(FakeJobs):
+        def start(self, role: Role) -> None:
+            super().start(role)
+            if role == Role.REVIEW:
+                tree.start()
+
+        def snapshot(self, role: Role) -> Observation:
+            if role != Role.REVIEW:
+                return super().snapshot(role)
+            return Observation(tree.wait_quiescent(0.02), tree.active_count())
+
+        def request_interrupt(self, role: Role) -> None:
+            super().request_interrupt(role)
+            raise OSError("synthetic interrupt-control failure")
+
+        def force(self, role: Role) -> None:
+            super().force(role)
+            assert role == Role.REVIEW
+            tree.force()
+
+    try:
+        now = [0.0]
+        jobs = NativeReview()
+        runner = Supervisor(lambda: now[0], jobs)
+        runner.start()
+        jobs.states[Role.VERIFIER] = Observation(True, 0, True)
+        assert runner.tick() == Action.ADVANCE
+        deadline = time.monotonic() + 8
+        while tree.active_count() < 3 and time.monotonic() < deadline:
+            time.sleep(0.02)
+        assert tree.active_count() == 3
+        now[0] = 780
+        assert runner.tick(known_active_turn=True) == Action.CLEANUP
+        assert tree.wait_quiescent(5)
+        assert tree.active_count() == 0
+        now[0] = 810
+        assert runner.tick() == Action.HOLD
+        assert jobs.interrupted == jobs.forced == [Role.REVIEW]
+        assert jobs.started == [Role.VERIFIER, Role.REVIEW]
+    finally:
+        tree.close()

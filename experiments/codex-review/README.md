@@ -60,7 +60,9 @@ without enabling an actual live invocation.
 - `supervisor.py` drives three injected job roles on one monotonic budget:
   verifier cutoff 30s; interrupt 780s; force review 810s; review shutdown and
   latest publication start 840s; force publisher 870s; hard failure at 900s
-  without confirmed local shutdown. The parent only observes or controls jobs.
+  without confirmed local shutdown. A control error prevents stage advancement
+  but keeps bounded local force/observation active until cleanup is confirmed
+  or the hard deadline expires. The parent only observes or controls owned jobs.
 - `windows_job.py` is currently wired only to a fixed, harmless Python
   fixture, not an arbitrary command, a PID, or the live SDK worker. The
   native test observes the worker plus two descendant levels, forcibly
@@ -85,7 +87,7 @@ Lead worker, authenticated GitHub transport, or COMMENT publisher. There
 is still no live command. Actual composition, privately configured trusted
 transport and receipt root, effective policy review, final packet approval,
 and fresh Lead readiness are required. During preparation the existing
-clarification's REST response did not supply App attribution; the verifier
+clarification's REST response did not supply App attribution to Dot; the Lead reported it was present under its own identity. This preparation does not verify the Lead transport. The verifier
 rejects that absence rather than trusting a display name. No claim is made
 that an actual future execution attestation will expose that required field.
 

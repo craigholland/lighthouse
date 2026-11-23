@@ -13,6 +13,7 @@ class Action(StrEnum):
     INTERRUPT = "interrupt"
     TERMINATE = "terminate"
     HOLD = "hold"
+    CLEANUP = "failed-cleanup-pending"
     ADVANCE = "advance"
     SHUTDOWN_UNCONFIRMED = "shutdown-unconfirmed"
 
@@ -104,10 +105,12 @@ class Supervisor:
 
     def __init__(self, clock: Callable[[], float], jobs: OwnedJobs) -> None:
         self._clock = clock
-        self._timeline = Timeline(clock())
+        self._entered_at = clock()
+        self._timeline = Timeline(self._entered_at)
         self._jobs = jobs
         self._stage: Role | None = None
         self._result: Action | None = None
+        self._failed = False
         self._forced = False
 
     def start(self) -> None:
@@ -126,6 +129,8 @@ class Supervisor:
         stage = self._stage
         if stage is None:
             return Action.HOLD
+        if self._failed:
+            return self._clean_failed_job(stage)
         try:
             state = self._jobs.snapshot(stage)
             now = self._clock()
@@ -137,15 +142,15 @@ class Supervisor:
                 action = self._timeline.publisher(now, state, started=True)
             if action == Action.TERMINATE:
                 if not self._forced:
-                    self._forced = True
                     self._jobs.force(stage)
+                    self._forced = True
             elif action == Action.INTERRUPT:
                 self._jobs.request_interrupt(stage)
             elif action in (Action.HOLD, Action.SHUTDOWN_UNCONFIRMED):
                 if action == Action.SHUTDOWN_UNCONFIRMED and not self._forced:
                     # A late scheduler tick must not skip local containment cleanup.
-                    self._forced = True
                     self._jobs.force(stage)
+                    self._forced = True
                 self._result = action
             elif action == Action.ADVANCE:
                 if stage == Role.VERIFIER:
@@ -159,10 +164,33 @@ class Supervisor:
                         self._result = Action.HOLD
                 else:
                     self._result = Action.ADVANCE
-            return self._result or action
+            return self._result or (Action.CLEANUP if self._failed else action)
         except (OSError, RuntimeError):
+            self._failed = True
+            return self._clean_failed_job(stage)
+
+    def _clean_failed_job(self, stage: Role) -> Action:
+        """Retain logical failure while forcing and observing the owned job."""
+        try:
+            if self._jobs.snapshot(stage).locally_quiescent:
+                self._result = Action.HOLD
+                return self._result
+        except (OSError, RuntimeError):
+            # Lost accounting is not evidence the job exited.
+            pass
+        if not self._forced:
+            try:
+                self._jobs.force(stage)
+            except (OSError, RuntimeError):
+                # A failed force is not an acknowledgement; next bounded tick
+                # can retry only this same owned local termination.
+                pass
+            else:
+                self._forced = True
+        if self._clock() - self._entered_at >= 900:
             self._result = Action.SHUTDOWN_UNCONFIRMED
             return self._result
+        return Action.CLEANUP
 
     def _start(self, stage: Role) -> None:
         """A failed child start is a terminal hold; no retry or fallback."""
@@ -171,4 +199,5 @@ class Supervisor:
         try:
             self._jobs.start(stage)
         except (OSError, RuntimeError):
-            self._result = Action.SHUTDOWN_UNCONFIRMED
+            self._failed = True
+            self._clean_failed_job(stage)
