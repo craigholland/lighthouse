@@ -55,7 +55,7 @@ external resources or start work. No public Python API is defined.
 - [src/lighthouse/cli.py](src/lighthouse/cli.py): parses help and version arguments.
 - [tests/test_cli.py](tests/test_cli.py): tests the real installed entry point.
 - [docs/README.md](docs/README.md): index of the adopted architecture and plan.
-- [Codex review experiment](experiments/codex-review/__ai__.md): offline schema, authorization, bounded job containment and recovery evidence; no live capability.
+- [Codex review experiment](experiments/codex-review/__ai__.md): offline-verified, separately gated adapter composition and recovery evidence; no live capability claimed.
 - [Verification contract](docs/development/verification-contract.md): commands and evidence limits.
 
 ## Known Gaps / Future-State Notes

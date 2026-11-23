@@ -1,16 +1,14 @@
 # Codex review experiment: T01 Phase A
 
-This is an offline proof for [Lighthouse issue #4](https://github.com/craigholland/lighthouse/issues/4).
+This experiment is the offline-verified preparation for [Lighthouse issue #4](https://github.com/craigholland/lighthouse/issues/4).
 It proves recovery behavior with synthetic data, not an actual Codex run,
-GitHub review, production adapter, or acceptance of Gate A. There is no live
-command, launcher, credential reader, approval callback, or GitHub client.
+GitHub review, production adapter, or acceptance of Gate A. The opt-in adapters are implemented but live activation remains held.
 
 ## Run
 
 From the repository root, use the
 [experiment verification contract](../../docs/development/verification-contract.md)
-with existing Windows AMD64 CPython 3.14.x. The only runnable experiment
-commands are `proof.py --help` and `proof.py --dry-run`. Dry-run drives the
+with existing Windows AMD64 CPython 3.14.x. The only authorized preparation verification commands are `proof.py --help` and `proof.py --dry-run`. Dry-run drives the
 actual recovery code against one synthetic target and deletes its temporary
 journal when it exits. No arbitrary repository, head, prompt or provider
 configuration is accepted.
@@ -55,7 +53,7 @@ configuration is accepted.
 
 The preparation contract is [Lead's pinned clarification](https://github.com/craigholland/lighthouse/issues/4#issuecomment-7116121458).
 This change exercises the fail-closed control and authorization boundaries
-without enabling an actual live invocation.
+without authorizing an actual live invocation.
 
 - `supervisor.py` drives three injected job roles on one monotonic budget:
   verifier cutoff 30s; interrupt 780s; force review 810s; review shutdown and
@@ -64,7 +62,7 @@ without enabling an actual live invocation.
   but keeps bounded local force/observation active until cleanup is confirmed
   or the hard deadline expires. The parent only observes or controls owned jobs.
 - `windows_job.py` is currently wired only to a fixed, harmless Python
-  fixture, not an arbitrary command, a PID, or the live SDK worker. The
+  fixture for native verification, never an arbitrary command or a PID. The
   native test observes the worker plus two descendant levels, forcibly
   terminates only the owned job, and verifies the retained worker handle is
   signaled and job active count is zero. Local process shutdown cannot prove
@@ -80,22 +78,59 @@ without enabling an actual live invocation.
   freshness; a stale-target hold may keep historical attributed evidence
   but cannot issue a second POST or advance the task.
 
-### Remaining implementation and live gates
 
-The offline-tested role controller and verifier do not instantiate a real
-Lead worker, authenticated GitHub transport, or COMMENT publisher. There
-is still no live command. Actual composition, privately configured trusted
-transport and receipt root, effective policy review, final packet approval,
-and fresh Lead readiness are required. During preparation the existing
-clarification's REST response did not supply App attribution to Dot; the Lead reported it was present under its own identity. This preparation does not verify the Lead transport. The verifier
-rejects that absence rather than trusting a display name. No claim is made
-that an actual future execution attestation will expose that required field.
+## Prepared opt-in composition (live execution remains held)
 
-## Candidate bridge for separate Phase B approval
+The implementation now connects the actual adapters, but the installed
+Codex client, provider and GitHub write path have **not** been exercised.
+Ordinary import, help and dry-run do not construct a client, retrieve a
+credential or start a child job. Only a separately selected Lead operator
+invocation may enter the verifier; no committed configuration enables it.
+
+- `live.py` validates a separately configured private file and its fixed
+  sibling packet, context and instruction files before creating a child
+  job. The canonical packet binds the exact invoked command, private receipt
+  root, context/instruction hashes, immutable target and expiry. An incomplete
+  local file is not approval.
+- `live_stage.py` assigns verifier, review, fresh re-verifier and publisher
+  roles to separate owned jobs and exchanges bounded, private challenge-bound
+  signals. The review may not dispatch until the independent re-verifier
+  rechecks the current attestation and exact head. The publisher cannot
+  start until identified review completion, worker exit and zero active
+  processes are confirmed. Unknown shutdown blocks advancement.
+- `sdk_worker.py` defers construction of the exact pinned SDK and bundled
+  runtime until the contained review role. It requires the existing
+  managed sign-in from a separately configured Codex home, verifies returned
+  account/model/provider, workspace, exact Git head and effective read-only
+  sandbox/approval behavior. External Issue/PR data cannot grant authority.
+  The model worker never receives a GitHub credential or its path.
+- `github_transport.py` uses fixed GitHub API origin, distinct least-privilege
+  installation-token roles, bounded transport, numeric App attribution and
+  exact immutable target checks. Publisher authorization is renewed before
+  its one COMMENT attempt. The canonical claim and separate durable COMMENT
+  intent survive restart; uncertain POST permits only an attributed lookup
+  of the original attempted head and cannot become a new POST.
+- Review interruption is best-effort within the one global 900-second
+  budget. Local Job termination cannot establish provider-side cancellation.
+
+### Disabled final execution packet (template only)
+
+Lead must privately supply the canonical packet and operator configuration,
+a separate verified checkout and managed Codex home, fresh role-specific
+short-lived Lead App JWT sources for the verifier and later publisher,
+and an existing private receipt directory. The exact command and SHA,
+context hashes, managed account/model, access settings, time limits, and
+receipt binding must be completed and independently reviewed. Craig's
+approval of that final SHA/packet and a new attributed Lead attestation
+are still required. No sample credentials, operator paths, or approved
+live command are committed. Missing, edited, stale or unattributed
+approval holds; absent metadata is never inferred from a login or file.
+
+## Candidate bridge surfaces (not exercised live)
 
 The [official SDK guide](https://learn.chatgpt.com/docs/codex-sdk),
 [App Server protocol](https://learn.chatgpt.com/docs/app-server) and pinned SDK
-source describe these surfaces. Nothing below is called by this experiment.
+source describe these surfaces. None of these provider operations was executed during offline verification.
 
 | Candidate | Evidence or use |
 | --- | --- |

@@ -136,3 +136,7 @@ The experiment test suite includes fake-clock role-cutoff and authenticated
 attestation tests, and on Windows one harmless Python-only Job Object test.
 The fixture verifies local containment and shutdown, never an SDK or remote
 provider lifecycle. The ordinary CLI does not start subprocesses.
+
+The same offline suite exercises the operator entry and private child roles
+through injected job, transport and SDK doubles. Do not supply real operator
+settings or execute the opt-in entry as part of preparation verification.

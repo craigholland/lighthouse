@@ -113,9 +113,9 @@ def test_hung_review_cannot_publish_even_after_late_success() -> None:
     assert supervisor.tick(known_active_turn=True) == Action.TERMINATE
     supervisor.tick(known_active_turn=True)
     now[0] = 840
-    assert supervisor.tick(known_active_turn=True) == Action.SHUTDOWN_UNCONFIRMED
+    assert supervisor.tick(known_active_turn=True) == Action.CLEANUP
     jobs.states[Role.REVIEW] = Observation(True, 0, True)
-    assert supervisor.tick() == Action.SHUTDOWN_UNCONFIRMED
+    assert supervisor.tick() == Action.HOLD
     assert jobs.started == [Role.VERIFIER, Role.REVIEW]
     assert jobs.interrupted == jobs.forced == [Role.REVIEW]
 

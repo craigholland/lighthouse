@@ -103,9 +103,11 @@ class OwnedJobs(Protocol):
 class Supervisor:
     """Drive one proof across separate jobs; invalid evidence can only hold."""
 
-    def __init__(self, clock: Callable[[], float], jobs: OwnedJobs) -> None:
+    def __init__(
+        self, clock: Callable[[], float], jobs: OwnedJobs, *, entered_at: float | None = None,
+    ) -> None:
         self._clock = clock
-        self._entered_at = clock()
+        self._entered_at = clock() if entered_at is None else entered_at
         self._timeline = Timeline(self._entered_at)
         self._jobs = jobs
         self._stage: Role | None = None
@@ -121,6 +123,11 @@ class Supervisor:
             self._result = Action.HOLD
             return
         self._start(Role.VERIFIER)
+
+    @property
+    def terminal(self) -> bool:
+        """True only when no further monitoring tick is required."""
+        return self._result is not None
 
     def tick(self, *, known_active_turn: bool = False) -> Action:
         """Take at most one nonblocking action; no external call runs in the parent."""
@@ -146,6 +153,13 @@ class Supervisor:
                     self._forced = True
             elif action == Action.INTERRUPT:
                 self._jobs.request_interrupt(stage)
+            elif (
+                action == Action.SHUTDOWN_UNCONFIRMED and now - self._entered_at < 900
+            ):
+                # Missing the review cleanup gate forbids publication, but
+                # do not abandon observation before the absolute deadline.
+                self._failed = True
+                return self._clean_failed_job(stage)
             elif action in (Action.HOLD, Action.SHUTDOWN_UNCONFIRMED):
                 if action == Action.SHUTDOWN_UNCONFIRMED and not self._forced:
                     # A late scheduler tick must not skip local containment cleanup.

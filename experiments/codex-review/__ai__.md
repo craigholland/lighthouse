@@ -18,7 +18,7 @@ not represent synthetic receipts as GitHub reviews.
 
 Save intent before an effect. Resolve ambiguity using attributed observations
 or hold; do not replay. Keep accepted scope fixed and separate receipt,
-acceptance and completion. Live execution is disabled.
+acceptance and completion. Live execution remains separately gated.
 
 ## Allowed Dependencies
 
@@ -29,7 +29,7 @@ the fixed harmless Python fixture and its descendants.
 
 ## Public API / Key Exports
 
-Local `proof.py --help` and `proof.py --dry-run`; no public package API.
+Local help/dry-run and separately held opt-in operator entry; no public package API.
 
 ## File Index
 
@@ -41,6 +41,8 @@ Local `proof.py --help` and `proof.py --dry-run`; no public package API.
 - [authorization.py](authorization.py): canonical packet, trusted evidence validation and claim.
 - [supervisor.py](supervisor.py): injected, deadline-bound control of distinct proof jobs.
 - [windows_job.py](windows_job.py): native Job Object operations scoped to the harmless fixture.
+- [live.py](live.py) and [live_stage.py](live_stage.py): gated role composition and private control.
+- [sdk_worker.py](sdk_worker.py) and [github_transport.py](github_transport.py): deferred, role-separated provider boundaries.
 - [README.md](README.md): offline capability report and disabled approval template.
 
 ## Known Gaps / Future-State Notes

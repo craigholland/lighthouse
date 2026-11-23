@@ -1,12 +1,16 @@
-"""Win32 containment for the fixed, harmless offline test fixture only."""
+"""Win32 containment for fixed Lighthouse child roles and the offline fixture."""
 
 import ctypes as c
 import os
 import subprocess
 import sys
+import sysconfig
 import time
 from ctypes import wintypes as w
 from pathlib import Path
+from typing import Literal
+
+from supervisor import Role
 
 _DWORD = w.DWORD
 _HANDLE = w.HANDLE
@@ -84,24 +88,32 @@ def _kernel() -> c.WinDLL:
     return k
 
 
-class FixtureJob:
-    """Own a single test job; never accepts a caller command or process ID."""
+class _OwnedProcess:
+    """Own one job and its process handle; never accepts a process ID."""
 
     def __init__(self) -> None:
         self._k = _kernel()
         self._job: int | None = None
         self._process: int | None = None
+        self._assigned = False
 
-    def start(self) -> None:
-        """Start the sibling Python fixture suspended; assign before resuming it."""
+    def _start(
+        self, arguments: list[str], environment: dict[str, str], *, interpreter: str = sys.executable,
+    ) -> None:
+        """Create suspended, assign to this job, and only then resume."""
         if self._job is not None:
-            raise RuntimeError("Fixture job already opened.")
-        executable = str(Path(sys.executable).resolve(strict=True))
-        fixture = str(Path(__file__).with_name("job_fixture.py").resolve(strict=True))
-        argv = c.create_unicode_buffer(subprocess.list2cmdline([executable, "-I", fixture]))
-        env = c.create_unicode_buffer(
-            "SystemRoot=" + os.environ["SystemRoot"] + "\0\0"
+            raise RuntimeError("Job already opened.")
+        executable = str(Path(interpreter).resolve(strict=True))
+        argv = c.create_unicode_buffer(subprocess.list2cmdline([executable, *arguments]))
+        if any(
+            "=" in key or not key or "\0" in key + value
+            for key, value in environment.items()
+        ):
+            raise RuntimeError("Invalid isolated child environment.")
+        block = "\0".join(
+            f"{key}={environment[key]}" for key in sorted(environment, key=str.casefold)
         )
+        env = c.create_unicode_buffer(block + "\0\0")
         startup = _Startup()
         startup.cb = c.sizeof(startup)
         process = _Process()
@@ -124,14 +136,14 @@ class FixtureJob:
             try:
                 if not self._k.AssignProcessToJobObject(self._job, self._process):
                     self._k.TerminateProcess(self._process, 1)
-                    self._k.WaitForSingleObject(self._process, 2000)
-                    raise RuntimeError("Fixture containment failed; never resumed.")
+                    raise RuntimeError("Owned worker containment failed; never resumed.")
+                self._assigned = True
                 if self._k.ResumeThread(process.thread) == 0xFFFFFFFF:
                     raise RuntimeError("Could not resume contained fixture.")
             finally:
                 self._k.CloseHandle(process.thread)
         except BaseException:
-            self.close()
+            # A partial start remains visible to supervisor cleanup.
             raise
 
     def active_count(self) -> int:
@@ -145,22 +157,30 @@ class FixtureJob:
 
     def force(self) -> None:
         """Terminate only the process tree belonging to this owned test job."""
+        if self._process and not self._assigned:
+            if not self.worker_exited() and not self._k.TerminateProcess(self._process, 1):
+                raise RuntimeError("Could not terminate the owned suspended worker.")
+            return
         if not self._job or not self._k.TerminateJobObject(self._job, 1):
-            raise RuntimeError("Could not terminate owned fixture job.")
+            raise RuntimeError("Could not terminate owned job.")
 
     def wait_quiescent(self, seconds: float) -> bool:
         """Require both retained worker-handle signal and zero active descendants."""
         deadline = time.monotonic() + seconds
         while time.monotonic() < deadline:
-            if not self._process:
-                return False
-            state = self._k.WaitForSingleObject(self._process, 0)
-            if state not in (0, 258):
-                raise RuntimeError("Could not observe fixture worker handle.")
-            if state == 0 and self.active_count() == 0:
+            if self.worker_exited() and self.active_count() == 0:
                 return True
             time.sleep(0.01)
         return False
+
+    def worker_exited(self) -> bool:
+        """Observe the retained worker handle without a blocking wait."""
+        if self._process is None:
+            return False
+        result = int(self._k.WaitForSingleObject(self._process, 0))
+        if result not in (0, 258):
+            raise RuntimeError("Could not observe worker handle.")
+        return result == 0
 
     def close(self) -> None:
         """Release handles; kill-on-close is fail-safe, not a shutdown receipt."""
@@ -168,5 +188,38 @@ class FixtureJob:
             self._k.CloseHandle(self._job)
             self._job = None
         if self._process:
+            if not self._assigned:
+                self._k.TerminateProcess(self._process, 1)
             self._k.CloseHandle(self._process)
             self._process = None
+
+
+
+class FixtureJob(_OwnedProcess):
+    """The native test can start only the fixed harmless sibling fixture."""
+
+    def start(self) -> None:
+        """Start the proof-owned Python-only fixture."""
+        fixture = str(Path(__file__).with_name("job_fixture.py").resolve(strict=True))
+        self._start(["-I", fixture], {"SystemRoot": os.environ["SystemRoot"]})
+
+
+class StageJob(_OwnedProcess):
+    """A fixed experiment worker, with an explicit role-specific environment."""
+
+    def start(self, role: Role | Literal["reverify"], control: Path, environment: dict[str, str]) -> None:
+        """Launch a known Lighthouse stage, not a configurable command."""
+        script = Path(__file__).with_name("live_stage.py").resolve(strict=True)
+        bootstrap = (
+            "import runpy,sys;sys.path.insert(0,sys.argv.pop(1));"
+            "sys.path.insert(1,sys.argv.pop(1));"
+            "runpy.run_path(sys.argv.pop(1),run_name='__main__')"
+        )
+        base_interpreter = getattr(sys, "_base_executable", None)
+        if not isinstance(base_interpreter, str) or not base_interpreter:
+            raise RuntimeError("Installed base interpreter unavailable.")
+        self._start(
+            ["-I", "-c", bootstrap, str(script.parent), sysconfig.get_path("purelib"),
+             str(script), str(role), str(control)],
+            environment, interpreter=base_interpreter,
+        )

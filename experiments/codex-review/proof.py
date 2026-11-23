@@ -2,6 +2,7 @@
 
 import argparse
 import sys
+import time
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Never
@@ -19,9 +20,21 @@ class OfflineParser(argparse.ArgumentParser):
 
 def main() -> int:
     """Run only with explicit dry-run; there is no live composition or fallback."""
+    entered = time.monotonic()
     parser = OfflineParser(description=__doc__, allow_abbrev=False)
-    parser.add_argument("--dry-run", action="store_true", help="exercise fake providers only")
+    modes = parser.add_mutually_exclusive_group()
+    modes.add_argument("--live", action="store_true", help=argparse.SUPPRESS)
+    modes.add_argument("--dry-run", action="store_true", help="exercise fake providers only")
     args = parser.parse_args()
+    if args.live:
+        from live import run
+
+        live_status = run(entered)
+        if live_status == 2:
+            parser.error("Operator configuration required.")
+        if live_status != 0:
+            print("Proof held; consult the authorized private receipt.", file=sys.stderr)
+        return live_status
     if not args.dry_run:
         parser.error("Only --dry-run is available; live execution is disabled.")
     fake = Fake()
