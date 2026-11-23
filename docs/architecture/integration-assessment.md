@@ -2,13 +2,15 @@
 title: "Lighthouse Integration Assessment"
 created_date: 2026-11-23
 update_date: 2026-11-23
-status: PROPOSED
+status: APPROVED
 ---
 
 # Lighthouse Integration Assessment
 
-This records evidence and candidates, not a completed integration. Read it with
-the [architecture proposal](proposal.md) and [initial plan](../development/initial-plan.md).
+Craig adopted this evidence and feasibility plan with the architecture and initial
+plan on 2026-11-23. Candidates remain conditional on the proofs below; approval
+does not establish a completed integration. Read it with the
+[system architecture](proposal.md) and [initial plan](../development/initial-plan.md).
 
 ## Observed bootstrap facts
 
@@ -59,7 +61,7 @@ draft protocol's polling or streaming modes. Event payloads are data; subscriber
 behavior comes from the user's authorized instructions.
 [MCP Events](https://developers.openai.com/plugins/build/mcp-events).
 
-Propose a small Dot adapter that exposes work availability and a claim/status
+Test a small Dot adapter that exposes work availability and a claim/status
 surface. Its claim is checked against the ledger and returns a stable dispatch
 identity. A notification acknowledgement is not proof of worker acceptance or
 completion. T02 must prove the full cloud-to-local chain and duplicate handling.
@@ -76,11 +78,11 @@ make a Codex session and a Dot session interchangeable.
 [Dot local access](https://learn.chatgpt.com/docs/enterprise/cloud-local-access).
 
 Do not create a tunnel, plugin connection, credential, public endpoint or paid
-resource under this proposal. Craig must approve the concrete setup when its
+resource under the architecture approval alone. Craig must approve the concrete setup when its
 requirements are known. If the candidate fails, record the blocker and return
 to Craig before selecting another transport.
 
-## GitHub observation candidate
+## GitHub observation strategy
 
 The repository activity feed can be delayed by up to six hours and is bounded
 by event count and age. It cannot be the sole completion or authorization source.
@@ -88,7 +90,7 @@ Reconcile current Issue/PR resources and attributed records instead.
 [GitHub Events API](https://docs.github.com/en/rest/activity/events).
 
 Use conditional reads, complete pagination, serialized requests, and server
-rate-limit/backoff instructions. Propose a 60-second initial interval, adjustable
+rate-limit/backoff instructions. Use a 60-second initial interval, adjustable
 within the shared installation budget and any endpoint minimum.
 [REST practices](https://docs.github.com/en/rest/using-the-rest-api/best-practices-for-using-the-rest-api),
 [rate limits](https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api).
@@ -101,9 +103,10 @@ application reconciliation path, without changing core rules.
 ## Proof gates
 
 Craig approved the feasibility-first stage in RQ-04 as part of the initial plan.
-Its sequence is approved; the capabilities below remain unproven. Final
-architecture/plan approval and concrete live-target/access approvals are still
-required before execution. Accepting this plan does not accept future proof results.
+Its sequence and overall architecture/plan are approved; the capabilities below
+remain unproven. Implementation waits for the planning PR to merge, and concrete
+live-target/access approvals remain required. Accepting this plan does not accept
+future proof results.
 
 RQ-05 approves controlled Lighthouse work for the proofs and Koios as the first
 real project. Its profile stays inactive until verified and approved for activation.
@@ -120,7 +123,7 @@ The [decision register](../decisions/open-questions.md) records who must resolve
 or explicitly delegate these gates. Product documentation is capability evidence;
 it is not proof that the complete Lighthouse integration has run.
 
-## Proposed agent boundary
+## Agent boundary to prove
 
 The application needs submission and observation of a durable dispatch. The
 proofs must validate this contract rather than expose provider SDK objects inward.

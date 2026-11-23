@@ -3,7 +3,8 @@
 ## Current scope
 
 The project currently contains governing documentation, bootstrap instructions,
-and proposed architecture/planning documents. There is no production package,
+and adopted architecture/planning documents with conditional integration
+candidates. There is no production package,
 application test suite, or CI pipeline. This contract describes checks that can
 actually run at this stage; it does not approve a future runtime architecture or
 dependency-management policy.
@@ -62,8 +63,8 @@ Write-Output ('Markdown file targets: PASS ({0} documents)' -f $markdownFiles.Co
 For standards adoption or later standards updates, compare the complete change
 with the approved source and explicitly authorized adaptations. Review each
 affected document as a whole to confirm its meaning remains intact. Architecture
-proposals must preserve the distinction between observed capability, proposed
-design, unresolved decisions and approved implementation authority.
+and planning documents must preserve the distinction between observed capability,
+approved design, unproven candidates and bounded implementation authority.
 
 ## Local environment readiness
 

@@ -13,16 +13,17 @@ This parent contract governs the current small documentation tree.
 
 ## Purpose
 
-Establish a reusable development-orchestration project's governing standards and
-contributor context before implementation. Record approved decisions alongside
-architecture and development-plan proposals, preserving their distinct authority.
+Maintain the governing standards, adopted architecture and initial plan for a
+reusable development-orchestration project. Distinguish approved design and
+delegated work from implemented behavior and demonstrated integration capability.
 
 ## Architectural Rules
 
 Apply [Craig Architecture](docs/architecture/standards/Craig-Architecture.md) and
-the approved role and branch binding in the [README](README.md). Preserve the
-distinction between adopted standards and proposed system design. Craig owns
-consequential decisions and specific merge authorizations.
+the approved role and branch binding in the [README](README.md), and the adopted
+[system architecture](docs/architecture/proposal.md) and
+[initial plan](docs/development/initial-plan.md). Craig owns consequential
+decisions and specific merge authorizations.
 
 The approved runtime baseline is one local Python process, TOML project profiles
 and a SQLite workflow ledger, with GitHub authoritative for repository facts.
@@ -31,8 +32,10 @@ readiness, dependencies, captured scope, priority and PR linkage. Codex selected
 its exact labels and fields under Craig's explicit delegation.
 The approved feasibility-first stage puts foundation and Codex/Dot proofs ahead
 of production orchestration. Its capabilities remain unproven; Craig must accept
-the evidence before production dispatch. Overall architecture/plan approval and
-applicable concrete live-target/access approvals are still required for execution.
+the evidence before engine construction and production dispatch. Craig approved
+the overall architecture/plan and delegated bounded task publication and compatible
+project-local version/pinning choices to Codex. Implementation waits for the
+planning PR to merge; concrete live-target/access approvals remain separate.
 The approved rollout uses controlled Lighthouse proof work and keeps Koios as the
 first real project, inactive until its bindings are verified and Craig approves
 activation. Concrete live targets require separate approval before execution.
@@ -47,8 +50,8 @@ core logic must remain independent of project profiles and concrete adapters.
 
 The current public surfaces are documentation and contributor instructions.
 There is no runtime package, CLI, configuration schema, or implemented adapter.
-The architecture package distinguishes approved intake conventions from proposed
-runtime contracts and their evidence gates.
+The architecture package defines approved design and intake contracts, including
+evidence gates for integration capabilities that remain unproven.
 
 ## File Index
 
@@ -58,22 +61,22 @@ runtime contracts and their evidence gates.
 - [docs/architecture/standards/](docs/architecture/standards/): the five adopted standards.
 - [docs/development/verification-contract.md](docs/development/verification-contract.md):
   runnable checks and their current evidence limits.
-- [docs/README.md](docs/README.md): index of the proposed architecture, integration
-  assessment, initial plan and decision register; none authorizes implementation.
+- [docs/README.md](docs/README.md): index of the adopted architecture, integration
+  assessment, initial plan, bounded delegation and decision register.
 - [docs/development/work-intake.md](docs/development/work-intake.md): approved
   admission policy and delegated intake conventions; not yet implemented.
 
 ## Known Gaps / Future-State Notes
 
-The remaining detailed architecture, initial plan, package layout, dependency
-management and supported runtime versions await overall adoption or the plan's
-proposed bounded delegation. The five policy questions are resolved; package
-approval and future evidence/live-execution gates are recorded in the
-[review register](docs/decisions/open-questions.md). Dedicated local Codex review
-sessions are accepted; SDK compatibility and Dot's full delivery/worker chain
-still require evidence. There is no application test suite or CI pipeline.
+The approved design has no runtime implementation yet. Compatible supported
+Python versions and reproducible dependency pins will be established during
+T00/T01 under Codex's bounded delegation. The five policy questions and overall
+adoption are resolved; future evidence/live-execution gates remain recorded in
+the [decision register](docs/decisions/open-questions.md). SDK compatibility and
+Dot's full delivery/worker chain still require evidence. There is no application
+test suite or CI pipeline.
 Ruff and mypy commands are not yet configured. Basic branch protections do not
-enforce the named reviewer or owner-only merging; proposed engine checks detect
+enforce the named reviewer or owner-only merging; planned engine checks detect
 violations and hold work. Stronger platform enforcement is outside the initial scope.
 
 ## Cross-Folder Contracts

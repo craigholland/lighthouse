@@ -5,15 +5,15 @@ The [project development profile](../README.md), [root local contract](../__ai__
 [current verification contract](development/verification-contract.md) govern the
 current documentation work.
 
-The following package remains **proposed** apart from the explicitly resolved
-choices in the review register: dedicated local Codex review sessions, the
-Python/TOML/SQLite baseline, the work-admission policy and the feasibility-first
-stage's planned sequence and the proof/project rollout policy. All five policy
-questions are resolved; the package still requires Craig's overall adoption and
-does not authorize implementation, live dispatch, new access grants, or an Issue
-backlog. Proof evidence and concrete live activation retain their future gates.
+Craig approved the following architecture and T00–T09 initial plan on 2026-11-23,
+including bounded delegation for Codex to define/publish task Issues and select
+compatible project-local versions and dependency pins. All five policy questions
+are resolved. Implementation starts after the planning PR merges into
+`development`; proof evidence, concrete live targets, new access/cost, activation,
+merges and releases retain their explicit owner gates. Approval describes design
+and authority, not a completed integration.
 
-- [Architecture proposal](architecture/proposal.md): responsibilities, state
+- [System architecture](architecture/proposal.md): responsibilities, state
   ownership, workflow safeguards, configuration, and a candidate source layout.
 - [Integration assessment](architecture/integration-assessment.md): current
   evidence, supported candidates, and the proof still required.
@@ -21,5 +21,5 @@ backlog. Proof evidence and concrete live activation retain their future gates.
   tasks, dependencies, acceptance, verification, and approval gates.
 - [Work intake contract](development/work-intake.md): approved admission policy
   and label/Issue-field conventions selected under Craig's delegation.
-- [Open Questions register](decisions/open-questions.md): resolved choices,
-  recommendations, and decisions that remain with Craig.
+- [Decision register](decisions/open-questions.md): adopted choices, approval
+  history and future execution/evidence gates.

@@ -2,35 +2,37 @@
 title: "Lighthouse Initial Development Plan"
 created_date: 2026-11-23
 update_date: 2026-11-23
-status: PROPOSED
+status: APPROVED
 ---
 
 # Lighthouse Initial Development Plan
 
-These are candidate task contracts for review, not published GitHub Issues or
-assignments. Follow the [architecture proposal](../architecture/proposal.md),
+Craig approved this T00–T09 plan and its bounded delegation on 2026-11-23. These
+task contracts are the basis for future Issues, not evidence of published Issues
+or active assignments. Follow the [system architecture](../architecture/proposal.md),
 [integration assessment](../architecture/integration-assessment.md), and
-[Open Questions register](../decisions/open-questions.md). No implementation is
-authorized by creating or merging this draft planning document.
+[decision register](../decisions/open-questions.md). Craig's explicit adoption
+grants plan authority; implementation starts after the planning PR merges into
+`development` and follows each task's readiness and execution gates.
 
 Craig approved the Python/TOML/SQLite baseline in RQ-02, the admission policy
 in RQ-03, the feasibility-first T00–T02 stage in RQ-04 and the rollout policy
 in RQ-05. The [work intake contract](work-intake.md) records delegated label and field
-conventions. The remaining detailed contracts, later task sequence and execution
-permissions below remain proposed; overall architecture/plan approval is pending.
+conventions. The contracts and sequence below are adopted design requirements;
+their implementation and integration evidence remain to be produced.
 
-## Proposed adoption and delegation
+## Adoption and delegation
 
-Overall adoption would authorize Codex to turn T00–T09 into bounded Issue
-contracts and coordinate their delivery in the sequence below. Codex proposes
-selecting compatible Python and project-local dependency versions, reproducible
-pinning/lock representation and SDK/runtime combinations during T00/T01, with
+Craig authorizes Codex to turn T00–T09 into bounded Issue contracts and coordinate
+their delivery in the sequence below. Codex may select compatible Python and
+project-local dependency versions, reproducible pinning/lock representation and
+SDK/runtime combinations during T00/T01, with
 documented compatibility evidence and independent review. These routine choices
 must preserve the approved Python/TOML/SQLite baseline and task scope; a need for
 a new machine-wide installation, external service, permission or cost returns to Craig.
 
-This delegation is not yet granted. Overall approval is distinct from the merge
-of the planning PR. Task implementation branches start from the approved baseline
+Craig granted this delegation on 2026-11-23. Overall approval is distinct from
+the merge of the planning PR. Task implementation branches start from the approved baseline
 on `development` after that PR merges. Concrete live targets, new connectivity or
 access, proof acceptance and Koios activation retain their explicit owner gates.
 No task receives permission to merge or release.
@@ -43,17 +45,17 @@ against `development`. Craig resolves consequential choices and personally merge
 approved PRs. A release promotion to `main` and its tag are separate owner actions.
 
 Use one active task per project. Do not begin the next task before the preceding
-PR actually merges. No implementation Issues are published until Craig approves
-the relevant architecture and initial plan, with open decisions resolved or
-explicitly delegated and bounded. Each future Issue must include its specific
-scope, source references, acceptance, verification and stop conditions.
+PR actually merges. Architecture/plan approval permits bounded Issue publication;
+it does not automatically mark any Issue ready or waive its prerequisites. Each
+Issue must include its specific scope, source references, acceptance, verification
+and stop conditions.
 
 The approved feasibility-first stage brings integration proofs ahead of the durable engine.
 This changes the bootstrap's tentative ordering because the cloud-to-local Dot
 path and external launch recovery could change the dispatch contract. The
 orchestration implementation should consume proven contracts.
 
-Every candidate task inherits these bounds: preserve the governing standards and
+Every task inherits these bounds: preserve the governing standards and
 existing consuming contracts; change only its listed surface family; exclude
 unrelated features, infrastructure and cleanup. Stop on a conflicting authority,
 unresolved task prerequisite, unsupported provider capability, or need for new
@@ -65,7 +67,9 @@ current PR head, evidence, findings and next actor for independent review.
 
 ### T00 — Runnable Python and verification foundation
 
-- **Depends on:** approval of this bounded foundation task and its runtime policy.
+- **Depends on:** the planning PR merged into `development` and a bounded T00
+  Issue contract authorized by Codex under the adopted plan. Compatible runtime
+  and dependency choices are delegated as described above.
 - **Surface:** `pyproject.toml`, one useful `src/lighthouse/` entry point, tests
   for import/entry-point side effects, and the verification/local contracts.
 - **Outcome:** an installable `src` package and configured pytest, Ruff and mypy.
@@ -108,8 +112,8 @@ current PR head, evidence, findings and next actor for independent review.
 
 **Gate A exit:** Craig accepts the capability evidence and any revised contracts.
 RQ-04 approves this stage's planned scope and sequence, not evidence that either
-integration works. Execution still requires final architecture/plan approval and
-the applicable concrete live-target and connectivity/access approvals. An
+integration works. Execution follows the adopted plan after the planning PR merges
+and still requires applicable concrete live-target and connectivity/access approvals. An
 inconclusive result returns to Craig for a revised design; do not substitute an
 unapproved transport or proceed into production dispatch.
 
@@ -120,8 +124,9 @@ An unsuccessful integration proof returns to design before engine construction.
 
 ### T03 — Configuration and project profile boundaries
 
-- **Depends on:** accepted Gate A evidence and approval of this bounded task's
-  profile schema. Admission conventions follow the approved work intake contract.
+- **Depends on:** accepted Gate A evidence and a bounded Issue contract defining
+  the profile schema within this architecture. Admission conventions follow the
+  approved work intake contract.
 - **Surface:** `configuration/`, inward-owned project policy/value types, inactive
   examples under `config/examples/` and `profiles/examples/`, Issue/PR intake
   templates under `.github/`, and their tests.
@@ -139,7 +144,7 @@ An unsuccessful integration proof returns to design before engine construction.
 
 ### T04 — Pure workflow rules and decision evidence
 
-- **Depends on:** T03 and the approved workflow in the architecture proposal.
+- **Depends on:** T03 and the approved workflow in the system architecture.
 - **Surface:** `domain/` workflow facts, decisions and transitions; focused tests.
 - **Outcome:** deterministic admission and transitions over supplied facts/time.
 - **Acceptance:** block unauthorized, blocked or dependency-incomplete Issues;
@@ -151,8 +156,9 @@ An unsuccessful integration proof returns to design before engine construction.
 
 ### T05 — SQLite ledger, reservation, audit and pending dispatch
 
-- **Depends on:** T04 and approval of this bounded task. SQLite is the approved
-  initial persistence adapter under RQ-02; its detailed contract remains proposed.
+- **Depends on:** T04 and the bounded Issue contract. SQLite is the approved
+  initial persistence adapter; implement and verify the adopted transaction
+  requirements through an application-owned contract.
 - **Surface:** application-owned storage contracts and `adapters/sqlite/`, schema
   versioning and persistence tests. No network calls inside transactions.
 - **Outcome:** atomically record state, one project reservation, audit evidence,
@@ -166,7 +172,7 @@ An unsuccessful integration proof returns to design before engine construction.
 
 ### T06 — GitHub current-state adapter and reconciliation
 
-- **Depends on:** T03–T05 and approval of this bounded task. Actor/readiness/linking
+- **Depends on:** T03–T05 and the bounded Issue contract. Actor/readiness/linking
   conventions follow the approved work intake contract.
 - **Surface:** `adapters/github/`, its normalized fact mapping and adapter tests.
 - **Outcome:** retrieve complete current Issue/PR/review/merge evidence using the
@@ -222,7 +228,7 @@ approval alone does not activate it.
 - **Depends on:** T03–T08, approved project bindings, and Craig-selected live work.
 - **Surface:** the private active project configuration, inactive public example,
   controlled integration scenarios and a delivery-evidence report.
-- **Outcome:** complete the first-outcome sequence in the architecture proposal
+- **Outcome:** complete the first-outcome sequence in the system architecture
   without Craig relaying handoff messages between agents.
 - **Acceptance:** authorization → Dot PR → exact-head Codex review → requested
   revision on that PR → fresh approval → awaiting Craig → actual Craig merge →
@@ -242,7 +248,7 @@ not need live credentials or launch agents. Live tests require an explicit
 target, permission boundary and cleanup plan; no production secrets in fixtures.
 
 T00 will configure the exact commands in the
-[verification contract](verification-contract.md). Proposed Python commands are
+[verification contract](verification-contract.md). Planned Python checks are
 pytest for behavior, Ruff for lint, and mypy for declared source scope. They are
 not current passing checks. Every PR records working directory, commands,
 results, checked commit, limitations, and the fresh review head.

@@ -1,22 +1,23 @@
 ---
-title: "Lighthouse Architecture Proposal"
+title: "Lighthouse System Architecture"
 created_date: 2026-11-23
 update_date: 2026-11-23
-status: PROPOSED
+status: APPROVED
 ---
 
-# Lighthouse Architecture Proposal
+# Lighthouse System Architecture
 
-This is a review proposal under [Craig Architecture](standards/Craig-Architecture.md).
-The [decision register](../decisions/open-questions.md) records adopted policy
-choices and remaining package/execution gates. Only decisions explicitly recorded
-as approved have been adopted.
+Craig approved this system architecture and the initial development plan on
+2026-11-23 under [Craig Architecture](standards/Craig-Architecture.md). This is an
+approved design, not a claim of implemented behavior. The
+[decision register](../decisions/open-questions.md) records adopted choices,
+bounded delegation and remaining execution/evidence gates.
 
 ## Product boundary and first outcome
 
 Lighthouse automates authorized development handoffs between independent agents,
 using GitHub as the shared coordination record. Craig keeps consequential decision
-and merge authority. Koios Cold is the first configured project; its rules,
+and merge authority. Koios Cold is the first real configured project; its rules,
 repository, workspaces, and verification commands belong to its profile.
 
 The first complete demonstration follows one authorized Issue through Dot's PR,
@@ -33,7 +34,7 @@ approves activation. Concrete live targets require his separate approval.
 
 Craig approved one local Python process, TOML project profiles, and a SQLite
 internal workflow ledger on 2026-11-23 (RQ-02). GitHub remains authoritative for
-repository facts. The remaining deployment details below are proposed.
+repository facts. The deployment details below are adopted as the initial design.
 
 Start with a headless process, explicit manual composition and a command-line
 operator surface.
@@ -41,7 +42,7 @@ Use one authoritative ledger for this deployment; coordination across independen
 ledger files or multiple hosts is outside the initial scope.
 Use the existing Python 3.14 environment for feasibility work; establish the
 supported runtime and pinned dependency set in T00. No source packages or
-runtime configuration are created by this proposal.
+runtime configuration are created by this documentation.
 
 SQLite supplies transactional local persistence; atomically committing a claim,
 transition, audit entry, and pending dispatch is a design requirement, to be
@@ -96,8 +97,8 @@ For managed dependencies, completion means a verified merged run. An unmanaged
 dependency needs an explicit Lead/Owner resolution before admission. Captured
 scope changes require renewed authorization before another dispatch. The
 [work intake contract](../development/work-intake.md) defines label names, Issue
-fields, dependency evidence and PR linkage under Craig's delegation. The detailed
-execution phases below remain proposed.
+fields, dependency evidence and PR linkage under Craig's delegation. The execution
+phases below are design requirements to verify before production dispatch.
 
 | Phase | Entry evidence | Next permitted action |
 | --- | --- | --- |
@@ -152,7 +153,7 @@ attention states. A worker becoming unavailable never silently abandons its task
 
 ## GitHub observation and identity
 
-Propose a configurable 60-second reconciliation interval, conditional requests,
+Use a configurable 60-second reconciliation interval, conditional requests,
 serialized API calls, complete pagination, and rate-limit-aware backoff. Refresh
 active PR heads and review/merge facts before consequential decisions. Startup
 and periodic complete reconciliation supplement overlapping incremental scans.
@@ -180,7 +181,7 @@ The existing broad App registrations are not an excuse for broad runtime tokens.
 
 GitHub's current basic protections do not themselves enforce the named Lead
 reviewer or Craig-only merging. Lighthouse must detect violations and hold work;
-this proposal does not claim a security boundary against an administrator or an
+this design does not claim a security boundary against an administrator or an
 independently misused App credential.
 
 ## Project profiles and candidate layout
@@ -215,7 +216,7 @@ config/examples/          inactive service examples
 Keep contracts focused on actual consumers. Use cohesive modules and informative
 docstrings; split by responsibility as the implementation earns boundaries. No
 generic helper collection, container framework, broker, server database, Docker
-deployment, or web frontend is proposed.
+deployment, or web frontend is included in the initial design.
 
 ## Operator experience and rollout
 
@@ -234,4 +235,4 @@ additional concurrency and an optional dashboard are later decisions.
 Craig approved the [initial plan's](../development/initial-plan.md) feasibility-first
 stage in RQ-04. Integration proofs precede production orchestration; their evidence
 and live activation remain behind explicit gates. Overall architecture/plan
-approval is still pending.
+approval is granted; implementation starts after the planning PR merges.
