@@ -13,8 +13,10 @@ assignments. Follow the [architecture proposal](../architecture/proposal.md),
 [Open Questions register](../decisions/open-questions.md). No implementation is
 authorized by creating or merging this draft planning document.
 
-Craig approved the Python/TOML/SQLite baseline in RQ-02. The task sequence,
-detailed contracts and execution permissions below remain proposed.
+Craig approved the Python/TOML/SQLite baseline in RQ-02 and the admission policy
+in RQ-03. The [work intake contract](work-intake.md) records delegated label and
+field conventions. The task sequence, remaining detailed contracts and execution
+permissions below remain proposed.
 
 ## Sequence and ownership
 
@@ -95,7 +97,8 @@ their existence in this document is not authority to run them.
 
 ### T03 — Configuration and project profile boundaries
 
-- **Depends on:** T00 and approved profile/authorization conventions.
+- **Depends on:** T00 and approval of this bounded task's profile schema. Admission
+  conventions are defined by the approved work intake contract.
 - **Surface:** `configuration/`, inward-owned project policy/value types, inactive
   examples under `config/examples/` and `profiles/examples/`, Issue/PR intake
   templates under `.github/`, and their tests.
@@ -105,7 +108,7 @@ their existence in this document is not authority to run them.
   workspace overlap, missing verification requirements and unsupported policies
   fail explicitly. Secret references resolve outside the repository; error output
   never includes secret values. An example cannot activate a live project. Intake
-  templates capture scope, dependencies, verification and PR linkage without
+  templates implement the work intake contract's fields, labels and PR linkage without
   automatically marking an unreviewed Issue ready. Codex establishes the agreed
   label mapping as a separate attributed setup action before live activation.
 - **Verification:** valid/invalid profile cases, deterministic defaults, isolation,
@@ -140,7 +143,8 @@ their existence in this document is not authority to run them.
 
 ### T06 — GitHub current-state adapter and reconciliation
 
-- **Depends on:** T03–T05 and approved actor/readiness/linking conventions.
+- **Depends on:** T03–T05 and approval of this bounded task. Actor/readiness/linking
+  conventions follow the approved work intake contract.
 - **Surface:** `adapters/github/`, its normalized fact mapping and adapter tests.
 - **Outcome:** retrieve complete current Issue/PR/review/merge evidence using the
   correct repository-scoped App identity and a bounded API budget.

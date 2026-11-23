@@ -24,6 +24,10 @@ and a SQLite workflow ledger on 2026-11-23. GitHub remains authoritative for
 repository facts. Other architecture decisions remain in the
 [review register](docs/decisions/open-questions.md).
 
+Craig also approved the work-admission policy and delegated exact labels and
+Issue fields to Codex. The [work intake contract](docs/development/work-intake.md)
+records those conventions; integration proof and live-activation decisions remain open.
+
 The [architecture and initial-plan package](docs/README.md) is now available for
 review. It is proposed, with unresolved decisions recorded explicitly; it does
 not authorize orchestration implementation or publication of its Issue backlog.

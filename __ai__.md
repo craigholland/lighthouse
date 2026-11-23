@@ -26,6 +26,9 @@ consequential decisions and specific merge authorizations.
 
 The approved runtime baseline is one local Python process, TOML project profiles
 and a SQLite workflow ledger, with GitHub authoritative for repository facts.
+The approved [work intake contract](docs/development/work-intake.md) governs
+readiness, dependencies, captured scope, priority and PR linkage. Codex selected
+its exact labels and fields under Craig's explicit delegation.
 
 ## Allowed Dependencies
 
@@ -37,7 +40,8 @@ core logic must remain independent of project profiles and concrete adapters.
 
 The current public surfaces are documentation and contributor instructions.
 There is no runtime package, CLI, configuration schema, or implemented adapter.
-The architecture package describes proposed contracts and their evidence gates.
+The architecture package distinguishes approved intake conventions from proposed
+runtime contracts and their evidence gates.
 
 ## File Index
 
@@ -49,6 +53,8 @@ The architecture package describes proposed contracts and their evidence gates.
   runnable checks and their current evidence limits.
 - [docs/README.md](docs/README.md): index of the proposed architecture, integration
   assessment, initial plan and decision register; none authorizes implementation.
+- [docs/development/work-intake.md](docs/development/work-intake.md): approved
+  admission policy and delegated intake conventions; not yet implemented.
 
 ## Known Gaps / Future-State Notes
 

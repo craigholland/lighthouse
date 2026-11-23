@@ -80,16 +80,18 @@ completion receipt is execution evidence; GitHub must confirm its claimed PR or 
 
 ## Workflow and admission
 
-Proposed admission requires an open Issue, a ready label applied by the configured
-Lead or Craig, no blocked marker, complete dependencies, a captured scope and
+The approved RQ-03 admission policy requires an open Issue, a ready label applied
+by the configured Lead or Craig, no blocked marker, complete dependencies, a captured scope and
 verification contract, and a free project reservation. Never infer authorization
 from arbitrary Issue text. Rank ready work deterministically using configured
 priority labels, then creation time and Issue number.
 
 For managed dependencies, completion means a verified merged run. An unmanaged
 dependency needs an explicit Lead/Owner resolution before admission. Captured
-scope changes require renewed authorization before another dispatch. These
-conventions are proposals requiring the RQ-03 decision.
+scope changes require renewed authorization before another dispatch. The
+[work intake contract](../development/work-intake.md) defines label names, Issue
+fields, dependency evidence and PR linkage under Craig's delegation. The detailed
+execution phases below remain proposed.
 
 | Phase | Entry evidence | Next permitted action |
 | --- | --- | --- |
