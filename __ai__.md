@@ -14,8 +14,8 @@ This parent contract governs the current small documentation tree.
 ## Purpose
 
 Establish a reusable development-orchestration project's governing standards and
-contributor context before its implementation architecture is approved. Record
-architecture and development-plan proposals without promoting them into authority.
+contributor context before implementation. Record approved decisions alongside
+architecture and development-plan proposals, preserving their distinct authority.
 
 ## Architectural Rules
 
@@ -23,6 +23,9 @@ Apply [Craig Architecture](docs/architecture/standards/Craig-Architecture.md) an
 the approved role and branch binding in the [README](README.md). Preserve the
 distinction between adopted standards and proposed system design. Craig owns
 consequential decisions and specific merge authorizations.
+
+The approved runtime baseline is one local Python process, TOML project profiles
+and a SQLite workflow ledger, with GitHub authoritative for repository facts.
 
 ## Allowed Dependencies
 
@@ -49,12 +52,13 @@ The architecture package describes proposed contracts and their evidence gates.
 
 ## Known Gaps / Future-State Notes
 
-The detailed architecture, initial plan, package layout, dependency management
-and runtime policy remain proposed. Their unresolved decisions and bounded
-delegations belong to the [review register](docs/decisions/open-questions.md).
-Dedicated local Codex review sessions are accepted; SDK compatibility and Dot's
-full delivery/worker chain still require evidence. There is no application test
-suite or CI pipeline. Ruff and mypy commands are not yet configured. Named
+The remaining detailed architecture, initial plan, package layout, dependency
+management and supported runtime versions remain proposed. Their unresolved
+decisions and bounded delegations belong to the
+[review register](docs/decisions/open-questions.md). Dedicated local Codex review
+sessions are accepted; SDK compatibility and Dot's full delivery/worker chain
+still require evidence. There is no application test suite or CI pipeline.
+Ruff and mypy commands are not yet configured. Named
 reviewer and owner-only merge enforcement remain unresolved.
 
 ## Cross-Folder Contracts

@@ -5,8 +5,11 @@ The [project development profile](../README.md), [root local contract](../__ai__
 [current verification contract](development/verification-contract.md) govern the
 current documentation work.
 
-The following package is **proposed** and requires Craig's review. It does not
-authorize implementation, live dispatch, new access grants, or an Issue backlog.
+The following package remains **proposed** apart from the explicitly resolved
+choices in the review register: dedicated local Codex review sessions and the
+Python/TOML/SQLite baseline. It requires Craig's review of the remaining decisions
+and does not authorize implementation, live dispatch, new access grants, or an
+Issue backlog.
 
 - [Architecture proposal](architecture/proposal.md): responsibilities, state
   ownership, workflow safeguards, configuration, and a candidate source layout.

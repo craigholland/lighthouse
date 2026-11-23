@@ -13,6 +13,9 @@ assignments. Follow the [architecture proposal](../architecture/proposal.md),
 [Open Questions register](../decisions/open-questions.md). No implementation is
 authorized by creating or merging this draft planning document.
 
+Craig approved the Python/TOML/SQLite baseline in RQ-02. The task sequence,
+detailed contracts and execution permissions below remain proposed.
+
 ## Sequence and ownership
 
 Codex owns scope, architectural integration and independent review. Dot implements
@@ -122,7 +125,8 @@ their existence in this document is not authority to run them.
 
 ### T05 — SQLite ledger, reservation, audit and pending dispatch
 
-- **Depends on:** T04 and approval of SQLite as the initial persistence adapter.
+- **Depends on:** T04 and approval of this bounded task. SQLite is the approved
+  initial persistence adapter under RQ-02; its detailed contract remains proposed.
 - **Surface:** application-owned storage contracts and `adapters/sqlite/`, schema
   versioning and persistence tests. No network calls inside transactions.
 - **Outcome:** atomically record state, one project reservation, audit evidence,

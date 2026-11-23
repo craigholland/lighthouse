@@ -23,10 +23,14 @@ Codex review, a revision on that PR, Craig's actual merge, and release of the ne
 eligible Issue. A second synthetic project profile proves isolation without a
 core-code change. Publishing a notification alone does not satisfy this outcome.
 
-## Proposed technical baseline
+## Technical baseline
 
-Use one headless Python process, TOML configuration, and a local SQLite ledger.
-Start with explicit manual composition and a command-line operator surface.
+Craig approved one local Python process, TOML project profiles, and a SQLite
+internal workflow ledger on 2026-11-23 (RQ-02). GitHub remains authoritative for
+repository facts. The remaining deployment details below are proposed.
+
+Start with a headless process, explicit manual composition and a command-line
+operator surface.
 Use one authoritative ledger for this deployment; coordination across independent
 ledger files or multiple hosts is outside the initial scope.
 Use the existing Python 3.14 environment for feasibility work; establish the

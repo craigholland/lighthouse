@@ -19,6 +19,11 @@ and its four supplements on 2026-11-23:
 These documents live in Lighthouse and use internal links. The detailed system
 architecture and initial implementation plan still require Craig's approval.
 
+Craig approved the baseline of one local Python process, TOML project profiles,
+and a SQLite workflow ledger on 2026-11-23. GitHub remains authoritative for
+repository facts. Other architecture decisions remain in the
+[review register](docs/decisions/open-questions.md).
+
 The [architecture and initial-plan package](docs/README.md) is now available for
 review. It is proposed, with unresolved decisions recorded explicitly; it does
 not authorize orchestration implementation or publication of its Issue backlog.
