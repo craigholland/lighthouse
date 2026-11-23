@@ -33,7 +33,9 @@ configuration is accepted.
   required before any fake COMMENT attempt. The stable marker, numeric actor
   bindings, repository/base/PR and head must match the returned receipt.
   Uncertain fake POST acknowledgement or loss of local receipt persistence
-  permits marker lookup, not another fake POST.
+  permits marker lookup, not another fake POST. A stale target does not erase
+  the persisted attempt. The original attributed receipt can be reconciled
+  separately without treating the current stale target as ready or posting again.
 - Timeouts, stale heads, unavailable capability, duplicate/out-of-order
   observations and uncertain cancel have conservative outcomes. A permission
   request holds for Craig. The journal is single writer, scratch-only and
@@ -47,6 +49,45 @@ configuration is accepted.
 - The CLI safety tests place import and audit fences around import/help/dry-run
   and disallowed live arguments; this is regression coverage, not an OS sandbox.
   The ordinary suite needs no credentials, network or Codex process.
+
+
+## Offline supervisor and authorization preparation
+
+The preparation contract is [Lead's pinned clarification](https://github.com/craigholland/lighthouse/issues/4#issuecomment-7116121458).
+This change exercises the fail-closed control and authorization boundaries
+without enabling an actual live invocation.
+
+- `supervisor.py` drives three injected job roles on one monotonic budget:
+  verifier cutoff 30s; interrupt 780s; force review 810s; review shutdown and
+  latest publication start 840s; force publisher 870s; hard failure at 900s
+  without confirmed local shutdown. The parent only observes or controls jobs.
+- `windows_job.py` is currently wired only to a fixed, harmless Python
+  fixture, not an arbitrary command, a PID, or the live SDK worker. The
+  native test observes the worker plus two descendant levels, forcibly
+  terminates only the owned job, and verifies the retained worker handle is
+  signaled and job active count is zero. Local process shutdown cannot prove
+  a provider stopped; unknown remote disposition cannot be replayed.
+- `authorization.py` checks a strict private packet plus a structured,
+  authenticated exact-comment attestation and fresh exact PR facts through
+  a trusted read-only transport boundary. Canonical SHA-256, unedited and
+  unexpired matching scope, exact numeric Lead/App identity and current PR
+  head are mandatory. Missing App attribution is a hold. It never resolves
+  a real transport, credentials, or a caller-supplied host. The canonical
+  private claim consumes the authorization's one launch allowance.
+- Original-head COMMENT receipt lookup is independent of current-head
+  freshness; a stale-target hold may keep historical attributed evidence
+  but cannot issue a second POST or advance the task.
+
+### Remaining implementation and live gates
+
+The offline-tested role controller and verifier do not instantiate a real
+Lead worker, authenticated GitHub transport, or COMMENT publisher. There
+is still no live command. Actual composition, privately configured trusted
+transport and receipt root, effective policy review, final packet approval,
+and fresh Lead readiness are required. During preparation the existing
+clarification's REST response did not supply App attribution; the verifier
+rejects that absence rather than trusting a display name. No claim is made
+that an actual future execution attestation will expose that required field.
 
 ## Candidate bridge for separate Phase B approval
 

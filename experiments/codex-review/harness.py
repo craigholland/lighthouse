@@ -69,6 +69,7 @@ class Record(BaseModel):
     phase: Literal["launch-intent", "accepted", "complete", "review-intent", "reviewed", "hold"]
     run: Run | None = None
     receipt: Receipt | None = None
+    review_intent_recorded: bool = False
     reason: Literal["launch-unknown", "permission", "unavailable", "rejected", "interrupted",
                     "cancel-unknown", "stale-target", "review-unknown"] | None = None
     next_actor: Literal["lead", "owner", "none"] = "lead"
@@ -188,14 +189,15 @@ class Proof:
         r = self._required(target)
         if r.phase == "reviewed":
             return r
-        pending = r.phase == "review-intent" or r.reason == "review-unknown"
+        pending = r.review_intent_recorded
         if r.phase != "complete" and not pending:
             return r
         try:
-            if not self.reviews.target_matches(target):
-                return self._hold(r, "stale-target")
+            fresh = self.reviews.target_matches(target)
         except (TimeoutError, ConnectionError):
             return self._hold(r, "review-unknown")
+        if not fresh and not pending:
+            return self._hold(r, "stale-target")
         if not pending:
             r = self._confirm(r, phase="review-intent")
         try:
@@ -209,7 +211,9 @@ class Proof:
                  receipt.reviewer, receipt.head, receipt.marker, receipt.kind) !=
                 (target.repository, target.base, target.pr, target.author,
                  target.reviewer, target.head, self._marker, "COMMENT")):
-            return self._hold(r, "review-unknown")
+            return self._hold(r, "review-unknown" if fresh else "stale-target")
+        if not fresh:
+            return self._hold(r.model_copy(update={"receipt": receipt}), "stale-target")
         return self._confirm(r, phase="reviewed", receipt=receipt, next_actor="none")
 
     def _bound(self, target: Target) -> Record | None:
@@ -233,6 +237,9 @@ class Proof:
         return self.journal.save(Record(fingerprint=record.fingerprint, phase=phase,
                                         confirmed="complete" if phase == "review-intent" else phase,
                                         run=run or record.run, receipt=receipt,
+                                        review_intent_recorded=(
+                                            record.review_intent_recorded or phase == "review-intent"
+                                        ),
                                         next_actor=next_actor))
 
     def _hold(
@@ -243,6 +250,7 @@ class Proof:
         return self.journal.save(Record(fingerprint=record.fingerprint, phase="hold",
                                         confirmed=record.confirmed,
                                         run=record.run, receipt=record.receipt,
+                                        review_intent_recorded=record.review_intent_recorded,
                                         reason=reason,
                                         next_actor="owner" if reason == "permission" else "lead"))
 

@@ -265,3 +265,27 @@ def test_cli_hides_scratch_path_on_failure(
     result = capsys.readouterr()
     assert not result.out
     assert result.err == "Offline proof could not use its scratch journal.\n"
+
+
+def test_ambiguous_comment_survives_head_change(tmp_path: Path) -> None:
+    """A head change cannot erase an ambiguous POST or enable a second one."""
+    f = Fake()
+    f.lost_post = True
+    j = Journal(tmp_path / "receipt.json")
+    t = target_a()
+    p = Proof(j, f, f)
+    p.dispatch(t)
+    p.observe(t)
+    assert p.publication(t).reason == "review-unknown"
+    assert f.receipt is not None
+    f.current_head = "b" * 40
+    restarted = Proof(j, f, f)
+    stale = restarted.publication(t)
+    assert stale.reason == "stale-target"
+    assert stale.receipt == f.receipt
+    assert stale.review_intent_recorded
+    assert f.posts == 1
+    # If the exact approved head is restored, resolve the old attempt by lookup.
+    f.current_head = t.head
+    assert Proof(j, f, f).publication(t).receipt == f.receipt
+    assert f.posts == 1

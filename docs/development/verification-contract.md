@@ -131,3 +131,8 @@ Do not run an executable from its runtime package. Any requests for a live
 runtime launch, sign-in, approval, real review or publication are out of
 scope here. The [experiment report](../../experiments/codex-review/README.md)
 describes the fake coverage and separate Phase B gate.
+
+The experiment test suite includes fake-clock role-cutoff and authenticated
+attestation tests, and on Windows one harmless Python-only Job Object test.
+The fixture verifies local containment and shutdown, never an SDK or remote
+provider lifecycle. The ordinary CLI does not start subprocesses.
