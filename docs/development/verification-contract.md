@@ -2,12 +2,7 @@
 
 ## Current scope
 
-The project currently contains governing documentation, bootstrap instructions,
-and adopted architecture/planning documents with conditional integration
-candidates. There is no production package,
-application test suite, or CI pipeline. This contract describes checks that can
-actually run at this stage; it does not approve a future runtime architecture or
-dependency-management policy.
+The project contains governing documentation and an installable Python CLI foundation. No orchestration engine, integration, or CI is configured.
 
 Run the following commands from the repository root in PowerShell. A failed
 command is a failed check. Record the checked commit and working-tree state in
@@ -66,28 +61,46 @@ affected document as a whole to confirm its meaning remains intact. Architecture
 and planning documents must preserve the distinction between observed capability,
 approved design, unproven candidates and bounded implementation authority.
 
-## Local environment readiness
+## Windows Python foundation
 
-In an existing project-local virtual environment, verify interpreter and tool
-readiness with:
+Use existing CPython 3.14.x on Windows AMD64. From the repository root, create
+a fresh `.venv` with that interpreter (`python -m venv .venv`). Run:
 
 ```powershell
 .\.venv\Scripts\python.exe --version
+.\.venv\Scripts\python.exe -m pip install --no-deps -r requirements-dev.lock
+.\.venv\Scripts\python.exe -m pip install --no-build-isolation --no-deps -e .
+.\.venv\Scripts\python.exe -m lighthouse --help
+.\.venv\Scripts\python.exe -m lighthouse --version
 .\.venv\Scripts\python.exe -m pip check
-.\.venv\Scripts\python.exe -m pytest --version
+.\.venv\Scripts\python.exe -m pytest -q
+.\.venv\Scripts\python.exe -m ruff check .
+.\.venv\Scripts\python.exe -m mypy src/lighthouse
 ```
 
-These commands establish environment readiness only. They do not run application
-tests or prove package installation reproducibility. Virtual environments and
-IDE configuration remain local and are not committed.
+Use a second, fresh venv created by the same interpreter in a new temporary
+directory outside the checkout. Run the same commands from the checkout with
+that venv's absolute Python path. Compare the two `python -m pip list
+--format=freeze` outputs by package and version; they must match. Also use the
+second venv from outside the repository root to run both `python -m lighthouse
+--help` and `python -m lighthouse --version`, without changing `PYTHONPATH`.
+Verify an invalid argument exits nonzero. Tests exercise these installed CLI
+paths and guard against integration side effects.
 
-## Future Python verification
+Record the exact checks and exit statuses, interpreter and tool versions,
+checked commit and tree state, and current review head in the PR. This is local
+verification, not CI or evidence of a live integration.
 
-The [Python guidance](../architecture/standards/Craig-Architecture-Python.md)
-names Ruff, mypy, and pytest as the normal baseline once configured. Their
-project dependencies, exact lint/type/test commands, and supported Python
-versions remain to be established in an approved implementation task.
+### Regenerate the development lock deliberately
 
-Do not report Ruff, mypy, or an application test suite as passing before those
-checks exist and have actually run. Update this contract and affected local
-contracts when that executable verification surface is introduced.
+In a clean scratch venv on the supported target, use the pip version pinned in
+the current lock (or review an intentional change to that pin). Resolve the
+build requirements and development extras listed in `pyproject.toml`, including
+their dependencies, against a trusted package index. Do not install Lighthouse
+in this resolver venv. Capture `python -m pip list --format=freeze`, review
+the resulting versions including pip and transitive dependencies, and update
+`requirements-dev.lock` with exact pins only. Update the declared direct
+requirements if their pins change. Never include local paths, credential-bearing
+index URLs, or editable entries. Validate by repeating the two fresh installs
+and checks above. This establishes version repeatability on the documented
+target, not a byte-identical or offline build guarantee.
