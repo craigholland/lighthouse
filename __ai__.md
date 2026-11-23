@@ -14,7 +14,8 @@ This parent contract governs the current small documentation tree.
 ## Purpose
 
 Establish a reusable development-orchestration project's governing standards and
-contributor context before its implementation architecture is approved.
+contributor context before its implementation architecture is approved. Record
+architecture and development-plan proposals without promoting them into authority.
 
 ## Architectural Rules
 
@@ -32,7 +33,8 @@ core logic must remain independent of project profiles and concrete adapters.
 ## Public API / Key Exports
 
 The current public surfaces are documentation and contributor instructions.
-There is no runtime package, CLI, configuration schema, or adapter contract yet.
+There is no runtime package, CLI, configuration schema, or implemented adapter.
+The architecture package describes proposed contracts and their evidence gates.
 
 ## File Index
 
@@ -42,13 +44,18 @@ There is no runtime package, CLI, configuration schema, or adapter contract yet.
 - [docs/architecture/standards/](docs/architecture/standards/): the five adopted standards.
 - [docs/development/verification-contract.md](docs/development/verification-contract.md):
   runnable checks and their current evidence limits.
+- [docs/README.md](docs/README.md): index of the proposed architecture, integration
+  assessment, initial plan and decision register; none authorizes implementation.
 
 ## Known Gaps / Future-State Notes
 
-The detailed architecture, roadmap, initial implementation plan, package layout,
-dependency management, and runtime support policy remain to be agreed. There is
-no application test suite or CI pipeline. Ruff and mypy commands are not yet
-configured. Named reviewer and owner-only merge enforcement remain unresolved.
+The detailed architecture, initial plan, package layout, dependency management
+and runtime policy remain proposed. Their unresolved decisions and bounded
+delegations belong to the [review register](docs/decisions/open-questions.md).
+Dedicated local Codex review sessions are accepted; SDK compatibility and Dot's
+full delivery/worker chain still require evidence. There is no application test
+suite or CI pipeline. Ruff and mypy commands are not yet configured. Named
+reviewer and owner-only merge enforcement remain unresolved.
 
 ## Cross-Folder Contracts
 
