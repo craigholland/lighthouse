@@ -7,9 +7,10 @@ current documentation work.
 
 The following package remains **proposed** apart from the explicitly resolved
 choices in the review register: dedicated local Codex review sessions, the
-Python/TOML/SQLite baseline and the work-admission policy. It requires Craig's
-review of the remaining decisions and does not authorize implementation, live
-dispatch, new access grants, or an Issue backlog.
+Python/TOML/SQLite baseline, the work-admission policy and the feasibility-first
+stage's planned sequence. It requires Craig's review of the remaining decisions
+and does not authorize implementation, live dispatch, new access grants, or an
+Issue backlog.
 
 - [Architecture proposal](architecture/proposal.md): responsibilities, state
   ownership, workflow safeguards, configuration, and a candidate source layout.

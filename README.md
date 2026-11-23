@@ -26,7 +26,10 @@ repository facts. Other architecture decisions remain in the
 
 Craig also approved the work-admission policy and delegated exact labels and
 Issue fields to Codex. The [work intake contract](docs/development/work-intake.md)
-records those conventions; integration proof and live-activation decisions remain open.
+records those conventions. He approved a feasibility-first stage for the initial
+plan: foundation, Codex review proof and Dot handoff proof before production
+orchestration. Integration capabilities remain unproven; execution and concrete
+live activation still require their applicable approvals.
 
 The [architecture and initial-plan package](docs/README.md) is now available for
 review. It is proposed, with unresolved decisions recorded explicitly; it does

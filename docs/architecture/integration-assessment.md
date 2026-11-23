@@ -100,6 +100,11 @@ application reconciliation path, without changing core rules.
 
 ## Proof gates
 
+Craig approved the feasibility-first stage in RQ-04 as part of the initial plan.
+Its sequence is approved; the capabilities below remain unproven. Final
+architecture/plan approval and concrete live-target/access approvals are still
+required before execution. Accepting this plan does not accept future proof results.
+
 | Gate | Required evidence | A failed or inconclusive result means |
 | --- | --- | --- |
 | Codex | Local session, exact-head review, actor identity, receipt/status and interruption behavior | Revise the adapter contract; no automated review dispatch |

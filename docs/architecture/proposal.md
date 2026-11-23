@@ -225,5 +225,7 @@ poll noise. Operator recovery must recheck authority and external state, without
 commands that manufacture approvals, merges, or completion. Windows autostart,
 additional concurrency and an optional dashboard are later decisions.
 
-The [initial plan](../development/initial-plan.md) front-loads integration proofs
-and keeps live activation behind explicit gates.
+Craig approved the [initial plan's](../development/initial-plan.md) feasibility-first
+stage in RQ-04. Integration proofs precede production orchestration; their evidence
+and live activation remain behind explicit gates. Overall architecture/plan
+approval is still pending.

@@ -13,10 +13,11 @@ assignments. Follow the [architecture proposal](../architecture/proposal.md),
 [Open Questions register](../decisions/open-questions.md). No implementation is
 authorized by creating or merging this draft planning document.
 
-Craig approved the Python/TOML/SQLite baseline in RQ-02 and the admission policy
-in RQ-03. The [work intake contract](work-intake.md) records delegated label and
-field conventions. The task sequence, remaining detailed contracts and execution
-permissions below remain proposed.
+Craig approved the Python/TOML/SQLite baseline in RQ-02, the admission policy
+in RQ-03 and the feasibility-first T00–T02 stage in RQ-04. The
+[work intake contract](work-intake.md) records delegated label and field
+conventions. The remaining detailed contracts, later task sequence and execution
+permissions below remain proposed; overall architecture/plan approval is pending.
 
 ## Sequence and ownership
 
@@ -31,7 +32,7 @@ the relevant architecture and initial plan, with open decisions resolved or
 explicitly delegated and bounded. Each future Issue must include its specific
 scope, source references, acceptance, verification and stop conditions.
 
-The proposed order brings integration feasibility ahead of the durable engine.
+The approved feasibility-first stage brings integration proofs ahead of the durable engine.
 This changes the bootstrap's tentative ordering because the cloud-to-local Dot
 path and external launch recovery could change the dispatch contract. The
 orchestration implementation should consume proven contracts.
@@ -90,8 +91,11 @@ current PR head, evidence, findings and next actor for independent review.
   permissions as a workaround. Return the concrete result to Craig.
 
 **Gate A exit:** Craig accepts the capability evidence and any revised contracts.
-The first plan approval must explicitly bound or delegate these experiments;
-their existence in this document is not authority to run them.
+RQ-04 approves this stage's planned scope and sequence, not evidence that either
+integration works. Execution still requires final architecture/plan approval and
+the applicable concrete live-target and connectivity/access approvals. An
+inconclusive result returns to Craig for a revised design; do not substitute an
+unapproved transport or proceed into production dispatch.
 
 ## Gate B — Deterministic orchestration foundation
 

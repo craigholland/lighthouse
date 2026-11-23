@@ -29,6 +29,10 @@ and a SQLite workflow ledger, with GitHub authoritative for repository facts.
 The approved [work intake contract](docs/development/work-intake.md) governs
 readiness, dependencies, captured scope, priority and PR linkage. Codex selected
 its exact labels and fields under Craig's explicit delegation.
+The approved feasibility-first stage puts foundation and Codex/Dot proofs ahead
+of production orchestration. Its capabilities remain unproven; Craig must accept
+the evidence before production dispatch. Overall architecture/plan approval and
+applicable concrete live-target/access approvals are still required for execution.
 
 ## Allowed Dependencies
 
