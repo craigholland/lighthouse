@@ -41,7 +41,7 @@ The [architecture and initial-plan package](docs/README.md) is approved. Codex m
 define and publish bounded task Issues and select compatible project-local
 versions and dependency pins within that plan. Implementation starts from the
 approved baseline on `development` after the planning PR merges; live execution
-retains its explicit task gates. The approved design has not yet been implemented.
+retains its explicit task gates. The orchestration design has not yet been implemented.
 
 ## Development profile
 
@@ -77,3 +77,22 @@ Read [agent instructions](AGENTS.md), the [root local contract](__ai__.md), and 
 [verification contract](docs/development/verification-contract.md) before changing
 the project. This repository is currently establishing its documentation and
 development foundation.
+
+## Install and verify the Python foundation
+
+Use an existing CPython 3.14.x (64-bit AMD64) on Windows. From the repository
+root in PowerShell, with that interpreter available as `python`:
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install --no-deps -r requirements-dev.lock
+.\.venv\Scripts\python.exe -m pip install --no-build-isolation --no-deps -e .
+.\.venv\Scripts\python.exe -m lighthouse --help
+.\.venv\Scripts\python.exe -m lighthouse --version
+```
+
+The CLI only shows help or the installed package version; unsupported arguments
+are rejected. It has no runtime third-party dependencies and does not start
+orchestration or contact providers. See the
+[verification contract](docs/development/verification-contract.md) for
+the test, lint, and type checks and the clean-room install procedure.

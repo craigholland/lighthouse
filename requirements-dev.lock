@@ -1,0 +1,17 @@
+# Windows AMD64, CPython 3.14.x; regenerate per the verification contract.
+ast-serialize==0.13.1
+colorama==0.4.6
+iniconfig==2.3.1
+librt==0.17.0
+mypy==2.4.1
+mypy-extensions==1.2.0
+packaging==26.3
+pathspec==1.1.1
+pip==25.3
+pluggy==1.7.0
+pygments==2.21.0
+pytest==9.2.0
+ruff==0.17.6
+setuptools==84.2.1
+typing-extensions==4.16.0
+wheel==0.48.0
