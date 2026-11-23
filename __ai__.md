@@ -8,7 +8,7 @@ verification evidence belongs to the PR and identifies its checked commit.
 ## Scope
 
 Tracked documentation, the Python foundation under `src/lighthouse/`, and its
-tests and packaging/tool configuration. Local virtual environments, IDE
+tests and packaging/tool configuration. The offline Codex review experiment has a narrower local contract. Local virtual environments, IDE
 settings, credentials, and Git internals are outside this scope.
 
 ## Purpose
@@ -37,7 +37,7 @@ implemented. Keep the foundation free of live integration behavior.
 The runtime depends only on the standard library. Build and development tools
 are version-pinned; see [pyproject.toml](pyproject.toml) and
 [requirements-dev.lock](requirements-dev.lock). Governing standards link
-within this repository and do not rely on another checkout.
+within this repository and do not rely on another checkout. The experiment pins its SDK separately and is not importable by the installed package.
 
 ## Public API / Key Exports
 
@@ -55,6 +55,7 @@ external resources or start work. No public Python API is defined.
 - [src/lighthouse/cli.py](src/lighthouse/cli.py): parses help and version arguments.
 - [tests/test_cli.py](tests/test_cli.py): tests the real installed entry point.
 - [docs/README.md](docs/README.md): index of the adopted architecture and plan.
+- [Codex review experiment](experiments/codex-review/__ai__.md): offline schema and recovery evidence; no live capability.
 - [Verification contract](docs/development/verification-contract.md): commands and evidence limits.
 
 ## Known Gaps / Future-State Notes

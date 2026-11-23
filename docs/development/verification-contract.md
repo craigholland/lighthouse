@@ -2,7 +2,7 @@
 
 ## Current scope
 
-The project contains governing documentation and an installable Python CLI foundation. No orchestration engine, integration, or CI is configured.
+The project contains governing documentation and an installable Python CLI foundation. The Codex review experiment is offline only; no orchestration engine, live integration, or CI is configured.
 
 Run the following commands from the repository root in PowerShell. A failed
 command is a failed check. Record the checked commit and working-tree state in
@@ -32,6 +32,7 @@ require review.
 $markdownFiles = @('README.md', 'AGENTS.md', '__ai__.md')
 $markdownFiles += @(Get-ChildItem -LiteralPath 'docs' -Recurse -File -Filter '*.md' |
     Select-Object -ExpandProperty FullName)
+$markdownFiles += @('experiments/codex-review/README.md', 'experiments/codex-review/__ai__.md')
 $brokenLinks = @(
     foreach ($file in $markdownFiles) {
         $resolved = (Get-Item -LiteralPath $file).FullName
@@ -104,3 +105,29 @@ requirements if their pins change. Never include local paths, credential-bearing
 index URLs, or editable entries. Validate by repeating the two fresh installs
 and checks above. This establishes version repeatability on the documented
 target, not a byte-identical or offline build guarantee.
+
+## Offline Codex review experiment
+
+From the repository root on Windows AMD64 with existing CPython 3.14.x, use
+a fresh experiment venv. The lock is separate from the foundation lock.
+
+```powershell
+python -m venv experiments/codex-review/.venv
+.\experiments\codex-review\.venv\Scripts\python.exe -m pip install --no-deps -r experiments/codex-review/requirements.lock
+.\experiments\codex-review\.venv\Scripts\python.exe -m pip install --no-build-isolation --no-deps -e .
+.\experiments\codex-review\.venv\Scripts\python.exe -m pip check
+.\experiments\codex-review\.venv\Scripts\python.exe -m pytest -q tests experiments/codex-review
+.\experiments\codex-review\.venv\Scripts\python.exe -m ruff check .
+.\experiments\codex-review\.venv\Scripts\python.exe -m mypy src/lighthouse experiments/codex-review
+.\experiments\codex-review\.venv\Scripts\python.exe experiments/codex-review/proof.py --help
+.\experiments\codex-review\.venv\Scripts\python.exe experiments/codex-review/proof.py --dry-run
+git diff --check origin/development...HEAD
+git diff --cached --check
+```
+
+Retain the foundation installed-module smoke from outside the checkout. The
+experiment's SDK package is installed for offline schema verification only.
+Do not run an executable from its runtime package. Any requests for a live
+runtime launch, sign-in, approval, real review or publication are out of
+scope here. The [experiment report](../../experiments/codex-review/README.md)
+describes the fake coverage and separate Phase B gate.
