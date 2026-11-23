@@ -105,6 +105,10 @@ Its sequence is approved; the capabilities below remain unproven. Final
 architecture/plan approval and concrete live-target/access approvals are still
 required before execution. Accepting this plan does not accept future proof results.
 
+RQ-05 approves controlled Lighthouse work for the proofs and Koios as the first
+real project. Its profile stays inactive until verified and approved for activation.
+Codex checks private bindings; Craig approves concrete live targets separately.
+
 | Gate | Required evidence | A failed or inconclusive result means |
 | --- | --- | --- |
 | Codex | Local session, exact-head review, actor identity, receipt/status and interruption behavior | Revise the adapter contract; no automated review dispatch |

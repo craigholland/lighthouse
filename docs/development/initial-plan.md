@@ -14,10 +14,26 @@ assignments. Follow the [architecture proposal](../architecture/proposal.md),
 authorized by creating or merging this draft planning document.
 
 Craig approved the Python/TOML/SQLite baseline in RQ-02, the admission policy
-in RQ-03 and the feasibility-first T00–T02 stage in RQ-04. The
-[work intake contract](work-intake.md) records delegated label and field
+in RQ-03, the feasibility-first T00–T02 stage in RQ-04 and the rollout policy
+in RQ-05. The [work intake contract](work-intake.md) records delegated label and field
 conventions. The remaining detailed contracts, later task sequence and execution
 permissions below remain proposed; overall architecture/plan approval is pending.
+
+## Proposed adoption and delegation
+
+Overall adoption would authorize Codex to turn T00–T09 into bounded Issue
+contracts and coordinate their delivery in the sequence below. Codex proposes
+selecting compatible Python and project-local dependency versions, reproducible
+pinning/lock representation and SDK/runtime combinations during T00/T01, with
+documented compatibility evidence and independent review. These routine choices
+must preserve the approved Python/TOML/SQLite baseline and task scope; a need for
+a new machine-wide installation, external service, permission or cost returns to Craig.
+
+This delegation is not yet granted. Overall approval is distinct from the merge
+of the planning PR. Task implementation branches start from the approved baseline
+on `development` after that PR merges. Concrete live targets, new connectivity or
+access, proof acceptance and Koios activation retain their explicit owner gates.
+No task receives permission to merge or release.
 
 ## Sequence and ownership
 
@@ -99,10 +115,13 @@ unapproved transport or proceed into production dispatch.
 
 ## Gate B — Deterministic orchestration foundation
 
+Enter this stage after Craig accepts Gate A's evidence and any revised contracts.
+An unsuccessful integration proof returns to design before engine construction.
+
 ### T03 — Configuration and project profile boundaries
 
-- **Depends on:** T00 and approval of this bounded task's profile schema. Admission
-  conventions are defined by the approved work intake contract.
+- **Depends on:** accepted Gate A evidence and approval of this bounded task's
+  profile schema. Admission conventions follow the approved work intake contract.
 - **Surface:** `configuration/`, inward-owned project policy/value types, inactive
   examples under `config/examples/` and `profiles/examples/`, Issue/PR intake
   templates under `.github/`, and their tests.
@@ -191,6 +210,12 @@ unapproved transport or proceed into production dispatch.
   notification, shutdown and status-reconciliation cases; controlled live proof.
 
 ## Gate D — First complete project demonstration
+
+RQ-05 establishes controlled Lighthouse work for the integration proofs and
+Koios as the first real configured project. Codex verifies the private project
+bindings and presents the exact live targets before execution. The Koios profile
+stays inactive until verification and Craig's activation approval; rollout-policy
+approval alone does not activate it.
 
 ### T09 — Approved Koios profile and end-to-end handoff
 

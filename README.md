@@ -4,7 +4,7 @@ Multi-Project AI Development Orchestrator.
 
 Lighthouse coordinates development handoffs between AI collaborators through
 GitHub, while preserving independent review and human ownership. It is a reusable
-platform; Koios Cold will be its first configured project.
+platform; Koios Cold will be its first real configured project.
 
 ## Governing architecture
 
@@ -21,8 +21,8 @@ architecture and initial implementation plan still require Craig's approval.
 
 Craig approved the baseline of one local Python process, TOML project profiles,
 and a SQLite workflow ledger on 2026-11-23. GitHub remains authoritative for
-repository facts. Other architecture decisions remain in the
-[review register](docs/decisions/open-questions.md).
+repository facts. The five policy decisions and remaining approval gates are in
+the [review register](docs/decisions/open-questions.md).
 
 Craig also approved the work-admission policy and delegated exact labels and
 Issue fields to Codex. The [work intake contract](docs/development/work-intake.md)
@@ -31,9 +31,14 @@ plan: foundation, Codex review proof and Dot handoff proof before production
 orchestration. Integration capabilities remain unproven; execution and concrete
 live activation still require their applicable approvals.
 
+The approved rollout uses controlled Lighthouse work for integration proofs and
+keeps Koios as the first real project, inactive until its profile is verified and
+approved for activation. Concrete live targets require separate approval.
+
 The [architecture and initial-plan package](docs/README.md) is now available for
-review. It is proposed, with unresolved decisions recorded explicitly; it does
-not authorize orchestration implementation or publication of its Issue backlog.
+overall adoption. Its five policy decisions are resolved, while the complete
+architecture and plan remain proposed. Implementation and Issue-backlog publication
+await that overall approval; live execution retains its explicit task gates.
 
 ## Development profile
 

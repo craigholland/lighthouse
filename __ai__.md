@@ -33,6 +33,9 @@ The approved feasibility-first stage puts foundation and Codex/Dot proofs ahead
 of production orchestration. Its capabilities remain unproven; Craig must accept
 the evidence before production dispatch. Overall architecture/plan approval and
 applicable concrete live-target/access approvals are still required for execution.
+The approved rollout uses controlled Lighthouse proof work and keeps Koios as the
+first real project, inactive until its bindings are verified and Craig approves
+activation. Concrete live targets require separate approval before execution.
 
 ## Allowed Dependencies
 
@@ -63,13 +66,15 @@ runtime contracts and their evidence gates.
 ## Known Gaps / Future-State Notes
 
 The remaining detailed architecture, initial plan, package layout, dependency
-management and supported runtime versions remain proposed. Their unresolved
-decisions and bounded delegations belong to the
+management and supported runtime versions await overall adoption or the plan's
+proposed bounded delegation. The five policy questions are resolved; package
+approval and future evidence/live-execution gates are recorded in the
 [review register](docs/decisions/open-questions.md). Dedicated local Codex review
 sessions are accepted; SDK compatibility and Dot's full delivery/worker chain
 still require evidence. There is no application test suite or CI pipeline.
-Ruff and mypy commands are not yet configured. Named
-reviewer and owner-only merge enforcement remain unresolved.
+Ruff and mypy commands are not yet configured. Basic branch protections do not
+enforce the named reviewer or owner-only merging; proposed engine checks detect
+violations and hold work. Stronger platform enforcement is outside the initial scope.
 
 ## Cross-Folder Contracts
 

@@ -8,8 +8,9 @@ status: PROPOSED
 # Lighthouse Architecture Proposal
 
 This is a review proposal under [Craig Architecture](standards/Craig-Architecture.md).
-The [Open Questions register](../decisions/open-questions.md) controls unresolved
-choices. Only decisions explicitly recorded as approved have been adopted.
+The [decision register](../decisions/open-questions.md) records adopted policy
+choices and remaining package/execution gates. Only decisions explicitly recorded
+as approved have been adopted.
 
 ## Product boundary and first outcome
 
@@ -22,6 +23,11 @@ The first complete demonstration follows one authorized Issue through Dot's PR,
 Codex review, a revision on that PR, Craig's actual merge, and release of the next
 eligible Issue. A second synthetic project profile proves isolation without a
 core-code change. Publishing a notification alone does not satisfy this outcome.
+
+Under the approved RQ-05 rollout policy, the earlier integration proofs use
+controlled Lighthouse work and Dot-authored PRs. Koios is the first real configured
+project and stays inactive until its private bindings are verified and Craig
+approves activation. Concrete live targets require his separate approval.
 
 ## Technical baseline
 

@@ -8,9 +8,10 @@ current documentation work.
 The following package remains **proposed** apart from the explicitly resolved
 choices in the review register: dedicated local Codex review sessions, the
 Python/TOML/SQLite baseline, the work-admission policy and the feasibility-first
-stage's planned sequence. It requires Craig's review of the remaining decisions
-and does not authorize implementation, live dispatch, new access grants, or an
-Issue backlog.
+stage's planned sequence and the proof/project rollout policy. All five policy
+questions are resolved; the package still requires Craig's overall adoption and
+does not authorize implementation, live dispatch, new access grants, or an Issue
+backlog. Proof evidence and concrete live activation retain their future gates.
 
 - [Architecture proposal](architecture/proposal.md): responsibilities, state
   ownership, workflow safeguards, configuration, and a candidate source layout.
