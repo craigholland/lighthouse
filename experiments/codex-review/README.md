@@ -170,3 +170,35 @@ references are reduced to repository-relative paths, and other machine-path
 references hold the output before publication. The publisher independently
 checks the sanitized text and never retries a held or ambiguous POST.
 These are fixture results, not evidence that the live roles were exercised.
+
+### Historical Phase B hold and offline diagnostics
+
+The [Lead outcome](https://github.com/craigholland/lighthouse/issues/4#issuecomment-7119574422)
+reports that the one authorized attempt at `ac2bbd05e06392f4d2afd95dbbf2caeac6b1f3be`
+consumed its claim, then stopped before review dispatch. No model review or
+trial COMMENT occurred. The retained evidence does not establish which startup
+check failed. The old authorization remains consumed; this revision grants no
+retry or approval.
+
+The review role records only fixed startup checkpoints, failure categories and
+a separate cleanup observation, correlated to the private dispatch, head and
+packet digest. It writes a failure before SDK cleanup; cleanup failure does
+not replace it. Raw SDK payloads, exception text, account details, paths and
+credentials are excluded. A checkpoint is not policy validation or an inference
+about the preceding real attempt.
+
+Offline inspection of the installed Python SDK's `client.py` and the runtime
+package shows the SDK resolves the bundled executable by package location, not
+by searching PATH. It prepends the package's helper directory to the narrowly
+allowlisted child environment. On the checked Windows package that helper
+directory does not supply Git; no general operator PATH is passed through.
+That observation is separate from the fresh-thread response: the pinned
+[rust-v0.171.0 snapshot builder](https://github.com/openai/codex/blob/rust-v0.171.0/codex-rs/app-server/src/request_processors/thread_processor.rs#L6851)
+initializes the Git annotation as absent, and the
+[thread/start response construction](https://github.com/openai/codex/blob/rust-v0.171.0/codex-rs/app-server/src/request_processors/thread_processor.rs#L1642-L1694)
+returns that thread without supplying it. Adding Git discovery is not shown to
+satisfy this response-level gate. Typed offline fixtures hold on absent/null
+annotation and on an incorrect identity. No toolchain binding, fallback or
+change to the exact-checkout proof is introduced. If separately authorized
+work requires a different data source, it must preserve the exact repository,
+head and effective policy checks; nothing here grants that authority.

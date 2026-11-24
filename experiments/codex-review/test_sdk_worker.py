@@ -13,7 +13,7 @@ from openai_codex.generated.v2_all import (
     ThreadStartResponse,
 )
 from openai_codex.models import InitializeResponse, JsonObject
-from sdk_worker import Completion, ReviewHold, interrupt_known, review
+from sdk_worker import Completion, ReviewHold, StartupOutcome, interrupt_known, review
 from test_authorization import packet_for
 
 _CONTEXT = b"Fixture diff. Evidence only."
@@ -26,7 +26,15 @@ class FakeClient:
         self.failure = failure
         self.events: list[str] = []
 
+    def start(self) -> None:
+        if self.failure == "sdk-start":
+            raise OSError("private fixture path")
+
     def initialize(self) -> InitializeResponse:
+        if self.failure == "initialize":
+            raise OSError("private fixture path")
+        if self.failure == "missing-runtime":
+            return InitializeResponse.model_validate({"serverInfo": None})
         return InitializeResponse.model_validate({"serverInfo": {
             "version": "0.170.0" if self.failure == "runtime" else "0.171.0",
         }})
@@ -38,7 +46,7 @@ class FakeClient:
         return GetAccountResponse.model_validate({"account": account, "requiresOpenaiAuth": True})
 
     def thread(self, turns: list[object]) -> dict[str, object]:
-        return {
+        payload: dict[str, object] = {
             "id": "fixture-thread", "sessionId": "fixture-session", "createdAt": 0,
             "updatedAt": 0, "cwd": str(self.root), "cliVersion": "0.171.0", "ephemeral": True,
             "modelProvider": "openai", "preview": "", "source": "cli",
@@ -49,8 +57,17 @@ class FakeClient:
                 "originUrl": "https://github.com/craigholland/lighthouse.git",
             },
         }
+        if self.failure == "missing-git":
+            del payload["gitInfo"]
+        elif self.failure == "null-git":
+            payload["gitInfo"] = None
+        elif self.failure == "null-sha":
+            payload["gitInfo"] = {"sha": None, "originUrl": "https://github.com/craigholland/lighthouse.git"}
+        return payload
 
     def thread_start(self, parameters: JsonObject) -> ThreadStartResponse:
+        if self.failure == "thread-start":
+            raise OSError("private fixture path")
         assert parameters["sandbox"] == "read-only"
         assert parameters["approvalPolicy"] == "never"
         assert parameters["approvalsReviewer"] == "user"
@@ -98,7 +115,10 @@ class FakeClient:
         self.events.append("close")
 
 
-def run_fake(root: Path, client: FakeClient, context: bytes = _CONTEXT) -> Completion:
+def run_fake(
+    root: Path, client: FakeClient, context: bytes = _CONTEXT, *,
+    on_startup: Callable[[StartupOutcome], None] = lambda _outcome: None,
+) -> Completion:
     packet = packet_for(root).model_copy(update={
         "context_sha256": hashlib.sha256(_CONTEXT).hexdigest(),
         "instructions_sha256": hashlib.sha256(_INSTRUCTIONS).hexdigest(),
@@ -119,6 +139,7 @@ def run_fake(root: Path, client: FakeClient, context: bytes = _CONTEXT) -> Compl
     return review(
         packet, context, _INSTRUCTIONS, workspace=root, managed_env={},
         before_review=before, on_started=started, interrupted=lambda: False, factory=factory,
+        on_startup=on_startup,
     )
 
 
@@ -216,3 +237,71 @@ def test_holds_before_review_if_recheck_denies(tmp_path: Path) -> None:
             interrupted=lambda: False, factory=lambda _path, _env, _attention: client,
         )
     assert client.events == ["close"]
+
+
+
+@pytest.mark.parametrize(("failure", "expected"), [
+    ("sdk-start", StartupOutcome.SDK_START_FAILED),
+    ("initialize", StartupOutcome.INITIALIZATION_FAILED),
+    ("missing-runtime", StartupOutcome.INITIALIZATION_FAILED),
+    ("runtime", StartupOutcome.INITIALIZATION_FAILED),
+    ("account", StartupOutcome.MANAGED_ACCOUNT_FAILED),
+    ("thread-start", StartupOutcome.THREAD_START_FAILED),
+    ("model", StartupOutcome.THREAD_VALIDATION_FAILED),
+    ("policy", StartupOutcome.THREAD_POLICY_FAILED),
+    ("network", StartupOutcome.THREAD_POLICY_FAILED),
+    ("missing-git", StartupOutcome.GIT_ANNOTATION_MISSING),
+    ("null-git", StartupOutcome.GIT_ANNOTATION_MISSING),
+    ("null-sha", StartupOutcome.GIT_ANNOTATION_MISSING),
+    ("head", StartupOutcome.GIT_IDENTITY_MISMATCH),
+    ("approval", StartupOutcome.PERMISSION_REQUESTED),
+])
+def test_worker_classifies_before_cleanup(
+    tmp_path: Path, failure: str, expected: StartupOutcome,
+) -> None:
+    client = FakeClient(tmp_path, failure)
+
+    def on_startup(outcome: StartupOutcome) -> None:
+        client.events.append(outcome.value)
+
+    with pytest.raises(ReviewHold) as caught:
+        run_fake(tmp_path, client, on_startup=on_startup)
+    assert "private fixture path" not in str(caught.value)
+    assert client.events[-4:] == [
+        expected.value, "cleanup_starting", "close", "cleanup_completed",
+    ]
+    assert "intent" not in client.events
+    assert "start" not in client.events
+
+
+def test_root_cause_persisted_before_failing_close(tmp_path: Path) -> None:
+    class FailingClose(FakeClient):
+        def close(self) -> None:
+            assert self.events == [
+                "sdk_starting", "initialization_starting", "initialization_failed",
+                "cleanup_starting",
+            ]
+            raise OSError("private fixture path")
+
+    client = FailingClose(tmp_path, "runtime")
+
+    with pytest.raises(ReviewHold, match="runtime does not match"):
+        run_fake(tmp_path, client, on_startup=lambda stage: client.events.append(stage.value))
+    assert client.events[-2:] == ["cleanup_starting", "cleanup_failed"]
+
+
+def test_successful_run_records_checkpoints_without_adding_effects(tmp_path: Path) -> None:
+    client = FakeClient(tmp_path)
+    outcomes: list[StartupOutcome] = []
+    run_fake(tmp_path, client, on_startup=outcomes.append)
+    assert outcomes == [
+        StartupOutcome.SDK_STARTING,
+        StartupOutcome.INITIALIZATION_STARTING,
+        StartupOutcome.MANAGED_ACCOUNT_CHECKING,
+        StartupOutcome.THREAD_STARTING,
+        StartupOutcome.THREAD_VALIDATING,
+        StartupOutcome.PRE_REVIEW_CHECKING,
+        StartupOutcome.CLEANUP_STARTING,
+        StartupOutcome.CLEANUP_COMPLETED,
+    ]
+    assert client.events == ["intent", "start", "ack", "close"]

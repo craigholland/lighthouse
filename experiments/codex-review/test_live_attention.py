@@ -55,7 +55,8 @@ def test_composed_hold_records_only_permission_attention(
             self.roles.append(role)
             self.role, self.control = role, control
             if role == Role.REVIEW:
-                with pytest.raises(sdk_worker.ReviewHold, match="local shutdown is not confirmed"):
+                primary = "permission request" if permission else "runtime does not match"
+                with pytest.raises(sdk_worker.ReviewHold, match=primary):
                     run_stage("review", control, env=environment, clock=lambda: 0.0,
                               parent_pid=os.getpid)
             else:
@@ -71,6 +72,17 @@ def test_composed_hold_records_only_permission_attention(
     [control] = (tmp_path / "receipt").glob("t01-private-*")
     assert not (control / "review.result.json").exists()
     assert not (control / "review.shutdown.json").exists()
+    primary_diagnostic = control / "review.startup.json"
+    cleanup_diagnostic = control / "review.cleanup.json"
+    startup = read_signal(primary_diagnostic)
+    cleanup = read_signal(cleanup_diagnostic)
+    assert startup["outcome"] == ("permission_requested" if permission else "initialization_failed")
+    assert cleanup["outcome"] == "cleanup_failed"
+    assert {k: v for k, v in startup.items() if k != "outcome"} == {
+        k: v for k, v in cleanup.items() if k != "outcome"
+    }
+    assert all("private provider detail" not in path.read_text(encoding="utf-8")
+               for path in (primary_diagnostic, cleanup_diagnostic))
     attention = control / "review.attention.json"
     assert attention.exists() == permission
     if permission:

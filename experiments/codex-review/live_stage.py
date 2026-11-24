@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING, Literal, Protocol
 
 if TYPE_CHECKING:
     from authorization import ExecutionPacket, VerifiedExecution
+    from sdk_worker import StartupOutcome
 
 Role = Literal["verifier", "review", "reverify", "publisher"]
 ROLES = frozenset(("verifier", "review", "reverify", "publisher"))
@@ -142,6 +143,7 @@ class ReviewCall(Protocol):
         workspace: Path, managed_env: dict[str, str],
         before_review: Callable[[str], None], on_started: Callable[[str, str], None],
         interrupted: Callable[[], bool], on_attention: Callable[[], None],
+        on_startup: Callable[[StartupOutcome], None],
     ) -> CompletionLike: ...
 
 
@@ -236,7 +238,7 @@ def _default_review(
     packet: ExecutionPacket, context: bytes, instructions: bytes, *,
     workspace: Path, managed_env: dict[str, str], before_review: Callable[[str], None],
     on_started: Callable[[str, str], None], interrupted: Callable[[], bool],
-    on_attention: Callable[[], None],
+    on_attention: Callable[[], None], on_startup: Callable[[StartupOutcome], None],
 ) -> CompletionLike:
     from sdk_worker import review
 
@@ -246,7 +248,7 @@ def _default_review(
     return review(
         packet, context, instructions, workspace=workspace, managed_env=managed_env,
         before_review=before_review, on_started=on_started, interrupted=interrupted,
-        on_attention=on_attention,
+        on_attention=on_attention, on_startup=on_startup,
     )
 
 
@@ -396,11 +398,25 @@ def run_stage(
                     result("review.attention.json", reason="permission-request", next_actor="owner")
                     attention_recorded = True
 
+        diagnostic_lock = Lock()
+
+        def on_startup(outcome: StartupOutcome) -> None:
+            # A diagnostic is evidence only: it is never an authority or success receipt.
+            from sdk_worker import StartupOutcome
+
+            if not isinstance(outcome, StartupOutcome):
+                raise StageHold("Unknown private startup outcome.")
+            name = "review.cleanup.json" if outcome.value.startswith("cleanup_") else "review.startup.json"
+            with diagnostic_lock:
+                write_signal(control / name, {
+                    **base, "dispatch_id": packet.dispatch_id, "outcome": outcome.value,
+                })
+
         completed = (review_call or _default_review)(
             packet, context, instructions, workspace=request.workspace,
             managed_env={key.upper(): value for key, value in env.items() if key.upper() in MANAGED},
             before_review=before_review, on_started=on_started, interrupted=interrupted,
-            on_attention=on_attention,
+            on_attention=on_attention, on_startup=on_startup,
         )
         if (
             matched_thread is None or matched_turn is None or completed.thread_id != matched_thread

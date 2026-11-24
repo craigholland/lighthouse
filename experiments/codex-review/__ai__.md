@@ -58,3 +58,8 @@ its SDK to the foundation runtime/dev lock.
 
 Use the [project verification contract](../../docs/development/verification-contract.md)
 from the repository root and record which exact head was checked.
+
+The diagnostic revision adds fixed, private startup and cleanup observations
+to the review role. These records are not inputs to authorization, the SDK
+prompt, the public review, or publication. A missing or mismatched Git
+annotation remains a hold. The historical Phase B claim remains consumed.

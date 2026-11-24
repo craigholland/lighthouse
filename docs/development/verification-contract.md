@@ -140,3 +140,12 @@ provider lifecycle. The ordinary CLI does not start subprocesses.
 The same offline suite exercises the operator entry and private child roles
 through injected job, transport and SDK doubles. Do not supply real operator
 settings or execute the opt-in entry as part of preparation verification.
+
+For the offline startup diagnostics, cover startup, initialization/runtime,
+managed account, thread start and policy/identity validation, permission hold
+and SDK close failure using fresh synthetic inputs. Verify private records are
+correlated to dispatch, exact head and packet digest, and the primary reason is
+present before close and unchanged if close fails. Assert no review intent,
+model call or publisher effect on these early holds. Tool discovery checks
+must use installed source or inert package metadata only; do not execute the
+bundled runtime.

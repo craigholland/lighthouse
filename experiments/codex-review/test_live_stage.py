@@ -24,6 +24,7 @@ from live_stage import (
     run_stage,
     write_signal,
 )
+from sdk_worker import StartupOutcome
 
 NONCE = "b" * 64
 ENV = {CHALLENGE: NONCE, PARENT: "123", "SYSTEMROOT": "windows"}
@@ -98,13 +99,13 @@ def test_stage_chain_uses_one_claim_fresh_thread_authority_and_separate_publish(
         p: ExecutionPacket, context: bytes, instructions: bytes, *,
         workspace: Path, managed_env: dict[str, str], before_review: Callable[[str], None],
         on_started: Callable[[str, str], None], interrupted: Callable[[], bool],
-        on_attention: Callable[[], None],
+        on_attention: Callable[[], None], on_startup: Callable[[StartupOutcome], None],
     ) -> Completed:
         assert p == packet
         assert workspace == (tmp_path / "verified").resolve()
         assert context and instructions
         assert managed_env == {"SYSTEMROOT": "windows"}
-        assert not interrupted() and callable(on_attention)
+        assert not interrupted() and callable(on_attention) and callable(on_startup)
         before_review("thread")
         on_started("thread", "turn")
         return Completed("thread", "turn", packet.head, "Synthetic findings")
@@ -156,6 +157,50 @@ def test_stage_chain_uses_one_claim_fresh_thread_authority_and_separate_publish(
             "verifier", control, env=ENV, clock=lambda: 106, parent_pid=lambda: 123,
             verify_call=_verify,
         )
+
+
+def test_startup_failure_survives_separate_cleanup_without_unlocking_effects(tmp_path: Path) -> None:
+    control, packet = _workspace(tmp_path)
+    run_stage(
+        "verifier", control, env=ENV, clock=lambda: 102, parent_pid=lambda: 123,
+        verify_call=_verify,
+    )
+
+    def failed_review(
+        _packet: ExecutionPacket, _context: bytes, _instructions: bytes, /, *,
+        on_startup: Callable[[StartupOutcome], None], **_kwargs: object,
+    ) -> Completed:
+        on_startup(StartupOutcome("thread_start_failed"))
+        primary = read_signal(control / "review.startup.json")
+        for observation in ("cleanup_starting", "cleanup_failed"):
+            on_startup(StartupOutcome(observation))
+        assert read_signal(control / "review.startup.json") == primary
+        raise StageHold("Fake startup failed.")
+
+    with pytest.raises(StageHold, match="Fake startup failed"):
+        run_stage(
+            "review", control, env=ENV, clock=lambda: 103, parent_pid=lambda: 123,
+            review_call=failed_review,
+        )
+
+    binding = {
+        "challenge": NONCE, "head": packet.head, "dispatch_id": packet.dispatch_id,
+        "packet_sha256": hashlib.sha256(canonical_packet(packet)).hexdigest(),
+    }
+    assert read_signal(control / "review.startup.json") == {**binding, "outcome": "thread_start_failed"}
+    assert read_signal(control / "review.cleanup.json") == {**binding, "outcome": "cleanup_failed"}
+    for name in ("ready", "intent", "started", "result"):
+        assert not (control / f"review.{name}.json").exists()
+
+    def forbidden_publish(*_: object, **__: object) -> int:
+        pytest.fail("A diagnostic must not unlock publishing.")
+
+    with pytest.raises(StageHold, match="unavailable"):
+        run_stage(
+            "publisher", control, env=ENV, clock=lambda: 104, parent_pid=lambda: 123,
+            verify_call=_verify, publish_call=forbidden_publish,
+        )
+    assert not (control / "publisher.result.json").exists()
 
 
 def test_private_role_rejects_missing_parent_or_review_credential_pointer(tmp_path: Path) -> None:
