@@ -221,3 +221,23 @@ the approved working directory and effective read-only/deny-all policy.
 Absent annotation cannot substitute for this proof; any conflicting supplied
 identity holds. Proof failures are sanitized and stop before review dispatch.
 No real client or trial COMMENT was executed for this correction.
+
+### Snapshot admission and inert operator preflight
+
+The [replacement attempt outcome](https://github.com/craigholland/lighthouse/issues/4#issuecomment-7136211698)
+records that the run at `4a007e21bd8eaf8eec8f51afb355b2a48f2dd446`
+consumed its claim and held before review dispatch. Its 301,566-byte context
+and 99,397-byte instructions exceeded the old worker-only 64,000-byte cap.
+That historical packet remains consumed and this revision authorizes no retry.
+
+For inert private preflight, call `live.load_request(config_path, command)`
+using the exact prospective operator config and command. It reads and validates
+the immutable snapshot bytes without starting a job, contacting GitHub,
+opening a credential, or granting authority. Entry, contained review stage
+and worker use the same inclusive limits: 524,288 UTF-8 bytes for complete
+context and 262,144 for governing instructions. Both must be nonempty,
+nonblank valid UTF-8, free of NUL, and match the approved SHA-256 values.
+Nothing is truncated. Invalid initial material holds before verification or
+claim; invalid material independently observed after copy retains a fixed
+private correlated rejection code without raw exception or snapshot content.
+The bounds are verified offline, not evidence of provider/model capacity.

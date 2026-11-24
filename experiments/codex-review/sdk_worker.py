@@ -1,5 +1,4 @@
 """Pinned Codex review worker; run only inside the approved, owned child job."""
-import hashlib
 import json
 import os
 import re
@@ -22,6 +21,12 @@ from openai_codex.generated.v2_all import (
 )
 from openai_codex.models import InitializeResponse, JsonObject
 from review_paths import ReviewPathError, sanitize_review_paths
+from snapshots import (
+    CONTEXT_LIMIT,
+    INSTRUCTIONS_LIMIT,
+    SnapshotError,
+    validate_snapshot,
+)
 
 _SAFE_ENV = frozenset({
     "SYSTEMROOT", "WINDIR", "USERPROFILE", "HOME", "CODEX_HOME",
@@ -38,6 +43,7 @@ _ORIGINS = {
 class StartupOutcome(StrEnum):
     """Bounded operational evidence codes; never include provider exception text."""
 
+    SNAPSHOT_VALIDATION_FAILED = auto()
     SDK_STARTING = auto()
     SDK_START_FAILED = auto()
     INITIALIZATION_STARTING = auto()
@@ -162,15 +168,6 @@ def open_review_client(workspace: Path, managed_env: dict[str, str],
     return _SdkClient(workspace, managed_env, on_attention)
 
 
-def _decode_snapshot(data: bytes, expected: str) -> str:
-    if not 0 < len(data) <= 64_000 or hashlib.sha256(data).hexdigest() != expected:
-        raise ReviewHold("Approved review snapshot does not match.")
-    text = data.decode("utf-8")
-    if not text.strip() or "\0" in text:
-        raise ReviewHold("Approved review snapshot is invalid.")
-    return text
-
-
 class _ThreadHold(ReviewHold):
     def __init__(self, outcome: StartupOutcome) -> None:
         super().__init__("Effective review settings or checkout identity do not match.")
@@ -266,8 +263,13 @@ def review(
 ) -> Completion:
     """Review once, with a pre-effect authority callback and private attribution."""
     try:
-        external = _decode_snapshot(context, packet.context_sha256)
-        trusted = _decode_snapshot(instructions, packet.instructions_sha256)
+        external = validate_snapshot(context, packet.context_sha256, CONTEXT_LIMIT)
+        trusted = validate_snapshot(instructions, packet.instructions_sha256, INSTRUCTIONS_LIMIT)
+    except SnapshotError:
+        on_startup(StartupOutcome.SNAPSHOT_VALIDATION_FAILED)
+        raise ReviewHold("Approved review snapshot is invalid.") from None
+
+    try:
         if {key.upper() for key in managed_env} - _SAFE_ENV or interrupted():
             raise ReviewHold("Managed review environment or deadline is invalid.")
         root = workspace.resolve(strict=True)

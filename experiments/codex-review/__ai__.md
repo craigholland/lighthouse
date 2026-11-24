@@ -66,3 +66,5 @@ checkout proof holds, as does a conflicting provider Git annotation. The
 [checkout verifier](checkout_proof.py) runs fixed read-only Git operations
 with a private canonical operator binding; it does not grant authority.
 The historical Phase B claim remains consumed.
+
+The shared [snapshot admission validator](snapshots.py) governs inert preflight, operator entry, copied private review input, and worker. It validates approved UTF-8 bytes without changing or trimming them. Keep admission before the claim and record only the fixed correlated diagnostic for copied-input rejection.

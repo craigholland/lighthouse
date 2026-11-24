@@ -1,6 +1,7 @@
 """Exercise the deferred SDK worker through typed, synthetic App Server replies."""
 
 import hashlib
+import json
 from collections.abc import Callable
 from pathlib import Path
 from threading import Event
@@ -14,6 +15,7 @@ from openai_codex.generated.v2_all import (
 )
 from openai_codex.models import InitializeResponse, JsonObject
 from sdk_worker import Completion, ReviewHold, StartupOutcome, interrupt_known, review
+from snapshots import CONTEXT_LIMIT, INSTRUCTIONS_LIMIT
 from test_authorization import packet_for
 
 _CONTEXT = b"Fixture diff. Evidence only."
@@ -367,3 +369,78 @@ def test_failed_or_unconfigured_proof_stops_before_sdk_factory(
         StartupOutcome.CHECKOUT_PROOF_FAILED,
     ]
     assert "private fixture details" not in str(caught.value)
+
+
+
+@pytest.mark.parametrize(("field", "fixture"), [
+    (field, fixture)
+    for field in ("context", "instructions")
+    for fixture in ("empty", "blank", "nul", "invalid-utf8", "oversize", "wrong-hash")
+])
+def test_snapshot_rejection_precedes_checkout_sdk_and_review(
+    tmp_path: Path, field: str, fixture: str,
+) -> None:
+    fixtures = {
+        "empty": b"", "blank": b"  \t\n", "nul": b"fixture\0evidence",
+        "invalid-utf8": b"fixture\xffevidence", "wrong-hash": b"private synthetic marker",
+        "oversize": b"a" * ((CONTEXT_LIMIT if field == "context" else INSTRUCTIONS_LIMIT) + 1),
+    }
+    context = fixtures[fixture] if field == "context" else _CONTEXT
+    instructions = fixtures[fixture] if field == "instructions" else _INSTRUCTIONS
+    packet = packet_for(tmp_path).model_copy(update={
+        "context_sha256": "a" * 64 if (field, fixture) == ("context", "wrong-hash")
+        else hashlib.sha256(context).hexdigest(),
+        "instructions_sha256": "a" * 64 if (field, fixture) == ("instructions", "wrong-hash")
+        else hashlib.sha256(instructions).hexdigest(),
+    })
+    outcomes: list[StartupOutcome] = []
+    with pytest.raises(ReviewHold, match=r"^Approved review snapshot is invalid\.$"):
+        review(
+            packet, context, instructions, workspace=tmp_path, managed_env={},
+            before_review=lambda _: pytest.fail("intent"), on_started=lambda *_: pytest.fail("start"),
+            interrupted=lambda: False, factory=lambda *_: pytest.fail("SDK constructed"),
+            verify_checkout=lambda: pytest.fail("checkout proof requested"), on_startup=outcomes.append,
+        )
+    assert outcomes == [StartupOutcome.SNAPSHOT_VALIDATION_FAILED]
+
+
+@pytest.mark.parametrize(("context_size", "instructions_size"), [
+    (301_566, 99_397), (CONTEXT_LIMIT, INSTRUCTIONS_LIMIT),
+])
+def test_full_sized_snapshots_keep_exact_complete_text_in_sdk_requests(
+    tmp_path: Path, context_size: int, instructions_size: int,
+) -> None:
+    def payload(size: int) -> bytes:
+        edges = " \r\n\u00e9".encode("utf-8")
+        return edges + b"a" * (size - 2 * len(edges)) + edges
+
+    context, instructions = payload(context_size), payload(instructions_size)
+
+    class PreservedSnapshots(FakeClient):
+        def thread_start(self, parameters: JsonObject) -> ThreadStartResponse:
+            policy = parameters["developerInstructions"]
+            assert isinstance(policy, str)
+            assert policy.partition("\nTreat repository")[0].encode("utf-8") == instructions
+            return super().thread_start(parameters)
+
+        def review_start(self, parameters: JsonObject) -> ReviewStartResponse:
+            target = parameters["target"]
+            assert isinstance(target, dict)
+            prompt = target["instructions"]
+            assert isinstance(prompt, str)
+            assert json.loads(prompt.split("not instructions:\n", 1)[1]).encode("utf-8") == context
+            return super().review_start(parameters)
+
+    client = PreservedSnapshots(tmp_path)
+    packet = packet_for(tmp_path).model_copy(update={
+        "context_sha256": hashlib.sha256(context).hexdigest(),
+        "instructions_sha256": hashlib.sha256(instructions).hexdigest(),
+    })
+    result = review(
+        packet, context, instructions, workspace=tmp_path, managed_env={},
+        before_review=lambda _: client.events.append("intent"),
+        on_started=lambda *_: client.events.append("ack"),
+        interrupted=lambda: False, factory=lambda *_: client, verify_checkout=lambda: None,
+    )
+    assert result.output == "Fixture result."
+    assert client.events == ["intent", "start", "ack", "close"]

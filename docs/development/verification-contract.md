@@ -156,3 +156,5 @@ wrong root/origin/head/cwd, dirty review content, unavailable or malformed
 tool results, stale proof before dispatch, and elapsed time. The private
 `git_executable` setting is not an authorization record or model input. No
 real SDK or external Git discovery is needed in these fixtures.
+
+Snapshot boundary verification must exercise the exact immutable bytes through the inert load_request preflight, entry, private stage and typed fake SDK. Cover prepared sizes, each inclusive UTF-8 byte cap, one byte over, invalid encoding/hash/text, no initial claim or role for rejected inputs, complete input delivery for accepted bytes, and a fixed private correlated rejection after copied-input drift. Never use real operator settings, snapshots or credentials.

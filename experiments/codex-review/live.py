@@ -15,6 +15,7 @@ from typing import Literal, Protocol
 
 from authorization import ExecutionPacket, canonical_packet, private_receipt_binding
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from snapshots import CONTEXT_LIMIT, INSTRUCTIONS_LIMIT, validate_snapshot
 from supervisor import Action, Observation, Role, Supervisor
 
 Stage = Role | Literal["reverify"]
@@ -89,13 +90,10 @@ def load_request(config_path: Path, command: str) -> Request:
         or canonical_packet(packet) != packet_bytes
     ):
         raise ValueError("Proof packet is not bound to this operator invocation.")
-    context = _read(source / "context.txt", 524_288)
-    instructions = _read(source / "instructions.txt", 262_144)
-    if (
-        hashlib.sha256(context).hexdigest() != packet.context_sha256
-        or hashlib.sha256(instructions).hexdigest() != packet.instructions_sha256
-    ):
-        raise ValueError("Proof context does not match.")
+    context = _read(source / "context.txt", CONTEXT_LIMIT)
+    instructions = _read(source / "instructions.txt", INSTRUCTIONS_LIMIT)
+    validate_snapshot(context, packet.context_sha256, CONTEXT_LIMIT)
+    validate_snapshot(instructions, packet.instructions_sha256, INSTRUCTIONS_LIMIT)
     return Request(config, packet, packet_bytes, context, instructions, root, workspace, git_executable,
                    hashlib.sha256(packet_bytes).hexdigest())
 

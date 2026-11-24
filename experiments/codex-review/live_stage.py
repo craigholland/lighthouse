@@ -359,13 +359,31 @@ def run_stage(
         checked()
         result("reverify.result.json", verified_at=clock(), thread_id=_identifier(ready.get("thread_id")))
     elif role == "review":
+        from snapshots import (
+            CONTEXT_LIMIT,
+            INSTRUCTIONS_LIMIT,
+            SnapshotError,
+            validate_snapshot,
+        )
+
         require("verifier.result.json")
-        context = read_bounded(control / "context.txt")
-        instructions = read_bounded(control / "instructions.txt")
-        if hashlib.sha256(context).hexdigest() != packet.context_sha256 or (
-            hashlib.sha256(instructions).hexdigest() != packet.instructions_sha256
-        ):
-            raise StageHold("Private review inputs changed.")
+        diagnostic_lock = Lock()
+
+        def record_diagnostic(value: str) -> None:
+            name = "review.cleanup.json" if value.startswith("cleanup_") else "review.startup.json"
+            with diagnostic_lock:
+                write_signal(control / name, {
+                    **base, "dispatch_id": packet.dispatch_id, "outcome": value,
+                })
+
+        try:
+            context = read_bounded(control / "context.txt", CONTEXT_LIMIT)
+            instructions = read_bounded(control / "instructions.txt", INSTRUCTIONS_LIMIT)
+            validate_snapshot(context, packet.context_sha256, CONTEXT_LIMIT)
+            validate_snapshot(instructions, packet.instructions_sha256, INSTRUCTIONS_LIMIT)
+        except (OSError, SnapshotError, StageHold):
+            record_diagnostic("snapshot_validation_failed")
+            raise StageHold("Private review snapshot validation failed.") from None
         matched_thread: str | None = None
         matched_turn: str | None = None
 
@@ -438,19 +456,13 @@ def run_stage(
                     result("review.attention.json", reason="permission-request", next_actor="owner")
                     attention_recorded = True
 
-        diagnostic_lock = Lock()
-
         def on_startup(outcome: StartupOutcome) -> None:
             # A diagnostic is evidence only: it is never an authority or success receipt.
             from sdk_worker import StartupOutcome
 
             if not isinstance(outcome, StartupOutcome):
                 raise StageHold("Unknown private startup outcome.")
-            name = "review.cleanup.json" if outcome.value.startswith("cleanup_") else "review.startup.json"
-            with diagnostic_lock:
-                write_signal(control / name, {
-                    **base, "dispatch_id": packet.dispatch_id, "outcome": outcome.value,
-                })
+            record_diagnostic(outcome.value)
 
         completed = (review_call or _default_review)(
             packet, context, instructions, workspace=request.workspace,
