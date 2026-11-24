@@ -101,25 +101,31 @@ class Request:
     repository_id: int
     receipt_root: Path
     workspace: Path
+    git_executable: Path
     started_at: float
 
     @classmethod
     def read(cls, control: Path, now: float) -> Request:
         """Accept only the exact request schema and a physically scoped control path."""
         item = read_signal(control / "request.json")
-        if set(item) != {"comment_id", "repository_id", "receipt_root", "workspace", "started_at"}:
+        if set(item) != {
+            "comment_id", "repository_id", "receipt_root", "workspace", "git_executable", "started_at",
+        }:
             raise StageHold("Malformed stage request.")
         comment, repo, start = item["comment_id"], item["repository_id"], item["started_at"]
         root, workspace = _absolute(item["receipt_root"]), _absolute(item["workspace"])
+        git_executable = _absolute(item["git_executable"])
         if (
             type(comment) is not int or comment <= 0 or type(repo) is not int or repo <= 0
             or not isinstance(start, (int, float)) or isinstance(start, bool)
             or not math.isfinite(start) or not 0 <= now - start < 900
             or root != control.parent or not control.is_dir() or not workspace.is_dir()
             or root.is_relative_to(workspace)
+            or not git_executable.is_file() or git_executable.suffix.lower() != ".exe"
+            or git_executable.is_relative_to(workspace) or git_executable.is_relative_to(root)
         ):
             raise StageHold("Malformed or expired stage request.")
-        return cls(comment, repo, root, workspace, float(start))
+        return cls(comment, repo, root, workspace, git_executable, float(start))
 
 
 class CompletionLike(Protocol):
@@ -143,8 +149,16 @@ class ReviewCall(Protocol):
         workspace: Path, managed_env: dict[str, str],
         before_review: Callable[[str], None], on_started: Callable[[str, str], None],
         interrupted: Callable[[], bool], on_attention: Callable[[], None],
-        on_startup: Callable[[StartupOutcome], None],
+        on_startup: Callable[[StartupOutcome], None], verify_checkout: Callable[[], None],
     ) -> CompletionLike: ...
+
+
+class CheckoutCall(Protocol):
+    """Independent local checkout proof with the existing stage time budget."""
+    def __call__(
+        self, executable: Path, workspace: Path, packet: ExecutionPacket,
+        remaining: Callable[[], float], /,
+    ) -> None: ...
 
 
 class VerifyCall(Protocol):
@@ -239,6 +253,7 @@ def _default_review(
     workspace: Path, managed_env: dict[str, str], before_review: Callable[[str], None],
     on_started: Callable[[str, str], None], interrupted: Callable[[], bool],
     on_attention: Callable[[], None], on_startup: Callable[[StartupOutcome], None],
+    verify_checkout: Callable[[], None],
 ) -> CompletionLike:
     from sdk_worker import review
 
@@ -248,7 +263,7 @@ def _default_review(
     return review(
         packet, context, instructions, workspace=workspace, managed_env=managed_env,
         before_review=before_review, on_started=on_started, interrupted=interrupted,
-        on_attention=on_attention, on_startup=on_startup,
+        on_attention=on_attention, on_startup=on_startup, verify_checkout=verify_checkout,
     )
 
 
@@ -261,7 +276,7 @@ def run_stage(
     clock: Callable[[], float] = time.monotonic, sleep: Callable[[float], None] = time.sleep,
     parent_pid: Callable[[], int] = os.getppid, verify_call: VerifyCall | None = None,
     review_call: ReviewCall | None = None, publish_call: PublishCall | None = None,
-    utc_now: Callable[[], datetime] = _utc_now,
+    utc_now: Callable[[], datetime] = _utc_now, checkout_call: CheckoutCall | None = None,
 ) -> None:
     """Run one job role, with all provider construction deferred and injectable."""
     from authorization import (
@@ -354,6 +369,20 @@ def run_stage(
         matched_thread: str | None = None
         matched_turn: str | None = None
 
+        def verify_checkout() -> None:
+            def require_budget() -> None:
+                require_unexpired()
+                if remaining() <= 0:
+                    raise StageHold("Private review deadline elapsed.")
+
+            require_budget()
+            proof = checkout_call
+            if proof is None:
+                from checkout_proof import verify_checkout as prove
+                proof = prove
+            proof(request.git_executable, request.workspace, packet, remaining)
+            require_budget()
+
         def before_review(thread: str) -> None:
             nonlocal matched_thread
             if matched_thread is not None:
@@ -369,9 +398,13 @@ def run_stage(
                         or isinstance(verified_at, bool) or not 0 <= clock() - verified_at <= 5
                     ):
                         raise StageHold("Fresh review authority not verified.")
-                    require_unexpired()
+                    verify_checkout()
+                    if not 0 <= clock() - verified_at <= 5:
+                        raise StageHold("Fresh review authority elapsed during checkout proof.")
                     result("review.intent.json", thread_id=thread)
                     require_unexpired()
+                    if remaining() <= 0 or not 0 <= clock() - verified_at <= 5:
+                        raise StageHold("Private review authority elapsed before dispatch.")
                     return
                 sleep(min(0.05, max(0, remaining())))
             raise StageHold("Fresh review authority was not received.")
@@ -416,7 +449,7 @@ def run_stage(
             packet, context, instructions, workspace=request.workspace,
             managed_env={key.upper(): value for key, value in env.items() if key.upper() in MANAGED},
             before_review=before_review, on_started=on_started, interrupted=interrupted,
-            on_attention=on_attention, on_startup=on_startup,
+            on_attention=on_attention, on_startup=on_startup, verify_checkout=verify_checkout,
         )
         if (
             matched_thread is None or matched_turn is None or completed.thread_id != matched_thread

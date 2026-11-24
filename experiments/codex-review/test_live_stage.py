@@ -46,6 +46,8 @@ def _workspace(tmp_path: Path) -> tuple[Path, ExecutionPacket]:
     workspace = tmp_path / "verified"
     control.mkdir(parents=True)
     workspace.mkdir()
+    executable = tmp_path / "fake-trusted.exe"
+    executable.touch()
     context = b"synthetic review snapshot"
     instructions = b"synthetic review instructions"
     packet = ExecutionPacket(
@@ -63,11 +65,19 @@ def _workspace(tmp_path: Path) -> tuple[Path, ExecutionPacket]:
     write_signal(control / "request.json", {
         "comment_id": 55, "repository_id": 42, "started_at": 100,
         "receipt_root": str(root.resolve()), "workspace": str(workspace.resolve()),
+        "git_executable": str(executable.resolve()),
     })
     (control / "packet.json").write_bytes(canonical_packet(packet))
     (control / "context.txt").write_bytes(context)
     (control / "instructions.txt").write_bytes(instructions)
     return control.resolve(), packet
+
+
+def _checkout(
+    executable: Path, workspace: Path, packet: ExecutionPacket, remaining: Callable[[], float],
+) -> None:
+    assert executable == workspace.parent / "fake-trusted.exe"
+    assert workspace.is_dir() and packet.head and remaining() > 0
 
 
 def _verify(data: bytes, request: Request, remaining: Callable[[], float]) -> VerifiedExecution:
@@ -100,19 +110,21 @@ def test_stage_chain_uses_one_claim_fresh_thread_authority_and_separate_publish(
         workspace: Path, managed_env: dict[str, str], before_review: Callable[[str], None],
         on_started: Callable[[str, str], None], interrupted: Callable[[], bool],
         on_attention: Callable[[], None], on_startup: Callable[[StartupOutcome], None],
+        verify_checkout: Callable[[], None],
     ) -> Completed:
         assert p == packet
         assert workspace == (tmp_path / "verified").resolve()
         assert context and instructions
         assert managed_env == {"SYSTEMROOT": "windows"}
         assert not interrupted() and callable(on_attention) and callable(on_startup)
+        verify_checkout()
         before_review("thread")
         on_started("thread", "turn")
         return Completed("thread", "turn", packet.head, "Synthetic findings")
 
     run_stage(
         "review", control, env={**ENV, "UNRELATED": "opaque"}, clock=lambda: 103,
-        parent_pid=lambda: 123, sleep=parent_reverify, review_call=review,
+        parent_pid=lambda: 123, sleep=parent_reverify, review_call=review, checkout_call=_checkout,
     )
     assert read_signal(control / "review.result.json")["output"] == "Synthetic findings"
 

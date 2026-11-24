@@ -149,3 +149,10 @@ present before close and unchanged if close fails. Assert no review intent,
 model call or publisher effect on these early holds. Tool discovery checks
 must use installed source or inert package metadata only; do not execute the
 bundled runtime.
+
+For the separate checkout proof, inject fake Git and SDK responses. Include
+absent thread Git metadata with valid proof; reject conflicting metadata,
+wrong root/origin/head/cwd, dirty review content, unavailable or malformed
+tool results, stale proof before dispatch, and elapsed time. The private
+`git_executable` setting is not an authorization record or model input. No
+real SDK or external Git discovery is needed in these fixtures.

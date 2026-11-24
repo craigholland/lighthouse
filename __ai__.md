@@ -79,4 +79,6 @@ delegates project verification to the Lighthouse verification contract.
 
 Run the [project verification contract](docs/development/verification-contract.md)
 from the repository root unless it calls for an outside-directory smoke check.
-Local results are not CI or independent review evidence.
+Local results are not CI or independent review evidence. The T01 experiment's
+private Git binding and two read-only checkout checks do not grant execution
+authority or affect the installable foundation.

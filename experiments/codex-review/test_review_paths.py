@@ -38,7 +38,7 @@ def test_checkout_path_becomes_relative_before_mock_comment(tmp_path: Path) -> N
     worker = review(
         packet, context, instructions, workspace=tmp_path, managed_env={},
         before_review=lambda _: client.events.append("intent"), on_started=lambda *_: None,
-        interrupted=lambda: False, factory=lambda *_: client,
+        interrupted=lambda: False, factory=lambda *_: client, verify_checkout=lambda: None,
     )
     assert worker.output == "Fix src/module.py:12."
     wire = FakeWire("publisher")
@@ -99,7 +99,7 @@ def test_worker_abstains_on_unrelated_private_path(tmp_path: Path) -> None:
         review(
             packet, context, instructions, workspace=tmp_path, managed_env={},
             before_review=lambda _: client.events.append("intent"), on_started=lambda *_: None,
-            interrupted=lambda: False, factory=lambda *_: client,
+            interrupted=lambda: False, factory=lambda *_: client, verify_checkout=lambda: None,
         )
     assert "fixture-private" not in str(caught.value)
     assert client.events[-1] == "close"

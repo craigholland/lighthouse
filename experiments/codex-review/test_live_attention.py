@@ -24,7 +24,7 @@ from openai_codex.generated.v2_all import (
 from openai_codex.models import JsonObject
 from supervisor import Role
 from test_live import Job, _operator_request
-from test_live_stage import ENV, _verify, _workspace
+from test_live_stage import ENV, _checkout, _verify, _workspace
 from test_sdk_worker import FakeClient
 
 
@@ -58,7 +58,7 @@ def test_composed_hold_records_only_permission_attention(
                 primary = "permission request" if permission else "runtime does not match"
                 with pytest.raises(sdk_worker.ReviewHold, match=primary):
                     run_stage("review", control, env=environment, clock=lambda: 0.0,
-                              parent_pid=os.getpid)
+                              parent_pid=os.getpid, checkout_call=_checkout)
             else:
                 run_stage("verifier", control, env=environment, clock=lambda: 0.0,
                           parent_pid=os.getpid, verify_call=_verify)
@@ -161,7 +161,7 @@ def test_receiver_persists_attention_without_waiting_for_rpc(
     def review_role() -> None:
         with pytest.raises(sdk_worker.ReviewHold, match="permission"):
             run_stage("review", control, env=env, clock=lambda: 102, parent_pid=lambda: 123,
-                      sleep=parent_handoff)
+                      sleep=parent_handoff, checkout_call=_checkout)
 
     with ThreadPoolExecutor(max_workers=1) as pool:
         worker = pool.submit(review_role)

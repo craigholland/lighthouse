@@ -118,7 +118,9 @@ invocation may enter the verifier; no committed configuration enables it.
 Lead must privately supply the canonical packet and operator configuration,
 a separate verified checkout and managed Codex home, fresh role-specific
 short-lived Lead App JWT sources for the verifier and later publisher,
-and an existing private receipt directory. The exact command and SHA,
+an existing private receipt directory, and a canonical absolute path to the
+existing trusted Git executable in the private operator `git_executable`
+binding. The exact command and SHA,
 context hashes, managed account/model, access settings, time limits, and
 receipt binding must be completed and independently reviewed. Craig's
 approval of that final SHA/packet and a new attributed Lead attestation
@@ -198,7 +200,19 @@ initializes the Git annotation as absent, and the
 [thread/start response construction](https://github.com/openai/codex/blob/rust-v0.171.0/codex-rs/app-server/src/request_processors/thread_processor.rs#L1642-L1694)
 returns that thread without supplying it. Adding Git discovery is not shown to
 satisfy this response-level gate. Typed offline fixtures hold on absent/null
-annotation and on an incorrect identity. No toolchain binding, fallback or
-change to the exact-checkout proof is introduced. If separately authorized
-work requires a different data source, it must preserve the exact repository,
-head and effective policy checks; nothing here grants that authority.
+annotation and on an incorrect identity in that historical revision.
+
+### Trusted checkout proof (offline verification only)
+
+The [Lead checkout-proof decision](https://github.com/craigholland/lighthouse/issues/4#issuecomment-7134473669)
+authorizes a bounded correction, not a retry. The private operator binds an
+existing canonical `git.exe`; the contained worker uses a fixed argument
+vector and minimal environment rather than inheriting PATH. Read-only Git
+checks confirm the canonical root, allowed repository origin, exact packet
+head and clean tracked/untracked (non-ignored) review content. The check
+runs before SDK startup and again under the same deadline after fresh
+review authority and before writing intent. The thread must still report
+the approved working directory and effective read-only/deny-all policy.
+Absent annotation cannot substitute for this proof; any conflicting supplied
+identity holds. Proof failures are sanitized and stop before review dispatch.
+No real client or trial COMMENT was executed for this correction.

@@ -49,7 +49,8 @@ class StartupOutcome(StrEnum):
     THREAD_VALIDATING = auto()
     THREAD_POLICY_FAILED = auto()
     THREAD_VALIDATION_FAILED = auto()
-    GIT_ANNOTATION_MISSING = auto()
+    CHECKOUT_PROOF_CHECKING = auto()
+    CHECKOUT_PROOF_FAILED = auto()
     GIT_IDENTITY_MISMATCH = auto()
     PRE_REVIEW_CHECKING = auto()
     CLEANUP_STARTING = auto()
@@ -193,9 +194,13 @@ def _verify_thread(response: ThreadStartResponse, packet: ExecutionPacket, works
         or not _ID.fullmatch(response.thread.id)
     ):
         raise _ThreadHold(StartupOutcome.THREAD_VALIDATION_FAILED)
-    if git is None or git.sha is None or git.origin_url is None:
-        raise _ThreadHold(StartupOutcome.GIT_ANNOTATION_MISSING)
-    if git.sha != packet.head or git.origin_url not in _ORIGINS:
+    # The independent checkout proof is mandatory. Any non-null identity
+    # annotation the SDK supplies must also agree, even if the other is absent.
+    if git is not None and (
+        (git.sha is not None and (not isinstance(git.sha, str) or git.sha != packet.head))
+        or (git.origin_url is not None
+            and (not isinstance(git.origin_url, str) or git.origin_url not in _ORIGINS))
+    ):
         raise _ThreadHold(StartupOutcome.GIT_IDENTITY_MISMATCH)
     return response.thread.id
 
@@ -257,6 +262,7 @@ def review(
     factory: Callable[[Path, dict[str, str], Callable[[], None]], ReviewClient] = open_review_client,
     on_attention: Callable[[], None] = lambda: None,
     on_startup: Callable[[StartupOutcome], None] = lambda _outcome: None,
+    verify_checkout: Callable[[], None] | None = None,
 ) -> Completion:
     """Review once, with a pre-effect authority callback and private attribution."""
     try:
@@ -269,6 +275,18 @@ def review(
         raise
     except Exception:
         raise ReviewHold("Managed review initialization failed.") from None
+
+    on_startup(StartupOutcome.CHECKOUT_PROOF_CHECKING)
+    try:
+        if verify_checkout is None:
+            raise ReviewHold("Managed checkout verification is not configured.")
+        verify_checkout()
+    except Exception:
+        on_startup(StartupOutcome.CHECKOUT_PROOF_FAILED)
+        raise ReviewHold("Managed checkout proof failed.") from None
+
+    if interrupted():
+        raise ReviewHold("Managed review deadline expired before SDK startup.")
 
     def permission_attention() -> None:
         # Preserve the existing permission marker even if diagnostics fail.

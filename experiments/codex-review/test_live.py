@@ -17,6 +17,8 @@ def _operator_request(tmp_path: Path) -> tuple[dict[str, str], ExecutionPacket]:
     receipt.mkdir()
     workspace = tmp_path / "lead-checkout"
     workspace.mkdir()
+    executable = tmp_path / "fake-trusted.exe"
+    executable.touch()
     context = b"synthetic approved context"
     instructions = b"synthetic instruction snapshot"
     packet = ExecutionPacket(
@@ -35,6 +37,7 @@ def _operator_request(tmp_path: Path) -> tuple[dict[str, str], ExecutionPacket]:
         "comment_id": 100, "repository_id": 123, "receipt_root": str(receipt),
         "workspace": str(workspace), "verifier_jwt_file": str(source / "read-fake.jwt"),
         "publisher_jwt_file": str(source / "write-fake.jwt"),
+        "git_executable": str(executable.resolve()),
     }), encoding="utf-8")
     (source / "context.txt").write_bytes(context)
     (source / "instructions.txt").write_bytes(instructions)
@@ -51,6 +54,14 @@ def test_invalid_config_cannot_construct_stage(tmp_path: Path) -> None:
 
     assert run(0, environ={}, factory=forbidden) == 2
     assert run(0, command="wrong-command", environ=env, factory=forbidden) == 1
+    config_path = Path(env["LIGHTHOUSE_T01_OPERATOR_CONFIG"])
+    config = json.loads(config_path.read_text(encoding="utf-8"))
+    untrusted = tmp_path / "lead-checkout" / "git.exe"
+    untrusted.touch()
+    for unaccepted in ("git.exe", str(tmp_path / "missing.exe"), str(untrusted)):
+        config_path.write_text(json.dumps({**config, "git_executable": unaccepted}), encoding="utf-8")
+        assert run(0, command="fixture-command", environ=env, factory=forbidden) == 1
+    config_path.write_text(json.dumps(config), encoding="utf-8")
     path = Path(env["LIGHTHOUSE_T01_OPERATOR_CONFIG"]).with_name("packet.json")
     path.write_text('{"owner-approved":true}', encoding="utf-8")
     assert run(0, command="fixture-command", environ=env, factory=forbidden) == 1
@@ -69,6 +80,7 @@ class Job:
 
     def start(self, role: Stage, control: Path, environment: dict[str, str]) -> None:
         assert "API_SECRET" not in environment
+        assert all(not value.endswith("fake-trusted.exe") for value in environment.values())
         assert ("LIGHTHOUSE_STAGE_JWT_FILE" in environment) == (role != Role.REVIEW)
         self.control, self.role = control, role
         self.roles.append(role)

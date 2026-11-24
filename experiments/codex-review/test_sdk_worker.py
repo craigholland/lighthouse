@@ -63,6 +63,18 @@ class FakeClient:
             payload["gitInfo"] = None
         elif self.failure == "null-sha":
             payload["gitInfo"] = {"sha": None, "originUrl": "https://github.com/craigholland/lighthouse.git"}
+        elif self.failure == "wrong-origin-no-sha":
+            payload["gitInfo"] = {"originUrl": "https://github.com/fixture/other"}
+        elif self.failure == "wrong-sha-no-origin":
+            payload["gitInfo"] = {"sha": "b" * 40}
+        elif self.failure == "empty-sha":
+            payload["gitInfo"] = {"sha": ""}
+        elif self.failure == "invalid-origin-type":
+            payload["gitInfo"] = {"originUrl": ["unexpected"]}
+        elif self.failure == "absent-git-fields":
+            payload["gitInfo"] = {}
+        elif self.failure == "null-origin":
+            payload["gitInfo"] = {"sha": "a" * 40, "originUrl": None}
         return payload
 
     def thread_start(self, parameters: JsonObject) -> ThreadStartResponse:
@@ -118,6 +130,8 @@ class FakeClient:
 def run_fake(
     root: Path, client: FakeClient, context: bytes = _CONTEXT, *,
     on_startup: Callable[[StartupOutcome], None] = lambda _outcome: None,
+    verify_checkout: Callable[[], None] | None = lambda: None,
+    on_factory: Callable[[], None] = lambda: None,
 ) -> Completion:
     packet = packet_for(root).model_copy(update={
         "context_sha256": hashlib.sha256(_CONTEXT).hexdigest(),
@@ -134,12 +148,13 @@ def run_fake(
 
     def factory(path: Path, env: dict[str, str], _attention: Callable[[], None]) -> FakeClient:
         assert path == root and not env
+        on_factory()
         return client
 
     return review(
         packet, context, _INSTRUCTIONS, workspace=root, managed_env={},
         before_review=before, on_started=started, interrupted=lambda: False, factory=factory,
-        on_startup=on_startup,
+        on_startup=on_startup, verify_checkout=verify_checkout,
     )
 
 
@@ -216,6 +231,7 @@ def test_cooperative_interrupt_targets_returned_run_only(tmp_path: Path) -> None
             before_review=lambda _thread: client.events.append("intent"),
             on_started=lambda _thread, _turn: client.events.append("ack"),
             interrupted=signal.is_set, factory=lambda _path, _env, _attention: client,
+            verify_checkout=lambda: None,
         )
     assert client.events == ["intent", "start", "ack", "requested-interrupt", "close"]
 
@@ -235,6 +251,7 @@ def test_holds_before_review_if_recheck_denies(tmp_path: Path) -> None:
             packet, _CONTEXT, _INSTRUCTIONS, workspace=tmp_path, managed_env={},
             before_review=before, on_started=lambda _thread, _turn: pytest.fail("dispatched"),
             interrupted=lambda: False, factory=lambda _path, _env, _attention: client,
+            verify_checkout=lambda: None,
         )
     assert client.events == ["close"]
 
@@ -250,9 +267,10 @@ def test_holds_before_review_if_recheck_denies(tmp_path: Path) -> None:
     ("model", StartupOutcome.THREAD_VALIDATION_FAILED),
     ("policy", StartupOutcome.THREAD_POLICY_FAILED),
     ("network", StartupOutcome.THREAD_POLICY_FAILED),
-    ("missing-git", StartupOutcome.GIT_ANNOTATION_MISSING),
-    ("null-git", StartupOutcome.GIT_ANNOTATION_MISSING),
-    ("null-sha", StartupOutcome.GIT_ANNOTATION_MISSING),
+    ("wrong-origin-no-sha", StartupOutcome.GIT_IDENTITY_MISMATCH),
+    ("wrong-sha-no-origin", StartupOutcome.GIT_IDENTITY_MISMATCH),
+    ("empty-sha", StartupOutcome.GIT_IDENTITY_MISMATCH),
+    ("invalid-origin-type", StartupOutcome.THREAD_START_FAILED),
     ("head", StartupOutcome.GIT_IDENTITY_MISMATCH),
     ("approval", StartupOutcome.PERMISSION_REQUESTED),
 ])
@@ -278,7 +296,7 @@ def test_root_cause_persisted_before_failing_close(tmp_path: Path) -> None:
     class FailingClose(FakeClient):
         def close(self) -> None:
             assert self.events == [
-                "sdk_starting", "initialization_starting", "initialization_failed",
+                "checkout_proof_checking", "sdk_starting", "initialization_starting", "initialization_failed",
                 "cleanup_starting",
             ]
             raise OSError("private fixture path")
@@ -295,6 +313,7 @@ def test_successful_run_records_checkpoints_without_adding_effects(tmp_path: Pat
     outcomes: list[StartupOutcome] = []
     run_fake(tmp_path, client, on_startup=outcomes.append)
     assert outcomes == [
+        StartupOutcome.CHECKOUT_PROOF_CHECKING,
         StartupOutcome.SDK_STARTING,
         StartupOutcome.INITIALIZATION_STARTING,
         StartupOutcome.MANAGED_ACCOUNT_CHECKING,
@@ -305,3 +324,46 @@ def test_successful_run_records_checkpoints_without_adding_effects(tmp_path: Pat
         StartupOutcome.CLEANUP_COMPLETED,
     ]
     assert client.events == ["intent", "start", "ack", "close"]
+
+
+
+@pytest.mark.parametrize("annotation", [
+    "missing-git", "null-git", "null-sha", "null-origin", "absent-git-fields",
+])
+def test_review_requires_initial_proof_but_allows_absent_annotation(
+    tmp_path: Path, annotation: str,
+) -> None:
+    class CheckedStart(FakeClient):
+        def start(self) -> None:
+            assert checks == ["checkout", "factory"]
+
+    checks: list[str] = []
+    client = CheckedStart(tmp_path, annotation)
+    assert run_fake(
+        tmp_path, client, verify_checkout=lambda: checks.append("checkout"),
+        on_factory=lambda: checks.append("factory"),
+    ).output == "Fixture result."
+    assert checks == ["checkout", "factory"]
+
+
+@pytest.mark.parametrize("configure_verifier", [False, True])
+def test_failed_or_unconfigured_proof_stops_before_sdk_factory(
+    tmp_path: Path, configure_verifier: bool,
+) -> None:
+    def deny() -> None:
+        raise ValueError("private fixture details")
+
+    client = FakeClient(tmp_path)
+    outcomes: list[StartupOutcome] = []
+    with pytest.raises(ReviewHold, match="Managed checkout proof failed") as caught:
+        run_fake(
+            tmp_path, client, on_startup=outcomes.append,
+            verify_checkout=deny if configure_verifier else None,
+            on_factory=lambda: pytest.fail("SDK constructed without checkout proof"),
+        )
+    assert not client.events
+    assert outcomes == [
+        StartupOutcome.CHECKOUT_PROOF_CHECKING,
+        StartupOutcome.CHECKOUT_PROOF_FAILED,
+    ]
+    assert "private fixture details" not in str(caught.value)

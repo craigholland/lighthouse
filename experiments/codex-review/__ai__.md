@@ -61,5 +61,8 @@ from the repository root and record which exact head was checked.
 
 The diagnostic revision adds fixed, private startup and cleanup observations
 to the review role. These records are not inputs to authorization, the SDK
-prompt, the public review, or publication. A missing or mismatched Git
-annotation remains a hold. The historical Phase B claim remains consumed.
+prompt, the public review, or publication. A missing or mismatched trusted
+checkout proof holds, as does a conflicting provider Git annotation. The
+[checkout verifier](checkout_proof.py) runs fixed read-only Git operations
+with a private canonical operator binding; it does not grant authority.
+The historical Phase B claim remains consumed.

@@ -32,6 +32,7 @@ class PrivateConfig(BaseModel):
     repository_id: int = Field(gt=0)
     receipt_root: str
     workspace: str
+    git_executable: str
     verifier_jwt_file: str
     publisher_jwt_file: str
 
@@ -47,6 +48,7 @@ class Request:
     instructions: bytes
     receipt_root: Path
     workspace: Path
+    git_executable: Path
     digest: str
 
 
@@ -67,11 +69,18 @@ def load_request(config_path: Path, command: str) -> Request:
     packet = ExecutionPacket.model_validate_json(packet_bytes)
     root = Path(config.receipt_root).resolve(strict=True)
     workspace = Path(config.workspace).resolve(strict=True)
+    git_executable = Path(config.git_executable)
     dot_checkout = Path(__file__).resolve().parents[2]
     if (
         not workspace.is_dir() or workspace == dot_checkout
         or source.is_relative_to(workspace) or source.is_relative_to(dot_checkout)
         or root.is_relative_to(workspace) or root.is_relative_to(dot_checkout)
+        or not git_executable.is_absolute()
+        or git_executable.resolve(strict=True) != git_executable
+        or not git_executable.is_file() or git_executable.suffix.lower() != ".exe"
+        or any(git_executable.is_relative_to(untrusted) for untrusted in (
+            workspace, dot_checkout, root, source,
+        ))
         or not Path(config.verifier_jwt_file).is_absolute()
         or not Path(config.publisher_jwt_file).is_absolute()
         or packet.repository_id != config.repository_id
@@ -87,7 +96,7 @@ def load_request(config_path: Path, command: str) -> Request:
         or hashlib.sha256(instructions).hexdigest() != packet.instructions_sha256
     ):
         raise ValueError("Proof context does not match.")
-    return Request(config, packet, packet_bytes, context, instructions, root, workspace,
+    return Request(config, packet, packet_bytes, context, instructions, root, workspace, git_executable,
                    hashlib.sha256(packet_bytes).hexdigest())
 
 
@@ -129,7 +138,7 @@ class LiveJobs:
         self._write("request.json", {
             "comment_id": config.comment_id, "repository_id": config.repository_id,
             "receipt_root": str(self.request.receipt_root), "workspace": str(self.request.workspace),
-            "started_at": self.entered,
+            "git_executable": str(self.request.git_executable), "started_at": self.entered,
         })
 
     def _write(self, name: str, value: dict[str, object]) -> None:
