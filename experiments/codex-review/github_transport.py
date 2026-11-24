@@ -6,7 +6,7 @@ import os
 import re
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Literal, Protocol
 
@@ -18,6 +18,7 @@ from authorization import (
     VerifiedExecution,
     private_receipt_binding,
 )
+from review_paths import ReviewPathError, require_relative_paths
 
 HOST = "api.github.com"
 REPO = "/repos/" + REPOSITORY
@@ -231,11 +232,12 @@ class CommentPublisher:
     """Consume one durable COMMENT attempt, then reconcile only its original facts."""
 
     def __init__(
-        self, transport: GithubTransport, verified: VerifiedExecution, journal_root: Path,
+        self, transport: GithubTransport, verified: VerifiedExecution, journal_root: Path, *, now: Callable[[], datetime] = lambda: datetime.now(UTC),
     ) -> None:
         self._transport = transport
         self._verified = verified
         self._root = journal_root
+        self._now = now
 
     def _binding(self) -> tuple[Path, str, bytes]:
         packet = self._verified.packet
@@ -265,6 +267,10 @@ class CommentPublisher:
                 or not review.thread or not review.turn or not review.text
                 or len(review.text) > 32_000 or "lighthouse-t01-comment:" in review.text):
             raise Denied("Review output does not match the completed authorized run.")
+        try:
+            require_relative_paths(review.text)
+        except ReviewPathError:
+            raise Denied("Review contains an unapproved machine path.") from None
         if intent.exists():
             raise Denied("COMMENT already attempted; lookup required.")
         self._transport.verify_identity()
@@ -281,6 +287,9 @@ class CommentPublisher:
                 os.fsync(f.fileno())
         except OSError:
             raise Denied("COMMENT already attempted or intent persistence unknown.") from None
+        now = self._now()
+        if now.utcoffset() is None or now.timestamp() >= packet.expires_at:
+            raise Denied("COMMENT authority expired after intent; no POST was sent.")
         result = self._receipt(self._transport._create_comment_review(
             packet.head, marker + "\n" + review.text,
         ), marker)

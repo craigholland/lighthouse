@@ -140,7 +140,7 @@ class ReviewCall(Protocol):
         self, packet: ExecutionPacket, context: bytes, instructions: bytes, /, *,
         workspace: Path, managed_env: dict[str, str],
         before_review: Callable[[str], None], on_started: Callable[[str, str], None],
-        interrupted: Callable[[], bool],
+        interrupted: Callable[[], bool], on_attention: Callable[[], None],
     ) -> CompletionLike: ...
 
 
@@ -235,6 +235,7 @@ def _default_review(
     packet: ExecutionPacket, context: bytes, instructions: bytes, *,
     workspace: Path, managed_env: dict[str, str], before_review: Callable[[str], None],
     on_started: Callable[[str, str], None], interrupted: Callable[[], bool],
+    on_attention: Callable[[], None],
 ) -> CompletionLike:
     from sdk_worker import review
 
@@ -244,7 +245,12 @@ def _default_review(
     return review(
         packet, context, instructions, workspace=workspace, managed_env=managed_env,
         before_review=before_review, on_started=on_started, interrupted=interrupted,
+        on_attention=on_attention,
     )
+
+
+def _utc_now() -> datetime:
+    return datetime.now(UTC)
 
 
 def run_stage(
@@ -252,6 +258,7 @@ def run_stage(
     clock: Callable[[], float] = time.monotonic, sleep: Callable[[float], None] = time.sleep,
     parent_pid: Callable[[], int] = os.getppid, verify_call: VerifyCall | None = None,
     review_call: ReviewCall | None = None, publish_call: PublishCall | None = None,
+    utc_now: Callable[[], datetime] = _utc_now,
 ) -> None:
     """Run one job role, with all provider construction deferred and injectable."""
     from authorization import (
@@ -282,8 +289,12 @@ def run_stage(
     packet_bytes = read_bounded(control / "packet.json", 32_768)
     packet = ExecutionPacket.model_validate_json(packet_bytes)
     digest = hashlib.sha256(canonical_packet(packet)).hexdigest()
-    if datetime.now(UTC).timestamp() >= packet.expires_at:
-        raise StageHold("Private execution packet expired.")
+    def require_unexpired() -> None:
+        observed = utc_now()
+        if observed.utcoffset() is None or observed.timestamp() >= packet.expires_at:
+            raise StageHold("Private execution packet expired.")
+
+    require_unexpired()
     if packet.repository_id != request.repository_id or (
         private_receipt_binding(request.receipt_root) != packet.receipt_binding
     ):
@@ -300,8 +311,11 @@ def run_stage(
         return item
 
     def checked() -> VerifiedExecution:
+        require_unexpired()
         verifier = verify_call or _default_verify(env)
         authority = verifier(packet_bytes, request, remaining)
+        # Reads can outlast the signed authorization.
+        require_unexpired()
         if authority.packet_sha256 != digest or authority.packet != packet or (
             authority.comment_id != request.comment_id or remaining() <= 0
         ):
@@ -315,7 +329,9 @@ def run_stage(
 
     if role == "verifier":
         authority = checked()
+        require_unexpired()
         claim(authority, request.receipt_root)
+        require_unexpired()
         if remaining() <= 0:
             raise StageHold("Private stage deadline elapsed.")
         result("verifier.result.json", verified_at=clock())
@@ -350,7 +366,9 @@ def run_stage(
                         or isinstance(verified_at, bool) or not 0 <= clock() - verified_at <= 5
                     ):
                         raise StageHold("Fresh review authority not verified.")
+                    require_unexpired()
                     result("review.intent.json", thread_id=thread)
+                    require_unexpired()
                     return
                 sleep(min(0.05, max(0, remaining())))
             raise StageHold("Fresh review authority was not received.")
@@ -366,10 +384,15 @@ def run_stage(
             marker = control / "review.interrupt.json"
             return marker.is_file() and read_signal(marker).get("challenge") == challenge
 
+        require_unexpired()
+        def on_attention() -> None:
+            result("review.attention.json", reason="permission-request", next_actor="owner")
+
         completed = (review_call or _default_review)(
             packet, context, instructions, workspace=request.workspace,
             managed_env={key.upper(): value for key, value in env.items() if key.upper() in MANAGED},
             before_review=before_review, on_started=on_started, interrupted=interrupted,
+            on_attention=on_attention,
         )
         if (
             matched_thread is None or matched_turn is None or completed.thread_id != matched_thread
@@ -392,6 +415,7 @@ def run_stage(
             raise StageHold("Local review job shutdown not confirmed.")
         authority = checked()
         try:
+            require_unexpired()
             review_id = (publish_call or _default_publish(env))(
                 authority, completed_result, request, remaining, checked
             )

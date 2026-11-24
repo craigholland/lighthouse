@@ -98,12 +98,13 @@ def test_stage_chain_uses_one_claim_fresh_thread_authority_and_separate_publish(
         p: ExecutionPacket, context: bytes, instructions: bytes, *,
         workspace: Path, managed_env: dict[str, str], before_review: Callable[[str], None],
         on_started: Callable[[str, str], None], interrupted: Callable[[], bool],
+        on_attention: Callable[[], None],
     ) -> Completed:
         assert p == packet
         assert workspace == (tmp_path / "verified").resolve()
         assert context and instructions
         assert managed_env == {"SYSTEMROOT": "windows"}
-        assert not interrupted()
+        assert not interrupted() and callable(on_attention)
         before_review("thread")
         on_started("thread", "turn")
         return Completed("thread", "turn", packet.head, "Synthetic findings")

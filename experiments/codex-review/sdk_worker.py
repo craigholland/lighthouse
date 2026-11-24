@@ -20,6 +20,7 @@ from openai_codex.generated.v2_all import (
     TurnStatus,
 )
 from openai_codex.models import InitializeResponse, JsonObject
+from review_paths import ReviewPathError, sanitize_review_paths
 
 _SAFE_ENV = frozenset({
     "SYSTEMROOT", "WINDIR", "USERPROFILE", "HOME", "CODEX_HOME",
@@ -163,9 +164,10 @@ def interrupt_known(client: ReviewClient, thread_id: str, turn_id: str) -> None:
 
 
 def _review_result(client: ReviewClient, packet: ExecutionPacket,
-                   thread: str, turn: str, stopped: Event) -> Completion:
+                   thread: str, turn: str, stopped: Event, on_attention: Callable[[], None], checkout: Path) -> Completion:
     while not stopped.is_set():
         if client.approval_requested():
+            on_attention()
             raise ReviewHold("Review paused at a permission request.")
         response = client.thread_read(thread).thread
         if response.id != thread or len(response.turns) != 1 or response.turns[0].id != turn:
@@ -175,6 +177,8 @@ def _review_result(client: ReviewClient, packet: ExecutionPacket,
         if status.type == "systemError":
             raise ReviewHold("Managed review is unavailable.")
         if status.type == "active" and status.active_flags:
+            if any(flag.value == "waitingOnApproval" for flag in status.active_flags):
+                on_attention()
             raise ReviewHold("Managed review needs attention.")
         if current.status == TurnStatus.completed:
             outputs = [
@@ -184,9 +188,16 @@ def _review_result(client: ReviewClient, packet: ExecutionPacket,
                 raise ReviewHold("Review completed without one attributable output.")
             if any(ord(char) < 32 and char not in "\r\n\t" for char in outputs[0]):
                 raise ReviewHold("Review output is malformed.")
-            if stopped.is_set() or client.approval_requested():
+            if client.approval_requested():
+                on_attention()
+                raise ReviewHold("Review moved to permission attention before completion.")
+            if stopped.is_set():
                 raise ReviewHold("Review moved to attention before completion.")
-            return Completion(thread, turn, packet.head, outputs[0])
+            try:
+                safe_output = sanitize_review_paths(outputs[0], checkout)
+            except ReviewPathError:
+                raise ReviewHold("Review contains an unapproved machine path.") from None
+            return Completion(thread, turn, packet.head, safe_output)
         if current.status == TurnStatus.interrupted:
             raise ReviewHold("Provider interruption was observed for the known review.")
         if current.status != TurnStatus.in_progress or status.type != "active":
@@ -200,6 +211,7 @@ def review(
     managed_env: dict[str, str], before_review: Callable[[str], None],
     on_started: Callable[[str, str], None], interrupted: Callable[[], bool],
     factory: Callable[[Path, dict[str, str]], ReviewClient] = open_review_client,
+    on_attention: Callable[[], None] = lambda: None,
 ) -> Completion:
     """Review once, with a pre-effect authority callback and private attribution."""
     try:
@@ -233,10 +245,16 @@ def review(
             ),
         })
         thread = _verify_thread(response, packet, root)
-        if client.approval_requested() or interrupted():
+        if client.approval_requested():
+            on_attention()
+            raise ReviewHold("Review paused at a permission request.")
+        if interrupted():
             raise ReviewHold("Managed review needs attention before dispatch.")
         before_review(thread)
-        if interrupted() or client.approval_requested():
+        if client.approval_requested():
+            on_attention()
+            raise ReviewHold("Review paused at a permission request.")
+        if interrupted():
             raise ReviewHold("Review deadline or permission hold reached before dispatch.")
         started = client.review_start({
             "threadId": thread, "delivery": "inline",
@@ -266,7 +284,7 @@ def review(
                 return
 
         Thread(target=monitor, daemon=True, name="lighthouse-review-interrupt").start()
-        return _review_result(client, packet, thread, turn, stop)
+        return _review_result(client, packet, thread, turn, stop, on_attention, root)
     except ReviewHold:
         raise
     except Exception:

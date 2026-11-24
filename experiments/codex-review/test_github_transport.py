@@ -1,4 +1,5 @@
 """Synthetic wire tests for Lead-only GitHub evidence and COMMENT behavior."""
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -120,7 +121,7 @@ def test_lost_post_old_head_receipt_only(tmp_path: Path) -> None:
         jwt=lambda: "synthetic-jwt", repository_id=123, remaining=lambda: 3,
         scope="publisher", wire=wire,
     )
-    pub = CommentPublisher(gh, approved, tmp_path)
+    pub = CommentPublisher(gh, approved, tmp_path, now=lambda: NOW)
     review = CompletedReview(approved.packet_sha256, packet.head, "thread", "turn", "Synthetic")
     with pytest.raises(Denied, match="synthetic response loss"):
         pub.publish(review, lambda: approved)
@@ -149,7 +150,7 @@ def test_stale_or_unattributed_output_makes_no_attempt(tmp_path: Path) -> None:
         jwt=lambda: "synthetic-jwt", repository_id=123, remaining=lambda: 3,
         scope="publisher", wire=wire,
     )
-    pub = CommentPublisher(gh, approved, tmp_path)
+    pub = CommentPublisher(gh, approved, tmp_path, now=lambda: NOW)
     review = CompletedReview(approved.packet_sha256, packet.head, "thread", "turn", "Synthetic")
     with pytest.raises(Denied, match="publication cannot be invented|no longer current"):
         pub.publish(review, lambda: approved)
@@ -159,3 +160,28 @@ def test_stale_or_unattributed_output_makes_no_attempt(tmp_path: Path) -> None:
     with pytest.raises(Denied, match="does not match"):
         pub.publish(incomplete, lambda: approved)
     assert not wire.sent
+
+
+def test_expiry_after_post_intent_does_not_submit_or_replay(tmp_path: Path) -> None:
+    packet = packet_for(tmp_path)
+    approved = verify(
+        canonical_packet(packet), comment_id=17, transport=FakeGithub(packet),
+        repository_id=123, now=NOW,
+    )
+    claim(approved, tmp_path)
+    wire = FakeWire("publisher")
+    gh = GithubTransport(
+        jwt=lambda: "synthetic-jwt", repository_id=123, remaining=lambda: 3,
+        scope="publisher", wire=wire,
+    )
+    def read_clock() -> datetime:
+        assert list(tmp_path.glob("*.comment-attempt"))
+        return datetime.fromtimestamp(packet.expires_at, UTC)
+
+    publisher = CommentPublisher(gh, approved, tmp_path, now=read_clock)
+    completed = CompletedReview(approved.packet_sha256, packet.head, "thread", "turn", "Synthetic")
+    with pytest.raises(Denied, match="expired"):
+        publisher.publish(completed, lambda: approved)
+    assert not wire.sent
+    with pytest.raises(Denied, match="already attempted"):
+        publisher.publish(completed, lambda: approved)

@@ -159,3 +159,14 @@ attributed through a separate narrowly scoped Lead publisher.
 | Evidence and stopping | Report real provider/model/runtime and exact-head receipts only if executed and verified. Do not admit T02; Gate A acceptance and merge remain Craig's. |
 
 This table is not a live configuration. The template cannot enable a run.
+
+### Exact-head review follow-up
+
+Offline tests assert that approval expiry is checked again after delayed
+verification, after the review handoff, and before COMMENT. A permission
+request writes a correlated private owner-attention signal before SDK
+cleanup; generic provider errors never appear in that signal. Checkout
+references are reduced to repository-relative paths, and other machine-path
+references hold the output before publication. The publisher independently
+checks the sanitized text and never retries a held or ambiguous POST.
+These are fixture results, not evidence that the live roles were exercised.

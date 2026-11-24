@@ -177,6 +177,14 @@ class LiveJobs:
         self.jobs[stage] = child
         child.start(stage, self.control, self._environment(stage))
 
+    def owner_attention(self) -> bool:
+        """Recognize only a correlated fixed permission reason, never provider text."""
+        signal = self._read_echo("review.attention.json")
+        return signal is not None and (
+            signal.get("ok") is True and signal.get("reason") == "permission-request"
+            and signal.get("next_actor") == "owner"
+        )
+
     def snapshot(self, role: Role) -> Observation:
         """Read bounded local files and account for both review-side jobs."""
         job = self.jobs[role]
@@ -192,7 +200,7 @@ class LiveJobs:
         complete = outcome is not None and outcome.get("ok") is True
         if role == Role.REVIEW:
             complete = (
-                complete and self.refresh_promoted and outcome is not None
+                complete and not self.owner_attention() and self.refresh_promoted and outcome is not None
                 and all(isinstance(outcome.get(key), str) and outcome[key]
                         for key in ("thread_id", "turn_id", "output"))
             )
