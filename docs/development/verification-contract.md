@@ -6,7 +6,7 @@ The project contains governing documentation and an installable Python CLI
 foundation. Verification commands below remain offline. The [T01 capability
 report](../../experiments/codex-review/README.md) separately records one exact-head,
 owner-authorized live proof and COMMENT. This contract grants no live authority.
-No production orchestration or CI is configured.
+The [T02 Phase A assessment](../../experiments/dot-events/README.md) is documentation only and authorizes no setup or execution. No production orchestration or CI is configured.
 
 Run the following commands from the repository root in PowerShell. A failed
 command is a failed check. Record the checked commit and working-tree state in
@@ -36,7 +36,7 @@ require review.
 $markdownFiles = @('README.md', 'AGENTS.md', '__ai__.md')
 $markdownFiles += @(Get-ChildItem -LiteralPath 'docs' -Recurse -File -Filter '*.md' |
     Select-Object -ExpandProperty FullName)
-$markdownFiles += @('experiments/codex-review/README.md', 'experiments/codex-review/__ai__.md')
+$markdownFiles += @('experiments/codex-review/README.md', 'experiments/codex-review/__ai__.md', 'experiments/dot-events/README.md', 'experiments/dot-events/__ai__.md')
 $brokenLinks = @(
     foreach ($file in $markdownFiles) {
         $resolved = (Get-Item -LiteralPath $file).FullName
