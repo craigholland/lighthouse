@@ -260,7 +260,7 @@ and does not reach account, thread, or review effects. No raw metadata
 is retained. A pinned SDK method with an inert RPC double demonstrates
 the wire shape; this is not evidence of a live runtime or available model.
 
-### Private history collection (offline correction)
+### Historical private history collection (superseded)
 
 The [Lead outcome](https://github.com/craigholland/lighthouse/issues/4#issuecomment-7138364585)
 records startup and an attributed review acknowledgement at `9028e60`,
@@ -297,3 +297,42 @@ cleanup cannot erase the primary collection disposition. No raw response,
 history, provider errors, prompts or machine paths are retained.
 No history read repeats review/start; neither local cleanup nor its receipt
 proves remote cancellation. Offline SDK-method fixtures are not live proof.
+
+### Public stdio collection (offline only)
+
+The [fifth held attempt](https://github.com/craigholland/lighthouse/issues/4#issuecomment-7140567269)
+recorded a mismatching projected turn ID after acknowledgement. The actual
+differing ID was deliberately not retained. Separately, the [Lead decision](https://github.com/craigholland/lighthouse/issues/4#issuecomment-7141253406)
+and inert SDK regression demonstrate that generic review/start can lose
+typed lifecycle events arriving before registration. This was not the
+mechanism used in the fifth trial.
+
+The experiment now uses the [public App Server stdio JSONL protocol](https://learn.chatgpt.com/docs/app-server)
+for its already-managed worker; SDK public schema and bundled runtime stay
+at 0.171.0. No PATH expansion, executable override, SDK private router,
+history reads, alternate review API, or recovery dispatch is used.
+The [pinned review handler](https://github.com/openai/codex/blob/rust-v0.171.0/codex-rs/app-server/src/request_processors/turn_processor.rs#L415-L438)
+returns the review thread and dispatched turn. The
+[pinned core review lifecycle](https://github.com/openai/codex/blob/rust-v0.171.0/codex-rs/core/src/session/review.rs)
+does not promise a normal parent turn/started. The review items carry
+independent item IDs; only the explicit envelope thread/turn and matching
+terminal turn identify the run. The terminal can have no items.
+
+One ordered reader arms capture before the review request is written.
+Before and after acknowledgement it retains only review-mode item
+completions and terminal signals, limited to 16 events and 256 KiB total
+wire size. The frame cap is 1 MiB, outgoing request cap 4 MiB and at most
+two request IDs are pending (one reserved for cooperative interruption).
+The existing parent cutoff remains authoritative. Only one matching
+entered/exited pair with substantive review text and a successful matching
+terminal can complete. Invalid framing, mismatches, duplicates, overflow,
+server error, loss before terminal, no output and permission requests hold.
+The existing fixed private correlation and separate late attention/cleanup
+receipts apply. Reader shutdown and validation precede the worker's result;
+the parent must still observe worker exit and zero active job processes
+before publication. Local shutdown does not establish provider cancellation.
+
+This is offline evidence only. All five historical claims remain consumed.
+The dedicated fresh non-ephemeral home and approved retention conditions
+remain unchanged; the wire does not open old sessions or query history.
+No new trial, merge, Gate A acceptance or T02 admission is authorized.

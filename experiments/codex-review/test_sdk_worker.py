@@ -7,6 +7,7 @@ from pathlib import Path
 from threading import Event
 
 import pytest
+from app_server_stdio import Signal
 from openai_codex.generated.v2_all import (
     GetAccountResponse,
     ReviewStartResponse,
@@ -56,6 +57,7 @@ class FakeClient:
             "updatedAt": 0, "cwd": str(self.root), "cliVersion": "0.171.0", "ephemeral": self.failure == "ephemeral",
             "modelProvider": "openai", "preview": "", "source": "cli",
             "status": {"type": "idle"},
+            "historyMode": "legacy",
             "turns": turns,
             "gitInfo": {
                 "sha": ("b" if self.failure == "head" else "a") * 40,
@@ -121,6 +123,20 @@ class FakeClient:
             "status": "interrupted" if self.failure == "interrupted" else "completed",
             "items": [item, item] if self.failure == "duplicate-output" else [item],
         }])})
+
+    def next_review_signals(self, count: int, stopped: Event) -> tuple[Signal, ...]:
+        assert count == 0
+        observed = self.thread_read("fixture-thread").thread
+        turn = observed.turns[0]
+        return (
+            Signal(observed.id, turn.id, "enteredReviewMode", ""),
+            *(Signal(observed.id, turn.id, "exitedReviewMode", item.root.review)
+              for item in turn.items if item.root.type == "exitedReviewMode"),
+            Signal(observed.id, turn.id, "terminal", turn.status.value),
+        )
+
+    def final_review_signals(self) -> None:
+        return None
 
     def turn_interrupt(self, thread_id: str, turn_id: str) -> None:
         assert (thread_id, turn_id) == ("fixture-thread", "fixture-turn")

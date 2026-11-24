@@ -7,17 +7,18 @@ from dataclasses import dataclass, field
 from enum import StrEnum, auto
 from importlib.metadata import version
 from pathlib import Path
+from subprocess import DEVNULL, PIPE, Popen
 from threading import Event, Thread
 from typing import Protocol
 
+from app_server_stdio import Child, Fault, ProtocolHold, Signal, StdioWire
 from authorization import ExecutionPacket
-from openai_codex.errors import InvalidRequestError
 from openai_codex.generated.v2_all import (
     AskForApprovalValue,
     GetAccountResponse,
     ReviewStartResponse,
-    ThreadReadResponse,
     ThreadStartResponse,
+    TurnInterruptResponse,
     TurnStatus,
 )
 from openai_codex.models import InitializeResponse, JsonObject
@@ -67,7 +68,21 @@ class StartupOutcome(StrEnum):
     CHECKOUT_PROOF_FAILED = auto()
     GIT_IDENTITY_MISMATCH = auto()
     PRE_REVIEW_CHECKING = auto()
+    REVIEW_DISPATCH_UNKNOWN = auto()
+    REVIEW_DISPATCH_DEADLINE_ELAPSED = auto()
+    REVIEW_DISPATCH_INTERRUPTED = auto()
+    REVIEW_DISPATCH_FRAME_INVALID = auto()
+    REVIEW_DISPATCH_BUFFER_OVERFLOW = auto()
+    REVIEW_DISPATCH_TRANSPORT_LOST = auto()
+    REVIEW_DISPATCH_SERVER_ERROR = auto()
+    REVIEW_DISPATCH_ACK_INVALID = auto()
     COLLECTION_READ_FAILED = auto()
+    COLLECTION_FRAME_INVALID = auto()
+    COLLECTION_DEADLINE_ELAPSED = auto()
+    COLLECTION_BUFFER_OVERFLOW = auto()
+    COLLECTION_TRANSPORT_LOST = auto()
+    COLLECTION_SERVER_ERROR = auto()
+    COLLECTION_TERMINAL_CONFLICT = auto()
     COLLECTION_THREAD_ID_MISMATCH = auto()
     COLLECTION_THREAD_MODE_MISMATCH = auto()
     COLLECTION_TURN_COUNT_MISMATCH = auto()
@@ -105,19 +120,31 @@ class ReviewClient(Protocol):
     def account_read(self) -> GetAccountResponse: ...
     def thread_start(self, parameters: JsonObject) -> ThreadStartResponse: ...
     def review_start(self, parameters: JsonObject) -> ReviewStartResponse: ...
-    def thread_read(self, thread_id: str) -> ThreadReadResponse: ...
+    def next_review_signals(self, count: int, stopped: Event) -> tuple[Signal, ...]: ...
+    def final_review_signals(self) -> tuple[Signal, ...] | None: ...
     def turn_interrupt(self, thread_id: str, turn_id: str) -> None: ...
     def approval_requested(self) -> bool: ...
     def close(self) -> None: ...
 
 
-class _SdkClient:
-    """Production boundary; constructor call is deferred to approved execution."""
+def _launch_app_server(workspace: Path, managed_env: dict[str, str]) -> Child:
+    """Launch only the pinned bundled executable on owned local stdio."""
+    from codex_cli_bin import bundled_codex_path  # type: ignore[import-untyped]
+
+    executable = bundled_codex_path()
+    if not executable.is_absolute() or not executable.is_file():
+        raise ProtocolHold(Fault.TRANSPORT)
+    return Popen(
+        [str(executable), "app-server", "--listen", "stdio://"],
+        stdin=PIPE, stdout=PIPE, stderr=DEVNULL, cwd=workspace, env=managed_env,
+    )
+
+
+class _StdioClient:
+    """Managed worker boundary; no SDK router or provider history access."""
 
     def __init__(self, workspace: Path, managed_env: dict[str, str],
-                 on_attention: Callable[[], None]) -> None:
-        from openai_codex.client import CodexClient, CodexConfig
-
+                 on_attention: Callable[[], None], interrupted: Callable[[], bool]) -> None:
         home = managed_env.get("CODEX_HOME")
         if not home:
             raise ReviewHold("Dedicated managed review home unavailable.")
@@ -131,59 +158,64 @@ class _SdkClient:
             or version("openai-codex-cli-bin") != "0.171.0"
         ):
             raise ReviewHold("Pinned SDK or runtime unavailable.")
-        self._approval = Event()
-        self._on_attention = on_attention
-        self._client = CodexClient(
-            CodexConfig(cwd=str(workspace), env=managed_env, experimental_api=False),
-            approval_handler=self._deny_approval,
-        )
+        self._workspace = workspace
+        self._env = managed_env
+        self._attention = on_attention
+        self._interrupted = interrupted
+        self._wire: StdioWire | None = None
+
+    @property
+    def wire(self) -> StdioWire:
+        if self._wire is None:
+            raise ProtocolHold(Fault.TRANSPORT)
+        return self._wire
 
     def start(self) -> None:
-        self._client.start()
-
-    def _deny_approval(self, method: str, params: JsonObject | None) -> JsonObject:
-        self._approval.set()
-        try:
-            self._on_attention()
-        except (OSError, RuntimeError):
-            # The request is still denied if private storage is unavailable.
-            # The approval flag also prevents an attributed completion.
-            pass
-        if method == "item/permissions/requestApproval":
-            return {"permissions": {}, "scope": "turn"}
-        if method == "item/tool/requestUserInput":
-            return {"answers": {}}
-        return {"decision": "decline"}
+        if self._wire is not None:
+            raise ProtocolHold(Fault.TRANSPORT)
+        self._wire = StdioWire(_launch_app_server(self._workspace, self._env), self._attention,
+                              cancelled=self._interrupted)
 
     def initialize(self) -> InitializeResponse:
-        return self._client.initialize()
+        result = self.wire.request("initialize", {
+            "clientInfo": {"name": "lighthouse_t01", "title": "Lighthouse T01", "version": "0.1.0"},
+            "capabilities": {"experimentalApi": False},
+        }, InitializeResponse)
+        self.wire.initialized()
+        return result
 
     def account_read(self) -> GetAccountResponse:
-        return self._client.account_read({"refreshToken": False})
+        return self.wire.request("account/read", {"refreshToken": False}, GetAccountResponse)
 
     def thread_start(self, parameters: JsonObject) -> ThreadStartResponse:
-        return self._client.thread_start(parameters)
+        return self.wire.request("thread/start", dict(parameters), ThreadStartResponse)
 
     def review_start(self, parameters: JsonObject) -> ReviewStartResponse:
-        return self._client.request("review/start", parameters, response_model=ReviewStartResponse)
+        return self.wire.request("review/start", dict(parameters), ReviewStartResponse, capture=True)
 
-    def thread_read(self, thread_id: str) -> ThreadReadResponse:
-        return self._client.thread_read(thread_id, include_turns=True)
+    def next_review_signals(self, count: int, stopped: Event) -> tuple[Signal, ...]:
+        self.wire.wait_for_change(count, stopped)
+        return self.wire.snapshot(stopped)
+
+    def final_review_signals(self) -> tuple[Signal, ...] | None:
+        return self.wire.snapshot(Event())
 
     def turn_interrupt(self, thread_id: str, turn_id: str) -> None:
-        self._client.turn_interrupt(thread_id, turn_id)
+        self.wire.request("turn/interrupt", {"threadId": thread_id, "turnId": turn_id},
+                          TurnInterruptResponse, allow_interrupt=True)
 
     def approval_requested(self) -> bool:
-        return self._approval.is_set()
+        return self._wire is not None and self.wire.requested_permission()
 
     def close(self) -> None:
-        self._client.close()
+        if self._wire is not None:
+            self.wire.close()
 
 
 def open_review_client(workspace: Path, managed_env: dict[str, str],
-                       on_attention: Callable[[], None]) -> ReviewClient:
+                       on_attention: Callable[[], None], interrupted: Callable[[], bool]) -> ReviewClient:
     """Construct, but do not start, the pinned client inside the authorized child."""
-    return _SdkClient(workspace, managed_env, on_attention)
+    return _StdioClient(workspace, managed_env, on_attention, interrupted)
 
 
 def _verify_runtime(info: InitializeResponse, expected: str) -> None:
@@ -250,136 +282,104 @@ class _CollectionHold(ReviewHold):
         self.outcome = outcome
 
 
+_COLLECTION_CODES = {
+    Fault.TIMEOUT: StartupOutcome.COLLECTION_DEADLINE_ELAPSED,
+    Fault.FRAME: StartupOutcome.COLLECTION_FRAME_INVALID,
+    Fault.OVERFLOW: StartupOutcome.COLLECTION_BUFFER_OVERFLOW,
+    Fault.TRANSPORT: StartupOutcome.COLLECTION_TRANSPORT_LOST,
+    Fault.SERVER: StartupOutcome.COLLECTION_SERVER_ERROR,
+    Fault.PERMISSION: StartupOutcome.COLLECTION_PERMISSION_REQUESTED,
+    Fault.INTERRUPTED: StartupOutcome.COLLECTION_INTERRUPTED,
+    Fault.THREAD: StartupOutcome.COLLECTION_THREAD_ID_MISMATCH,
+    Fault.TURN: StartupOutcome.COLLECTION_TURN_ID_MISMATCH,
+    Fault.TERMINAL: StartupOutcome.COLLECTION_TERMINAL_CONFLICT,
+    Fault.OUTPUT: StartupOutcome.COLLECTION_OUTPUT_FAILED,
+}
+_DISPATCH_CODES = {
+    Fault.INTERRUPTED: StartupOutcome.REVIEW_DISPATCH_INTERRUPTED,
+    Fault.TIMEOUT: StartupOutcome.REVIEW_DISPATCH_DEADLINE_ELAPSED,
+    Fault.FRAME: StartupOutcome.REVIEW_DISPATCH_FRAME_INVALID,
+    Fault.OVERFLOW: StartupOutcome.REVIEW_DISPATCH_BUFFER_OVERFLOW,
+    Fault.TRANSPORT: StartupOutcome.REVIEW_DISPATCH_TRANSPORT_LOST,
+    Fault.SERVER: StartupOutcome.REVIEW_DISPATCH_SERVER_ERROR,
+    Fault.ACK: StartupOutcome.REVIEW_DISPATCH_ACK_INVALID,
+    Fault.PERMISSION: StartupOutcome.PERMISSION_REQUESTED,
+}
+
+
+def _check_attention(client: ReviewClient, stopped: Event, on_attention: Callable[[], None]) -> None:
+    if client.approval_requested():
+        on_attention()
+        raise _CollectionHold(StartupOutcome.COLLECTION_PERMISSION_REQUESTED,
+                              "Review needs permission attention.")
+    if stopped.is_set():
+        raise _CollectionHold(StartupOutcome.COLLECTION_INTERRUPTED,
+                              "Review interrupted locally; remote outcome is unknown.")
+
+
+def _attributed_output(signals: tuple[Signal, ...], thread: str, turn: str) -> str | None:
+    output: str | None = None
+    entered = False
+    terminal = False
+    for signal in signals:
+        if signal.thread != thread:
+            raise ProtocolHold(Fault.THREAD)
+        if signal.turn != turn:
+            raise ProtocolHold(Fault.TURN)
+        if terminal:
+            raise ProtocolHold(Fault.TERMINAL)
+        if signal.kind == "enteredReviewMode":
+            if entered or output is not None:
+                raise ProtocolHold(Fault.OUTPUT)
+            entered = True
+        elif signal.kind == "exitedReviewMode":
+            if output is not None or not entered:
+                raise ProtocolHold(Fault.OUTPUT)
+            output = signal.value
+        elif signal.kind == "terminal":
+            if signal.value == "interrupted":
+                raise _CollectionHold(StartupOutcome.COLLECTION_INTERRUPTED,
+                                      "Provider interruption was observed for the known review.")
+            if signal.value == "failed":
+                raise _CollectionHold(StartupOutcome.COLLECTION_RUNTIME_FAILED,
+                                      "Provider reported a failed review.")
+            if signal.value != "completed":
+                raise ProtocolHold(Fault.TERMINAL)
+            terminal = True
+            if (output is None or len(output) > 60_000 or output.strip() in ("", _REVIEW_FALLBACK)
+                or any(ord(char) < 32 and char not in "\r\n\t" for char in output)):
+                raise ProtocolHold(Fault.OUTPUT)
+        else:
+            raise ProtocolHold(Fault.FRAME)
+    return output if terminal else None
+
+
 def _review_result(client: ReviewClient, packet: ExecutionPacket,
-                   thread: str, turn: str, stopped: Event, on_attention: Callable[[], None], checkout: Path) -> Completion:
-    seen = False
-    pending = 0
-
-    def wait_for_visibility() -> None:
-        nonlocal pending
-        if seen:
-            raise _CollectionHold(
-                StartupOutcome.COLLECTION_TURN_DISAPPEARED, "Known review disappeared.",
-            )
-        pending += 1
-        if pending >= 20:
-            raise _CollectionHold(
-                StartupOutcome.COLLECTION_OUTPUT_FAILED, "Known review is not visible.",
-            )
-        stopped.wait(0.25)
-
-    def check_attention() -> None:
-        if client.approval_requested():
-            on_attention()
-            raise _CollectionHold(
-                StartupOutcome.COLLECTION_PERMISSION_REQUESTED, "Review needs permission attention.",
-            )
-        if stopped.is_set():
-            raise _CollectionHold(
-                StartupOutcome.COLLECTION_INTERRUPTED, "Review interrupted locally; remote outcome is unknown.",
-            )
-
+                   thread: str, turn: str, stopped: Event, on_attention: Callable[[], None],
+                   checkout: Path) -> Completion:
+    count = 0
     while True:
-        check_attention()
-        try:
-            response = client.thread_read(thread).thread
-        except InvalidRequestError as exc:
-            check_attention()
-            if exc.code == -32600 and exc.message == (
-                f"thread {thread} is not materialized yet; "
-                "includeTurns is unavailable before first user message"
-            ):
-                wait_for_visibility()
-                continue
-            raise _CollectionHold(
-                StartupOutcome.COLLECTION_READ_FAILED, "Managed review history read was rejected.",
-            ) from None
-        except Exception:
-            check_attention()
-            raise _CollectionHold(
-                StartupOutcome.COLLECTION_READ_FAILED, "Managed review history read failed.",
-            ) from None
-        check_attention()
-        if response.id != thread:
-            raise _CollectionHold(
-                StartupOutcome.COLLECTION_THREAD_ID_MISMATCH, "Review thread ID does not match.",
-            )
-        if response.ephemeral is not False:
-            raise _CollectionHold(
-                StartupOutcome.COLLECTION_THREAD_MODE_MISMATCH, "Review thread mode does not match.",
-            )
-        status = response.status.root
-        if status.type == "systemError":
-            raise _CollectionHold(
-                StartupOutcome.COLLECTION_RUNTIME_FAILED, "Managed review is unavailable.",
-            )
-        if status.type == "active" and status.active_flags:
-            if any(flag.value == "waitingOnApproval" for flag in status.active_flags):
-                on_attention()
-                raise _CollectionHold(
-                    StartupOutcome.COLLECTION_PERMISSION_REQUESTED, "Review needs permission attention.",
-                )
-            raise _CollectionHold(
-                StartupOutcome.COLLECTION_RUNTIME_FAILED, "Managed review needs attention.",
-            )
-        if not response.turns and status.type in ("idle", "active"):
-            wait_for_visibility()
-            continue
-        if not response.turns and seen:
-            raise _CollectionHold(
-                StartupOutcome.COLLECTION_TURN_DISAPPEARED, "Known review disappeared.",
-            )
-        if len(response.turns) != 1:
-            raise _CollectionHold(
-                StartupOutcome.COLLECTION_TURN_COUNT_MISMATCH, "Expected exactly one review turn.",
-            )
-        if response.turns[0].id != turn:
-            raise _CollectionHold(
-                StartupOutcome.COLLECTION_TURN_ID_MISMATCH, "Review turn ID does not match.",
-            )
-        seen = True
-        current = response.turns[0]
-        if current.status == TurnStatus.completed:
-            outputs = [
-                item.root.review for item in current.items if item.root.type == "exitedReviewMode"
-            ]
-            if (
-                len(outputs) != 1 or len(outputs[0]) > 60_000
-                or outputs[0].strip() in ("", _REVIEW_FALLBACK)
-                or any(ord(char) < 32 and char not in "\r\n\t" for char in outputs[0])
-            ):
-                raise _CollectionHold(
-                    StartupOutcome.COLLECTION_OUTPUT_FAILED, "Review lacks one acceptable output.",
-                )
-            check_attention()
+        _check_attention(client, stopped, on_attention)
+        signals = client.next_review_signals(count, stopped)
+        count = len(signals)
+        _check_attention(client, stopped, on_attention)
+        output = _attributed_output(signals, thread, turn)
+        if output is not None:
             try:
-                safe_output = sanitize_review_paths(outputs[0], checkout)
+                safe_output = sanitize_review_paths(output, checkout)
             except ReviewPathError:
                 raise _CollectionHold(
                     StartupOutcome.COLLECTION_OUTPUT_FAILED, "Review contains an unapproved machine path.",
                 ) from None
-            check_attention()
+            _check_attention(client, stopped, on_attention)
             return Completion(thread, turn, packet.head, safe_output)
-        if current.status == TurnStatus.interrupted:
-            raise _CollectionHold(
-                StartupOutcome.COLLECTION_INTERRUPTED, "Provider interruption was observed for the known review.",
-            )
-        if current.status == TurnStatus.failed:
-            raise _CollectionHold(
-                StartupOutcome.COLLECTION_RUNTIME_FAILED, "Provider reported a failed review.",
-            )
-        if current.status != TurnStatus.in_progress or status.type != "active":
-            raise _CollectionHold(
-                StartupOutcome.COLLECTION_OUTPUT_FAILED, "Managed review stopped without an attributable result.",
-            )
-        stopped.wait(0.25)
 
 
 def review(
     packet: ExecutionPacket, context: bytes, instructions: bytes, *, workspace: Path,
     managed_env: dict[str, str], before_review: Callable[[str], None],
     on_started: Callable[[str, str], None], interrupted: Callable[[], bool],
-    factory: Callable[[Path, dict[str, str], Callable[[], None]], ReviewClient] = open_review_client,
+    factory: Callable[[Path, dict[str, str], Callable[[], None]], ReviewClient] | None = None,
     on_attention: Callable[[], None] = lambda: None,
     on_startup: Callable[[StartupOutcome], None] = lambda _outcome: None,
     verify_checkout: Callable[[], None] | None = None,
@@ -427,7 +427,8 @@ def review(
 
     on_startup(StartupOutcome.SDK_STARTING)
     try:
-        client = factory(root, managed_env, permission_attention)
+        client = (factory(root, managed_env, permission_attention) if factory is not None
+                  else open_review_client(root, managed_env, permission_attention, interrupted))
     except Exception:
         on_startup(StartupOutcome.SDK_START_FAILED)
         raise ReviewHold("Managed SDK startup failed.") from None
@@ -482,6 +483,7 @@ def review(
         hold_for_permission()
         if interrupted():
             raise ReviewHold("Review deadline or permission hold reached before dispatch.")
+        failure = StartupOutcome.REVIEW_DISPATCH_UNKNOWN
         started = client.review_start({
             "threadId": thread, "delivery": "inline",
             "target": {
@@ -494,8 +496,9 @@ def review(
             },
         })
         turn = started.turn.id
-        if started.review_thread_id != thread or not _ID.fullmatch(turn):
-            raise ReviewHold("Review dispatch acknowledgement is not attributable.")
+        if (started.review_thread_id != thread or not _ID.fullmatch(turn)
+            or started.turn.status != TurnStatus.in_progress):
+            raise ProtocolHold(Fault.ACK)
         on_started(thread, turn)
         acknowledged.set()
         failure = StartupOutcome.COLLECTION_RUNTIME_FAILED
@@ -512,7 +515,19 @@ def review(
                 return
 
         Thread(target=monitor, daemon=True, name="lighthouse-review-interrupt").start()
-        return _review_result(client, packet, thread, turn, stop, permission_attention, root)
+        completed = _review_result(client, packet, thread, turn, stop, permission_attention, root)
+    except ProtocolHold as exc:
+        operation_failed = True
+        if acknowledged.is_set():
+            code = _COLLECTION_CODES.get(exc.fault, StartupOutcome.COLLECTION_RUNTIME_FAILED)
+        elif failure == StartupOutcome.REVIEW_DISPATCH_UNKNOWN:
+            code = _DISPATCH_CODES.get(exc.fault, failure)
+        else:
+            code = failure or StartupOutcome.INITIALIZATION_FAILED
+        on_startup(code)
+        if exc.fault == Fault.PERMISSION:
+            raise ReviewHold("Review paused at a permission request.") from None
+        raise ReviewHold("Managed review protocol held; acceptance may be unknown.") from None
     except ReviewHold as exc:
         operation_failed = True
         if isinstance(exc, (_ThreadHold, _CollectionHold)):
@@ -541,3 +556,18 @@ def review(
                 pass
             if not operation_failed:
                 raise ReviewHold("Managed review local shutdown is not confirmed.") from None
+
+    try:
+        _check_attention(client, stop, permission_attention)
+        if interrupted():
+            raise ProtocolHold(Fault.INTERRUPTED)
+        final = client.final_review_signals()
+        if final is not None and _attributed_output(final, completed.thread_id, completed.turn_id) is None:
+            raise ProtocolHold(Fault.OUTPUT)
+    except ProtocolHold as exc:
+        on_startup(_COLLECTION_CODES.get(exc.fault, StartupOutcome.COLLECTION_RUNTIME_FAILED))
+        raise ReviewHold("Managed review protocol held during shutdown.") from None
+    except _CollectionHold as exc:
+        on_startup(exc.outcome)
+        raise
+    return completed

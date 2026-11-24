@@ -69,6 +69,11 @@ The historical Phase B claims remain consumed. Persistent review history
 is private to a new dedicated home and authorized only by a new exact
 owner-approved packet with explicit retention terms. Never inspect or reuse
 existing history. Collection failure does not permit another start or publication.
+The experiment-local public JSONL adapter captures before dispatch and
+binds only the acknowledged thread/turn's explicit item and terminal
+signals. Never consult public or private history as fallback, infer
+identity from item IDs, or replace the owned Job Object shutdown gate.
+Retain fixed codes and existing correlation only on holds.
 Persist only fixed collection categories with exact acknowledged IDs and
 approval correlation. Keep primary attribution evidence separate from late
 permission attention and cleanup; a display fallback is not review output.

@@ -159,8 +159,8 @@ real SDK or external Git discovery is needed in these fixtures.
 
 Snapshot boundary verification must exercise the exact immutable bytes through the inert load_request preflight, entry, private stage and typed fake SDK. Cover prepared sizes, each inclusive UTF-8 byte cap, one byte over, invalid encoding/hash/text, no initial claim or role for rejected inputs, complete input delivery for accepted bytes, and a fixed private correlated rejection after copied-input drift. Never use real operator settings, snapshots or credentials.
 
-For pinned initialize metadata, run the installed low-level SDK method
-against an inert RPC double through the wrapper and worker. Verify matching
+For pinned initialize metadata, run the public JSONL startup request
+against an inert wire through the wrapper and worker. Verify matching
 public userAgent-only build metadata reaches only typed fake gates, and
 missing, malformed, prerelease, mismatched or contradictory metadata
 cannot reach account, thread or review activity. The correlated fixed
@@ -168,13 +168,15 @@ initialization failure must survive a fake close failure. Do not read a
 private SDK version attribute or use the client-requested version as
 runtime evidence.
 
-For review collection, use the installed public SDK method through an inert
-RPC double. Check pinned legacy and paginated full-history response shapes,
-including initial bounded visibility and exact ongoing and completed turn
-identity. Reject the pinned missing-output display fallback. Verify distinct
-fixed receipts for wrong thread ID, effective mode, turn count or ID, and
-disappearance of the established turn. Check acknowledged-ID correlation,
-failed cleanup, late and independently received permission attention,
-one dispatch, and no publication or replay. Do not infer which guard
-fired in the fourth live attempt from source or offline fixtures.
-Never read existing private provider history or launch the runtime.
+For review collection, inject inert JSONL byte streams/process factories
+through the assembled adapter, worker and private stage. Compare the pinned
+SDK's actual pre-acknowledgement notification loss with the public wire
+retaining source-shaped matching item/completion signals in that order.
+Exercise post-acknowledgement/interleaved orders, terminal with no items,
+no parent turn/started, foreign/duplicate/conflicting IDs or output, missing
+and fallback output, malformed frames, count/byte overflow, server errors,
+EOF, permission before acknowledgement and during blocking collection,
+deadlines, exact interruption and failed cleanup. Assert no replay,
+no publication on holds and no bypass of parent-confirmed shutdown even
+for an exact terminal and private completion. Do not inspect existing
+private history, start the actual runtime or infer the old mismatching ID.

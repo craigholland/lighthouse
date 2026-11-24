@@ -1,25 +1,16 @@
-"""Exercise the pinned SDK initialize method against an inert RPC double."""
+"""Exercise pinned initialize metadata through the public JSONL wire."""
 import hashlib
 from pathlib import Path
 from types import SimpleNamespace
-from typing import cast
 
 import pytest
 import sdk_worker
 from authorization import canonical_packet
 from live_stage import CHALLENGE, read_signal, run_stage
-from openai_codex.client import CodexClient, CodexConfig
-from openai_codex.generated.v2_all import (
-    GetAccountResponse,
-    ReviewStartResponse,
-    ThreadReadResponse,
-    ThreadStartResponse,
-)
-from openai_codex.models import InitializeResponse, JsonObject
+from test_collection_wire import InertChild, _item, _terminal
 from test_live_stage import ENV, _verify, _workspace
 from test_sdk_worker import FakeClient
 
-_INITIALIZE = CodexClient.initialize
 _UA = "codex_python_sdk/0.171.0 (Windows 10.0.0; x86_64) fixture/1.0"
 
 
@@ -54,56 +45,45 @@ def test_pinned_initialize_method_and_worker_share_effective_runtime_evidence(
     if server is not None:
         payload["serverInfo"] = server
 
-    class InertRPC(FakeClient):
-        def __init__(self, config: CodexConfig, **_unused: object) -> None:
-            super().__init__(workspace, "null-git")
-            self.config = config
-            self.config.client_version = "7.7.7"
+    fixture = FakeClient(workspace, "null-git")
+    child: InertChild
 
-        def initialize(self) -> InitializeResponse:
-            return _INITIALIZE(cast(CodexClient, self))
-
-        def request(
-            self, method: str, params: JsonObject | None, *,
-            response_model: type[InitializeResponse] | type[ReviewStartResponse],
-        ) -> InitializeResponse | ReviewStartResponse:
-            if method == "initialize":
-                assert response_model is InitializeResponse and params is not None
-                assert isinstance(params["clientInfo"], dict)
-                assert params["clientInfo"]["version"] == "7.7.7"
-                effects.append("initialize-rpc")
-                return response_model.model_validate(payload)
-            assert method == "review/start" and response_model is ReviewStartResponse
-            assert params is not None
-            effects.append("fake-dispatch")
-            self.events.append("intent")
-            ack = self.review_start(params)
-            self.events.append("ack")
-            return ack
-
-        def notify(self, method: str, params: JsonObject | None) -> None:
-            assert method == "initialized" and params is None
+    def receive(message: dict[str, object]) -> None:
+        method = message["method"]
+        if method == "initialized":
             effects.append("initialized")
-
-        def account_read(self, _params: JsonObject | None = None) -> GetAccountResponse:
+            return
+        message_id = message["id"]
+        params = message["params"]
+        assert isinstance(params, dict)
+        if method == "initialize":
+            effects.append("initialize-rpc")
+            assert params["clientInfo"]["version"] == "0.1.0"
+            response = payload
+        elif method == "account/read":
             effects.append("fake-account")
-            return super().account_read()
-
-        def thread_start(self, parameters: JsonObject) -> ThreadStartResponse:
+            response = fixture.account_read().model_dump(by_alias=True, mode="json")
+        elif method == "thread/start":
             effects.append("fake-thread")
-            return super().thread_start(parameters).model_copy(update={"model": packet.model})
+            thread = fixture.thread_start(params).model_copy(update={"model": packet.model})
+            response = thread.model_dump(by_alias=True, mode="json")
+        else:
+            assert method == "review/start"
+            effects.append("fake-dispatch")
+            child.frame(_item("enteredReviewMode"))
+            child.frame(_item("exitedReviewMode"))
+            child.frame(_terminal())
+            response = {"reviewThreadId": "fixture-thread",
+                        "turn": {"id": "fixture-turn", "status": "inProgress", "items": []}}
+        child.frame({"id": message_id, "result": response})
 
-        def thread_read(self, thread_id: str, *, include_turns: bool = True) -> ThreadReadResponse:
-            assert include_turns
-            return super().thread_read(thread_id)
+    def during_close() -> None:
+        effects.append("fake-close")
+        if not valid:
+            assert read_signal(control / "review.startup.json")["outcome"] == "initialization_failed"
 
-        def close(self) -> None:
-            effects.append("fake-close")
-            if not valid:
-                assert read_signal(control / "review.startup.json")["outcome"] == "initialization_failed"
-                raise OSError("synthetic private cleanup text")
-
-    monkeypatch.setattr("openai_codex.client.CodexClient", InertRPC)
+    child = InertChild(receive, during_close=during_close, close_fails=not valid)
+    monkeypatch.setattr(sdk_worker, "_launch_app_server", lambda *_: child)
     monkeypatch.setattr(sdk_worker, "os", SimpleNamespace(environ={}))
 
     def parent_handoff(_delay: float) -> None:

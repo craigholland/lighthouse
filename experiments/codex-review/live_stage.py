@@ -257,7 +257,7 @@ def _default_review(
 ) -> CompletionLike:
     from sdk_worker import review
 
-    # Isolated, one-role child only; do not give the SDK internal control markers.
+    # The managed App Server must not inherit private worker controls.
     os.environ.pop(CHALLENGE, None)
     os.environ.pop(PARENT, None)
     return review(
@@ -457,7 +457,9 @@ def run_stage(
 
         def interrupted() -> bool:
             marker = control / "review.interrupt.json"
-            return marker.is_file() and read_signal(marker).get("challenge") == challenge
+            observed = utc_now()
+            return (remaining() <= 0 or observed.utcoffset() is None or observed.timestamp() >= packet.expires_at
+                    or (marker.is_file() and read_signal(marker).get("challenge") == challenge))
 
         require_unexpired()
         attention_lock = Lock()
@@ -489,6 +491,7 @@ def run_stage(
             or completed.turn_id != matched_turn or completed.head != packet.head or remaining() <= 0
         ):
             raise StageHold("Private review completion not attributed.")
+        require_unexpired()
         result(
             "review.result.json", thread_id=completed.thread_id, turn_id=completed.turn_id,
             output=completed.output,
