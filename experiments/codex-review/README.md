@@ -241,3 +241,20 @@ Nothing is truncated. Invalid initial material holds before verification or
 claim; invalid material independently observed after copy retains a fixed
 private correlated rejection code without raw exception or snapshot content.
 The bounds are verified offline, not evidence of provider/model capacity.
+
+### Pinned initialization wire compatibility
+
+The [Lead initialization decision](https://github.com/craigholland/lighthouse/issues/4#issuecomment-7137162662)
+covers a source-identified blocker, not another live attempt or proof of
+the first attempt's lost reason. The pinned [wire type](https://github.com/openai/codex/blob/rust-v0.171.0/codex-rs/app-server-protocol/src/protocol/v1.rs#L71-L81)
+and [response builder](https://github.com/openai/codex/blob/rust-v0.171.0/codex-rs/app-server/src/request_processors/initialize_processor.rs#L203-L209)
+return public `userAgent` build metadata, not `serverInfo`. The
+[source-backed prefix](https://github.com/openai/codex/blob/rust-v0.171.0/codex-rs/login/src/auth/default_client.rs#L138-L164)
+places the compiled build version before platform and other suffixes.
+The low-level initialized response is checked at the worker boundary
+against the exact approved runtime pin, not the requested SDK client
+version or SDK internals. Missing, malformed, prerelease, conflicting
+or wrong build metadata retains the fixed private initialization failure
+and does not reach account, thread, or review effects. No raw metadata
+is retained. A pinned SDK method with an inert RPC double demonstrates
+the wire shape; this is not evidence of a live runtime or available model.

@@ -34,6 +34,11 @@ _SAFE_ENV = frozenset({
     "PROGRAMFILES", "PROGRAMFILES(X86)", "PROGRAMDATA",
 })
 _ID = re.compile(r"[A-Za-z0-9_-]{1,128}")
+_RUNTIME_USER_AGENT = re.compile(
+    r"(?P<product>[A-Za-z0-9][A-Za-z0-9._-]*)/"
+    r"(?P<build>(?:0|[1-9][0-9]*)(?:[.](?:0|[1-9][0-9]*)){2})"
+    r"(?: [(][ -'*-~]+[)](?: [ -~]*)?)?"
+)
 _ORIGINS = {
     "https://github.com/craigholland/lighthouse",
     "https://github.com/craigholland/lighthouse.git",
@@ -166,6 +171,20 @@ def open_review_client(workspace: Path, managed_env: dict[str, str],
                        on_attention: Callable[[], None]) -> ReviewClient:
     """Construct, but do not start, the pinned client inside the authorized child."""
     return _SdkClient(workspace, managed_env, on_attention)
+
+
+def _verify_runtime(info: InitializeResponse, expected: str) -> None:
+    """Require the pinned build in the public initialize response's product token."""
+    match = _RUNTIME_USER_AGENT.fullmatch(info.userAgent or "")
+    server = info.serverInfo
+    if (
+        match is None or match["build"] != expected
+        or (server is not None and (
+            (server.version is not None and server.version != match["build"])
+            or (server.name is not None and server.name != match["product"])
+        ))
+    ):
+        raise ReviewHold("Effective App Server runtime does not match.")
 
 
 class _ThreadHold(ReviewHold):
@@ -323,8 +342,7 @@ def review(
         on_startup(StartupOutcome.INITIALIZATION_STARTING)
         info = client.initialize()
         hold_for_permission()
-        if info.serverInfo is None or info.serverInfo.version != packet.runtime:
-            raise ReviewHold("Effective App Server runtime does not match.")
+        _verify_runtime(info, packet.runtime)
         failure = StartupOutcome.MANAGED_ACCOUNT_FAILED
         on_startup(StartupOutcome.MANAGED_ACCOUNT_CHECKING)
         account = client.account_read()

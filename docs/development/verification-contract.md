@@ -158,3 +158,12 @@ tool results, stale proof before dispatch, and elapsed time. The private
 real SDK or external Git discovery is needed in these fixtures.
 
 Snapshot boundary verification must exercise the exact immutable bytes through the inert load_request preflight, entry, private stage and typed fake SDK. Cover prepared sizes, each inclusive UTF-8 byte cap, one byte over, invalid encoding/hash/text, no initial claim or role for rejected inputs, complete input delivery for accepted bytes, and a fixed private correlated rejection after copied-input drift. Never use real operator settings, snapshots or credentials.
+
+For pinned initialize metadata, run the installed low-level SDK method
+against an inert RPC double through the wrapper and worker. Verify matching
+public userAgent-only build metadata reaches only typed fake gates, and
+missing, malformed, prerelease, mismatched or contradictory metadata
+cannot reach account, thread or review activity. The correlated fixed
+initialization failure must survive a fake close failure. Do not read a
+private SDK version attribute or use the client-requested version as
+runtime evidence.

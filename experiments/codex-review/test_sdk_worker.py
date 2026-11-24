@@ -18,6 +18,7 @@ from sdk_worker import Completion, ReviewHold, StartupOutcome, interrupt_known, 
 from snapshots import CONTEXT_LIMIT, INSTRUCTIONS_LIMIT
 from test_authorization import packet_for
 
+_FIXTURE_AGENT = "codex_python_sdk/0.171.0 (Windows 10.0.0; x86_64) fixture/1.0"
 _CONTEXT = b"Fixture diff. Evidence only."
 _INSTRUCTIONS = b"Fixture operator policy."
 
@@ -37,9 +38,11 @@ class FakeClient:
             raise OSError("private fixture path")
         if self.failure == "missing-runtime":
             return InitializeResponse.model_validate({"serverInfo": None})
-        return InitializeResponse.model_validate({"serverInfo": {
-            "version": "0.170.0" if self.failure == "runtime" else "0.171.0",
-        }})
+        return InitializeResponse.model_validate({
+            "userAgent": _FIXTURE_AGENT.replace("0.171.0", "0.170.0")
+            if self.failure == "runtime" else _FIXTURE_AGENT,
+            "platformFamily": "windows", "platformOs": "windows",
+        })
 
     def account_read(self) -> GetAccountResponse:
         account = {"type": "apiKey"} if self.failure == "account" else {
@@ -444,3 +447,62 @@ def test_full_sized_snapshots_keep_exact_complete_text_in_sdk_requests(
     )
     assert result.output == "Fixture result."
     assert client.events == ["intent", "start", "ack", "close"]
+
+
+
+@pytest.mark.parametrize("metadata", [
+    {"userAgent": _FIXTURE_AGENT},
+    {"userAgent": "codex_cli_rs/0.171.0 (Windows 10.0.0; x86_64) "},
+    {"userAgent": _FIXTURE_AGENT, "serverInfo": None},
+    {"userAgent": _FIXTURE_AGENT, "serverInfo": {"version": "0.171.0", "name": "codex_python_sdk"}},
+])
+def test_runtime_build_is_read_from_public_initialize_payload(
+    tmp_path: Path, metadata: dict[str, object],
+) -> None:
+    class PublicMetadata(FakeClient):
+        def initialize(self) -> InitializeResponse:
+            return InitializeResponse.model_validate(metadata)
+
+    assert run_fake(tmp_path, PublicMetadata(tmp_path)).output == "Fixture result."
+
+
+@pytest.mark.parametrize("metadata", [
+    {},
+    {"serverInfo": {"version": "0.171.0"}},
+    {"userAgent": None},
+    {"userAgent": ""},
+    {"userAgent": "codex_python_sdk 0.171.0 (Windows; x86_64)"},
+    {"userAgent": "codex_python_sdk/0.171.0-rc1 (Windows; x86_64)"},
+    {"userAgent": "codex_python_sdk/0.171.0+custom (Windows; x86_64)"},
+    {"userAgent": "codex_python_sdk/0.170.0 (Windows; x86_64) fixture/0.171.0"},
+    {"userAgent": "codex_python_sdk/0.171.0bad (Windows; x86_64)"},
+    {"userAgent": "codex_python_sdk/0.171.0 extra"},
+    {"userAgent": "codex_python_sdk/0.171.0 (Windows; x86_64)broken)"},
+    {"userAgent": _FIXTURE_AGENT + "\n"},
+    {"userAgent": _FIXTURE_AGENT, "serverInfo": {"version": "0.170.0"}},
+    {"userAgent": _FIXTURE_AGENT, "serverInfo": {"version": ""}},
+    {"userAgent": _FIXTURE_AGENT, "serverInfo": {"name": "other_product"}},
+])
+def test_invalid_runtime_metadata_stops_before_account_thread_and_review(
+    tmp_path: Path, metadata: dict[str, object],
+) -> None:
+    class RejectedMetadata(FakeClient):
+        def initialize(self) -> InitializeResponse:
+            return InitializeResponse.model_validate(metadata)
+
+        def account_read(self) -> GetAccountResponse:
+            pytest.fail("account operation must not follow invalid initialization")
+
+    client = RejectedMetadata(tmp_path)
+    outcomes: list[StartupOutcome] = []
+    with pytest.raises(ReviewHold, match=r"^Effective App Server runtime does not match\.$"):
+        run_fake(tmp_path, client, on_startup=outcomes.append)
+    assert outcomes == [
+        StartupOutcome.CHECKOUT_PROOF_CHECKING,
+        StartupOutcome.SDK_STARTING,
+        StartupOutcome.INITIALIZATION_STARTING,
+        StartupOutcome.INITIALIZATION_FAILED,
+        StartupOutcome.CLEANUP_STARTING,
+        StartupOutcome.CLEANUP_COMPLETED,
+    ]
+    assert client.events == ["close"]
