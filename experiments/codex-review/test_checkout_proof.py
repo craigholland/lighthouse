@@ -8,7 +8,8 @@ from test_authorization import packet_for
 
 @pytest.mark.parametrize("failure", (
     "", "root", "origin", "head", "index", "dirty", "malformed", "unavailable", "deadline",
-    "head-changed", "config", "oversize",
+    "head-changed", "config", "oversize", "worktree-origin", "worktree-include",
+    "worktree-conditional-include", "worktree-filter", "url-rewrite",
 ))
 def test_exact_clean_checkout_requires_current_bounded_tool_evidence(
     tmp_path: Path, failure: str,
@@ -22,19 +23,26 @@ def test_exact_clean_checkout_requires_current_bounded_tool_evidence(
     calls: list[tuple[str, ...]] = []
     expected = [
         (("rev-parse", "--show-toplevel"), workspace.as_posix().encode() + b"\n"),
-        (("config", "--local", "--null", "--get-all", "remote.origin.url"),
+        (("config", "--no-includes", "--name-only", "--null", "--list"), b"remote.origin.url\0"),
+        (("config", "--no-includes", "--null", "--get-all", "remote.origin.url"),
          b"https://github.com/craigholland/lighthouse.git\0"),
-        (("config", "--local", "--name-only", "--null", "--list"), b"remote.origin.url\0"),
         (("rev-parse", "--verify", "HEAD"), packet.head.encode() + b"\n"),
         (("ls-files", "-v", "-z"), b"H example.py\0"),
         (("status", "--porcelain=v1", "-z", "--untracked-files=all", "--ignore-submodules=none"), b""),
         (("rev-parse", "--verify", "HEAD"), packet.head.encode() + b"\n"),
     ]
     bad = {
-        "root": (0, b"another\0root"), "origin": (1, b"https://github.com/other/repo\0"),
+        "root": (0, b"another\0root"), "origin": (2, b"https://github.com/other/repo\0"),
         "head": (3, b"b" * 40 + b"\n"), "index": (4, b"S example.py\0"),
         "dirty": (5, b" M example.py\0"), "malformed": (0, b"\xff\n"),
-        "head-changed": (6, b"b" * 40 + b"\n"), "config": (2, b"filter.example.clean\0"),
+        "head-changed": (6, b"b" * 40 + b"\n"), "config": (1, b"filter.example.clean\0"),
+        "worktree-origin": (
+            2, b"https://github.com/craigholland/lighthouse.git\0https://github.com/other/repo\0",
+        ),
+        "worktree-include": (1, b"remote.origin.url\0include.path\0"),
+        "worktree-conditional-include": (1, b"remote.origin.url\0includeIf.gitdir:fixture.path\0"),
+        "worktree-filter": (1, b"remote.origin.url\0filter.example.process\0"),
+        "url-rewrite": (1, b"remote.origin.url\0url.https://example.invalid/.insteadOf\0"),
         "oversize": (5, b"/" * 262_145),
     }
 

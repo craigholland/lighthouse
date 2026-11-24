@@ -369,7 +369,7 @@ def run_stage(
         matched_thread: str | None = None
         matched_turn: str | None = None
 
-        def verify_checkout() -> None:
+        def verify_checkout(*, fresh: bool = False) -> None:
             def require_budget() -> None:
                 require_unexpired()
                 if remaining() <= 0:
@@ -380,7 +380,14 @@ def run_stage(
             if proof is None:
                 from checkout_proof import verify_checkout as prove
                 proof = prove
-            proof(request.git_executable, request.workspace, packet, remaining)
+            try:
+                proof(request.git_executable, request.workspace, packet, remaining)
+            except Exception:
+                if fresh:
+                    from sdk_worker import StartupOutcome
+
+                    on_startup(StartupOutcome.CHECKOUT_PROOF_FAILED)
+                raise
             require_budget()
 
         def before_review(thread: str) -> None:
@@ -398,7 +405,7 @@ def run_stage(
                         or isinstance(verified_at, bool) or not 0 <= clock() - verified_at <= 5
                     ):
                         raise StageHold("Fresh review authority not verified.")
-                    verify_checkout()
+                    verify_checkout(fresh=True)
                     if not 0 <= clock() - verified_at <= 5:
                         raise StageHold("Fresh review authority elapsed during checkout proof.")
                     result("review.intent.json", thread_id=thread)

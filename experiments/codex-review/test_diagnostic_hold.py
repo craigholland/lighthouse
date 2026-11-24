@@ -100,6 +100,13 @@ def test_typed_null_annotation_uses_both_proofs_at_real_stage_boundary(
     events: list[str] = []
 
     class Client(FakeClient):
+        def close(self) -> None:
+            if drift:
+                assert read_signal(control / "review.startup.json")["outcome"] == "checkout_proof_failed"
+                events.append("close-with-checkout-hold")
+                raise OSError("synthetic cleanup detail")
+            super().close()
+
         def thread_start(self, parameters: JsonObject) -> ThreadStartResponse:
             events.append("thread")
             return super().thread_start(parameters).model_copy(update={"model": packet.model})
@@ -142,11 +149,29 @@ def test_typed_null_annotation_uses_both_proofs_at_real_stage_boundary(
 
     monkeypatch.setattr(sdk_worker, "review", partial(sdk_worker.review, factory=factory))
     if drift:
+        claim_path = control.parent / "t01-55.claim"
+        original_claim = claim_path.read_bytes()
         with pytest.raises(sdk_worker.ReviewHold):
             review()
-        assert events == ["proof", "construct", "thread", "fresh-authority"]
+        assert events == ["proof", "construct", "thread", "fresh-authority", "close-with-checkout-hold"]
+        correlation = {
+            "challenge": ENV[CHALLENGE], "head": packet.head, "dispatch_id": packet.dispatch_id,
+            "packet_sha256": hashlib.sha256(canonical_packet(packet)).hexdigest(),
+        }
+        assert read_signal(control / "review.startup.json") == {
+            **correlation, "outcome": "checkout_proof_failed",
+        }
+        assert read_signal(control / "review.cleanup.json") == {
+            **correlation, "outcome": "cleanup_failed",
+        }
+        assert not (control / "review.started.json").exists()
         assert not (control / "review.intent.json").exists()
         assert not (control / "review.result.json").exists()
+        with pytest.raises(RuntimeError, match="already claimed"):
+            run_stage("verifier", control, env=ENV, clock=lambda: 104, parent_pid=lambda: 123,
+                      verify_call=_verify)
+        assert claim_path.read_bytes() == original_claim
+        assert events == ["proof", "construct", "thread", "fresh-authority", "close-with-checkout-hold"]
     else:
         review()
         assert events == ["proof", "construct", "thread", "fresh-authority", "proof", "dispatch"]

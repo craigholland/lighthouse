@@ -93,15 +93,19 @@ def verify_checkout(
         root = read("rev-parse", "--show-toplevel").removesuffix(b"\n").removesuffix(b"\r")
         if not root or b"\n" in root or b"\r" in root or Path(root.decode("utf-8")) != workspace:
             raise CheckoutHold("Checkout root mismatch.")
-        origin = read("config", "--local", "--null", "--get-all", "remote.origin.url")
-        if not origin.endswith(b"\0") or origin[:-1] not in _ORIGINS:
-            raise CheckoutHold("Checkout origin mismatch.")
-        keys = read("config", "--local", "--name-only", "--null", "--list")
+        # System/global inputs are disabled by run_git. Omitting --local
+        # includes the higher-priority worktree layer as well as common config.
+        # Inspect include directives without following them.
+        keys = read("config", "--no-includes", "--name-only", "--null", "--list")
         if not keys.endswith(b"\0") or any(
             not key or key.lower().startswith((b"include.", b"includeif.", b"filter."))
+            or (key.lower().startswith(b"url.") and key.lower().endswith(b".insteadof"))
             for key in keys[:-1].split(b"\0")
         ):
             raise CheckoutHold("Checkout configuration is not inert.")
+        origin = read("config", "--no-includes", "--null", "--get-all", "remote.origin.url")
+        if not origin.endswith(b"\0") or origin[:-1] not in _ORIGINS:
+            raise CheckoutHold("Checkout origin mismatch or ambiguity.")
         expected_head = packet.head.encode("ascii")
         head_args = ("rev-parse", "--verify", "HEAD")
         if read(*head_args) not in (expected_head + b"\n", expected_head + b"\r\n"):

@@ -209,7 +209,12 @@ authorizes a bounded correction, not a retry. The private operator binds an
 existing canonical `git.exe`; the contained worker uses a fixed argument
 vector and minimal environment rather than inheriting PATH. Read-only Git
 checks confirm the canonical root, allowed repository origin, exact packet
-head and clean tracked/untracked (non-ignored) review content. The check
+head and clean tracked/untracked (non-ignored) review content. Common and
+worktree Git configuration are considered together. Multiple origin values,
+includes, filters, and fetch URL rewrites hold rather than falling back to
+common config or following an include. A changed checkout discovered by
+the second proof retains a private correlated failure before cleanup.
+The check
 runs before SDK startup and again under the same deadline after fresh
 review authority and before writing intent. The thread must still report
 the approved working directory and effective read-only/deny-all policy.
