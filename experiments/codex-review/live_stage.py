@@ -12,6 +12,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
+from threading import Lock
 from typing import TYPE_CHECKING, Literal, Protocol
 
 if TYPE_CHECKING:
@@ -385,8 +386,15 @@ def run_stage(
             return marker.is_file() and read_signal(marker).get("challenge") == challenge
 
         require_unexpired()
+        attention_lock = Lock()
+        attention_recorded = False
+
         def on_attention() -> None:
-            result("review.attention.json", reason="permission-request", next_actor="owner")
+            nonlocal attention_recorded
+            with attention_lock:
+                if not attention_recorded:
+                    result("review.attention.json", reason="permission-request", next_actor="owner")
+                    attention_recorded = True
 
         completed = (review_call or _default_review)(
             packet, context, instructions, workspace=request.workspace,

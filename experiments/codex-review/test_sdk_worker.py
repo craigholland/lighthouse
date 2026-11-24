@@ -1,6 +1,7 @@
 """Exercise the deferred SDK worker through typed, synthetic App Server replies."""
 
 import hashlib
+from collections.abc import Callable
 from pathlib import Path
 from threading import Event
 
@@ -111,7 +112,7 @@ def run_fake(root: Path, client: FakeClient, context: bytes = _CONTEXT) -> Compl
         assert (thread_id, turn_id) == ("fixture-thread", "fixture-turn")
         client.events.append("ack")
 
-    def factory(path: Path, env: dict[str, str]) -> FakeClient:
+    def factory(path: Path, env: dict[str, str], _attention: Callable[[], None]) -> FakeClient:
         assert path == root and not env
         return client
 
@@ -193,7 +194,7 @@ def test_cooperative_interrupt_targets_returned_run_only(tmp_path: Path) -> None
             packet, _CONTEXT, _INSTRUCTIONS, workspace=tmp_path, managed_env={},
             before_review=lambda _thread: client.events.append("intent"),
             on_started=lambda _thread, _turn: client.events.append("ack"),
-            interrupted=signal.is_set, factory=lambda _path, _env: client,
+            interrupted=signal.is_set, factory=lambda _path, _env, _attention: client,
         )
     assert client.events == ["intent", "start", "ack", "requested-interrupt", "close"]
 
@@ -212,6 +213,6 @@ def test_holds_before_review_if_recheck_denies(tmp_path: Path) -> None:
         review(
             packet, _CONTEXT, _INSTRUCTIONS, workspace=tmp_path, managed_env={},
             before_review=before, on_started=lambda _thread, _turn: pytest.fail("dispatched"),
-            interrupted=lambda: False, factory=lambda _path, _env: client,
+            interrupted=lambda: False, factory=lambda _path, _env, _attention: client,
         )
     assert client.events == ["close"]

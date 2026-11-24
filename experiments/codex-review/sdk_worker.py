@@ -64,7 +64,8 @@ class ReviewClient(Protocol):
 class _SdkClient:
     """Production boundary; constructor call is deferred to approved execution."""
 
-    def __init__(self, workspace: Path, managed_env: dict[str, str]) -> None:
+    def __init__(self, workspace: Path, managed_env: dict[str, str],
+                 on_attention: Callable[[], None]) -> None:
         from openai_codex.client import CodexClient, CodexConfig
 
         home = managed_env.get("CODEX_HOME")
@@ -81,6 +82,7 @@ class _SdkClient:
         ):
             raise ReviewHold("Pinned SDK or runtime unavailable.")
         self._approval = Event()
+        self._on_attention = on_attention
         self._client = CodexClient(
             CodexConfig(cwd=str(workspace), env=managed_env, experimental_api=False),
             approval_handler=self._deny_approval,
@@ -93,6 +95,12 @@ class _SdkClient:
 
     def _deny_approval(self, method: str, params: JsonObject | None) -> JsonObject:
         self._approval.set()
+        try:
+            self._on_attention()
+        except (OSError, RuntimeError):
+            # The request is still denied if private storage is unavailable.
+            # The approval flag also prevents an attributed completion.
+            pass
         if method == "item/permissions/requestApproval":
             return {"permissions": {}, "scope": "turn"}
         if method == "item/tool/requestUserInput":
@@ -124,9 +132,10 @@ class _SdkClient:
         self._client.close()
 
 
-def open_review_client(workspace: Path, managed_env: dict[str, str]) -> ReviewClient:
+def open_review_client(workspace: Path, managed_env: dict[str, str],
+                       on_attention: Callable[[], None]) -> ReviewClient:
     """Open the real pinned client only inside the authorized child."""
-    return _SdkClient(workspace, managed_env)
+    return _SdkClient(workspace, managed_env, on_attention)
 
 
 def _decode_snapshot(data: bytes, expected: str) -> str:
@@ -210,7 +219,7 @@ def review(
     packet: ExecutionPacket, context: bytes, instructions: bytes, *, workspace: Path,
     managed_env: dict[str, str], before_review: Callable[[str], None],
     on_started: Callable[[str, str], None], interrupted: Callable[[], bool],
-    factory: Callable[[Path, dict[str, str]], ReviewClient] = open_review_client,
+    factory: Callable[[Path, dict[str, str], Callable[[], None]], ReviewClient] = open_review_client,
     on_attention: Callable[[], None] = lambda: None,
 ) -> Completion:
     """Review once, with a pre-effect authority callback and private attribution."""
@@ -220,7 +229,7 @@ def review(
         if {key.upper() for key in managed_env} - _SAFE_ENV or interrupted():
             raise ReviewHold("Managed review environment or deadline is invalid.")
         root = workspace.resolve(strict=True)
-        client = factory(root, managed_env)
+        client = factory(root, managed_env, on_attention)
     except ReviewHold:
         raise
     except Exception:
