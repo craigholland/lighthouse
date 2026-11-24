@@ -2,7 +2,11 @@
 
 ## Current scope
 
-The project contains governing documentation and an installable Python CLI foundation. No orchestration engine, integration, or CI is configured.
+The project contains governing documentation and an installable Python CLI
+foundation. Verification commands below remain offline. The [T01 capability
+report](../../experiments/codex-review/README.md) separately records one exact-head,
+owner-authorized live proof and COMMENT. This contract grants no live authority.
+No production orchestration or CI is configured.
 
 Run the following commands from the repository root in PowerShell. A failed
 command is a failed check. Record the checked commit and working-tree state in
@@ -32,6 +36,7 @@ require review.
 $markdownFiles = @('README.md', 'AGENTS.md', '__ai__.md')
 $markdownFiles += @(Get-ChildItem -LiteralPath 'docs' -Recurse -File -Filter '*.md' |
     Select-Object -ExpandProperty FullName)
+$markdownFiles += @('experiments/codex-review/README.md', 'experiments/codex-review/__ai__.md')
 $brokenLinks = @(
     foreach ($file in $markdownFiles) {
         $resolved = (Get-Item -LiteralPath $file).FullName
@@ -104,3 +109,88 @@ requirements if their pins change. Never include local paths, credential-bearing
 index URLs, or editable entries. Validate by repeating the two fresh installs
 and checks above. This establishes version repeatability on the documented
 target, not a byte-identical or offline build guarantee.
+
+## Offline Codex review experiment
+
+From the repository root on Windows AMD64 with existing CPython 3.14.x, use
+a fresh experiment venv. The lock is separate from the foundation lock.
+
+```powershell
+python -m venv experiments/codex-review/.venv
+.\experiments\codex-review\.venv\Scripts\python.exe -m pip install --no-deps -r experiments/codex-review/requirements.lock
+.\experiments\codex-review\.venv\Scripts\python.exe -m pip install --no-build-isolation --no-deps -e .
+.\experiments\codex-review\.venv\Scripts\python.exe -m pip check
+.\experiments\codex-review\.venv\Scripts\python.exe -m pytest -q tests experiments/codex-review
+.\experiments\codex-review\.venv\Scripts\python.exe -m ruff check .
+.\experiments\codex-review\.venv\Scripts\python.exe -m mypy src/lighthouse experiments/codex-review
+.\experiments\codex-review\.venv\Scripts\python.exe experiments/codex-review/proof.py --help
+.\experiments\codex-review\.venv\Scripts\python.exe experiments/codex-review/proof.py --dry-run
+git diff --check origin/development...HEAD
+git diff --cached --check
+```
+
+Retain the foundation installed-module smoke from outside the checkout. The
+experiment's SDK package is installed for offline schema verification only.
+Do not run an executable from its runtime package. Any requests for a live
+runtime launch, sign-in, approval, real review or publication are out of
+scope here. The [experiment report](../../experiments/codex-review/README.md)
+distinguishes fake coverage from the completed one-use live proof. Its consumed
+packet is not approval for another run.
+
+The experiment test suite includes fake-clock role-cutoff and authenticated
+attestation tests, and on Windows one harmless Python-only Job Object test.
+The fixture verifies local containment and shutdown, never an SDK or remote
+provider lifecycle. The ordinary CLI does not start subprocesses.
+
+The same offline suite exercises the operator entry and private child roles
+through injected job, transport and SDK doubles. Do not supply real operator
+settings or execute the opt-in entry as part of preparation verification.
+
+For the offline startup diagnostics, cover startup, initialization/runtime,
+managed account, thread start and policy/identity validation, permission hold
+and SDK close failure using fresh synthetic inputs. Verify private records are
+correlated to dispatch, exact head and packet digest, and the primary reason is
+present before close and unchanged if close fails. Assert no review intent,
+model call or publisher effect on these early holds. Tool discovery checks
+must use installed source or inert package metadata only; do not execute the
+bundled runtime.
+
+For the separate checkout proof, inject fake Git and SDK responses. Include
+absent thread Git metadata with valid proof; reject conflicting metadata,
+wrong root/origin/head/cwd, dirty review content, unavailable or malformed
+tool results, stale proof before dispatch, and elapsed time. The private
+`git_executable` setting is not an authorization record or model input. No
+real SDK or external Git discovery is needed in these fixtures.
+
+Snapshot boundary verification must exercise the exact immutable bytes through the inert load_request preflight, entry, private stage and typed fake SDK. Cover prepared sizes, each inclusive UTF-8 byte cap, one byte over, invalid encoding/hash/text, no initial claim or role for rejected inputs, complete input delivery for accepted bytes, and a fixed private correlated rejection after copied-input drift. Never use real operator settings, snapshots or credentials.
+
+For pinned initialize metadata, run the public JSONL startup request
+against an inert wire through the wrapper and worker. Verify matching
+public userAgent-only build metadata reaches only typed fake gates, and
+missing, malformed, prerelease, mismatched or contradictory metadata
+cannot reach account, thread or review activity. The correlated fixed
+initialization failure must survive a fake close failure. Do not read a
+private SDK version attribute or use the client-requested version as
+runtime evidence.
+
+For review collection, inject inert JSONL byte streams/process factories
+through the assembled adapter, worker and private stage. Compare the pinned
+SDK's actual pre-acknowledgement notification loss with the public wire
+retaining source-shaped matching item/completion signals in that order.
+Exercise post-acknowledgement/interleaved orders, terminal with no items,
+no parent turn/started, foreign/duplicate/conflicting IDs or output, missing
+and fallback output, malformed frames, count/byte overflow, server errors,
+EOF, permission before acknowledgement and during blocking collection,
+deadlines, exact interruption and failed cleanup. Assert no replay,
+no publication on holds and no bypass of parent-confirmed shutdown even
+for an exact terminal and private completion. Do not inspect existing
+private history, start the actual runtime or infer the old mismatching ID.
+
+For the custom-target budget, synthetic request, acknowledgement
+userMessage and enteredReviewMode must share the same complete target.
+Exercise at least 383,589 raw input bytes with escaping and multibyte
+text, accepted raw and encoded boundaries, and the first unsupported
+encoding. Verify outgoing thread/review envelope sizes and both known
+pinned echoes before verifier/claim, with no provider imports in inert
+entry. Test raw-frame, retained-projection and event-count limits
+separately. The sixth observed overflow is not raw provider-frame evidence.

@@ -1,0 +1,86 @@
+# Codex Review Experiment Local Contract
+
+## Last Verified (CI)
+
+No CI is configured. Exact-head offline evidence belongs to the T01 PR.
+
+## Scope
+
+Files in this experiment only. Scratch journals, local venvs, Lead credentials
+and personal settings are not tracked.
+
+## Purpose
+
+Verify conservative recovery and public protocol compatibility offline.
+Keep synthetic receipts distinct from the one [controlled live proof](README.md#controlled-live-proof-2026-11-24).
+
+## Architectural Rules
+
+Save intent before an effect. Resolve ambiguity using attributed observations
+or hold; do not replay. Keep accepted scope fixed and separate receipt,
+acceptance and completion. Live execution remains separately gated.
+
+## Allowed Dependencies
+
+Experiment lock and Python standard library only. SDK use is limited to
+public schema types; no construction, subprocess, network or credential access
+from experiment entry paths. Only the designated offline Windows test launches
+the fixed harmless Python fixture and its descendants.
+
+## Public API / Key Exports
+
+Local help/dry-run and separately held opt-in operator entry; no public package API.
+
+## File Index
+
+- [proof.py](proof.py): offline-only composition and CLI.
+- [harness.py](harness.py): synthetic worker/review boundaries and journal recovery.
+- [sdk_schema.py](sdk_schema.py): response schema parsing without a client.
+- [test_proof.py](test_proof.py) and [test_sdk_schema.py](test_sdk_schema.py):
+  synthetic recovery, safety fences and SDK schema fixtures.
+- [authorization.py](authorization.py): canonical packet, trusted evidence validation and claim.
+- [supervisor.py](supervisor.py): injected, deadline-bound control of distinct proof jobs.
+- [windows_job.py](windows_job.py): owned native Job Object handling; offline native tests use a harmless fixture.
+- [live.py](live.py) and [live_stage.py](live_stage.py): gated role composition and private control.
+- [sdk_worker.py](sdk_worker.py) and [github_transport.py](github_transport.py): deferred, role-separated provider boundaries.
+- [README.md](README.md): capability report, exact controlled proof and disabled approval template.
+
+## Known Gaps / Future-State Notes
+
+One controlled exact-head review and separate COMMENT succeeded. The allowance
+is consumed and readiness retired. No production ledger, general capability,
+Gate A acceptance, merge authority or T02 admission follows from the proof.
+
+## Cross-Folder Contracts
+
+Do not import this experiment into the installable Lighthouse package or add
+its SDK to the foundation runtime/dev lock.
+
+## Verification Contract
+
+Use the [project verification contract](../../docs/development/verification-contract.md)
+from the repository root and record which exact head was checked.
+
+The diagnostic revision adds fixed, private startup and cleanup observations
+to the review role. These records are not inputs to authorization, the SDK
+prompt, the public review, or publication. A missing or mismatched trusted
+checkout proof holds, as does a conflicting provider Git annotation. The
+[checkout verifier](checkout_proof.py) runs fixed read-only Git operations
+with a private canonical operator binding; it does not grant authority.
+All seven Phase B allowances remain consumed. Persistent review history
+is private to a new dedicated home and authorized only by a new exact
+owner-approved packet with explicit retention terms. Never inspect or reuse
+existing history. Collection failure does not permit another start or publication.
+The experiment-local public JSONL adapter captures before dispatch and
+binds only the acknowledged thread/turn's explicit item and terminal
+signals. Never consult public or private history as fallback, infer
+identity from item IDs, or replace the owned Job Object shutdown gate.
+Retain fixed codes and existing correlation only on holds. Check the
+actual custom request and both pinned echoes with the shared wire budget
+before verifier/claim and again in the worker. Do not count discarded
+entered echo text as retained lifecycle output. Preserve full snapshots.
+Persist only fixed collection categories with exact acknowledged IDs and
+approval correlation. Keep primary attribution evidence separate from late
+permission attention and cleanup; a display fallback is not review output.
+
+The shared [snapshot admission validator](snapshots.py) governs inert preflight, operator entry, copied private review input, and worker. It validates approved UTF-8 bytes without changing or trimming them. Keep admission before the claim and record only the fixed correlated diagnostic for copied-input rejection.
