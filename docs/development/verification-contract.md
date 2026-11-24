@@ -2,7 +2,11 @@
 
 ## Current scope
 
-The project contains governing documentation and an installable Python CLI foundation. The Codex review experiment is offline only; no orchestration engine, live integration, or CI is configured.
+The project contains governing documentation and an installable Python CLI
+foundation. Verification commands below remain offline. The [T01 capability
+report](../../experiments/codex-review/README.md) separately records one exact-head,
+owner-authorized live proof and COMMENT. This contract grants no live authority.
+No production orchestration or CI is configured.
 
 Run the following commands from the repository root in PowerShell. A failed
 command is a failed check. Record the checked commit and working-tree state in
@@ -130,7 +134,8 @@ experiment's SDK package is installed for offline schema verification only.
 Do not run an executable from its runtime package. Any requests for a live
 runtime launch, sign-in, approval, real review or publication are out of
 scope here. The [experiment report](../../experiments/codex-review/README.md)
-describes the fake coverage and separate Phase B gate.
+distinguishes fake coverage from the completed one-use live proof. Its consumed
+packet is not approval for another run.
 
 The experiment test suite includes fake-clock role-cutoff and authenticated
 attestation tests, and on Windows one harmless Python-only Job Object test.

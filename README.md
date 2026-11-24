@@ -30,8 +30,10 @@ Craig also approved the work-admission policy and delegated exact labels and
 Issue fields to Codex. The [work intake contract](docs/development/work-intake.md)
 records those conventions. He approved a feasibility-first stage for the initial
 plan: foundation, Codex review proof and Dot handoff proof before production
-orchestration. Integration capabilities remain unproven; execution and concrete
-live activation still require their applicable approvals.
+orchestration. The [T01 capability report](experiments/codex-review/README.md)
+records one controlled exact-head Codex review and COMMENT. Production
+orchestration and Dot handoff remain unproved; execution, acceptance and
+concrete live activation still require their applicable approvals.
 
 The approved rollout uses controlled Lighthouse work for integration proofs and
 keeps Koios as the first real project, inactive until its profile is verified and

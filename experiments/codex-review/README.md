@@ -1,8 +1,34 @@
-# Codex review experiment: T01 Phase A
+# Codex review experiment: T01 capability report
 
-This experiment is the offline-verified preparation for [Lighthouse issue #4](https://github.com/craigholland/lighthouse/issues/4).
-It proves recovery behavior with synthetic data, not an actual Codex run,
-GitHub review, production adapter, or acceptance of Gate A. The opt-in adapters are implemented but live activation remains held.
+[Lighthouse issue #4](https://github.com/craigholland/lighthouse/issues/4) combines
+offline recovery tests and one demonstrated, separately authorized controlled live
+proof. Ordinary verification remains inert. The one-use approval is consumed and
+execution readiness retired. Production orchestration, Dot handoff and Gate A
+acceptance are not established.
+
+## Controlled live proof: 2026-11-24
+
+The [Lead evidence record](https://github.com/craigholland/lighthouse/issues/4#issuecomment-7144851277)
+attributes one successful invocation to source head `1279741bd91b344bc3636e1a034657b3365dbe34`.
+A later documentation commit does not move that receipt to a new source head.
+
+| Evidence | Recorded result |
+| --- | --- |
+| Authority and immutable target | [Execution attestation](https://github.com/craigholland/lighthouse/issues/4#issuecomment-7144548633) binds Lighthouse PR #14 against development, packet SHA-256 `96ca6d99ae49fc341c9b4783fb6de42b1a6bff927df211cb6c7083ea4de00cc4` and dispatch `t01-pr14-1279741-1795554062368`. Fresh pre-effect authority, input admission and both independent checkout checks passed. |
+| Timing | 2026-11-24 21:09:35.5499345 UTC to 21:13:20.4274768 UTC; 224.878 seconds, exit 0, within the single 900-second bound. |
+| Profile | Windows AMD64 / CPython 3.14.2; public SDK schema and bundled runtime 0.171.0; public App Server stdio; fresh private non-ephemeral session; existing managed ChatGPT sign-in; gpt-6.1-sol with configured xhigh; effective read-only/no-network sandbox and deny-all (`never`) approvals. No alternate model, runtime, identity or inherited chat. |
+| Immutable input | Approved context/instructions were 397,238 / 113,308 bytes; their hashes are bound by the packet digest. Admitted thread/review requests were 115,827 / 466,202 bytes and conservative acknowledgement/entered echoes were 466,621 / 466,476 plus the 1,024-byte reserve. No truncation or history fallback. |
+| Completion and shutdown | The review acknowledged and completed with exact attribution. The parent observed worker exit and zero active review-job processes before the separate publisher. The supervisor completed publication and the run; independent post-run local inventory found zero remaining trial-window processes. |
+| Publication | [One reconciled COMMENT review, 6047504741](https://github.com/craigholland/lighthouse/pull/14#pullrequestreview-6047504741), GitHub state COMMENTED at the executed head, by Lead actor 359712317 / App 5869282. Lead matched the receipt, unique marker, head, actor and full body to the completed private output. The model found no actionable defects in the supplied diff; that static finding is separate from integration evidence. |
+| Offline evidence | [Independent review at the executed head](https://github.com/craigholland/lighthouse/pull/14#pullrequestreview-6047311477) records 243 tests in each of two isolated environments and other prescribed checks. This is not CI or live failure-mode coverage. |
+
+After local quiescence, the copied sign-in and both JWT sources were removed
+and the active profile retired. Private non-credential history and receipts
+are retained under the approved terms without post-run history queries. All
+seven allowances are consumed. The six earlier claims and attestations remain
+intact; prior unknown completion and provider cancellation are unchanged.
+No retry, duplicate/restart or negative live proof ran. The result does not
+establish general capability, Gate A acceptance, merge authority or T02 admission.
 
 ## Run
 
@@ -61,8 +87,8 @@ without authorizing an actual live invocation.
   without confirmed local shutdown. A control error prevents stage advancement
   but keeps bounded local force/observation active until cleanup is confirmed
   or the hard deadline expires. The parent only observes or controls owned jobs.
-- `windows_job.py` is currently wired only to a fixed, harmless Python
-  fixture for native verification, never an arbitrary command or a PID. The
+- `windows_job.py` uses a fixed, harmless Python fixture in offline
+  native verification, never an arbitrary command or a PID. The
   native test observes the worker plus two descendant levels, forcibly
   terminates only the owned job, and verifies the retained worker handle is
   signaled and job active count is zero. Local process shutdown cannot prove
@@ -79,10 +105,9 @@ without authorizing an actual live invocation.
   but cannot issue a second POST or advance the task.
 
 
-## Prepared opt-in composition (live execution remains held)
+## Separately gated opt-in composition
 
-The implementation now connects the actual adapters, but the installed
-Codex client, provider and GitHub write path have **not** been exercised.
+The controlled proof above exercised the provider and COMMENT path once.
 Ordinary import, help and dry-run do not construct a client, retrieve a
 credential or start a child job. Only a separately selected Lead operator
 invocation may enter the verifier; no committed configuration enables it.
@@ -98,8 +123,8 @@ invocation may enter the verifier; no committed configuration enables it.
   rechecks the current attestation and exact head. The publisher cannot
   start until identified review completion, worker exit and zero active
   processes are confirmed. Unknown shutdown blocks advancement.
-- `sdk_worker.py` defers construction of the exact pinned SDK and bundled
-  runtime until the contained review role. It requires the existing
+- `sdk_worker.py` uses pinned public schemas and defers the public stdio
+  adapter and bundled runtime until the contained review role. It requires the existing
   managed sign-in from a separately configured Codex home, verifies returned
   account/model/provider, workspace, exact Git head and effective read-only
   sandbox/approval behavior. External Issue/PR data cannot grant authority.
@@ -128,7 +153,7 @@ are still required. No sample credentials, operator paths, or approved
 live command are committed. Missing, edited, stale or unattributed
 approval holds; absent metadata is never inferred from a login or file.
 
-## Candidate bridge surfaces (not exercised live)
+## Historical bridge candidates (not the current wire contract)
 
 The [official SDK guide](https://learn.chatgpt.com/docs/codex-sdk),
 [App Server protocol](https://learn.chatgpt.com/docs/app-server) and pinned SDK
@@ -142,8 +167,9 @@ source describe these surfaces. None of these provider operations was executed d
 | `item/completed` with `exitedReviewMode` | Candidate end-of-review output; not a GitHub receipt or authorization. |
 | `ExternalMessage` and repository instructions | Keep Issue/PR content as external data under controlling instructions; never treat it as permission, readiness or a scope change. |
 
-Sandbox enforcement, account/model/runtime availability, approval handling,
-and exact review-output attribution remain unproved on a real run. Any
+The proof used direct public stdio, not SDK notification routing or history
+polling. Another environment, account, model, runtime or provider failure mode
+is not established by that proof. Any
 unavailable or mismatched setting is a stop, not a reason to change permissions,
 use auto approval, reuse a chat, or add a billing path. The model context never
 receives GitHub App credentials; publication, if separately approved, is
@@ -298,7 +324,7 @@ history, provider errors, prompts or machine paths are retained.
 No history read repeats review/start; neither local cleanup nor its receipt
 proves remote cancellation. Offline SDK-method fixtures are not live proof.
 
-### Public stdio collection (offline only)
+### Public stdio collection and budget correction (offline regression evidence)
 
 The [fifth held attempt](https://github.com/craigholland/lighthouse/issues/4#issuecomment-7140567269)
 recorded a mismatching projected turn ID after acknowledgement. The actual
@@ -357,7 +383,8 @@ The worker sends the entire decoded approved input, using UTF-8 inside
 the JSON text rather than escaping ordinary Unicode twice. Output caps,
 exact IDs, one dispatch, permissions and shutdown gates are unchanged.
 
-This is offline evidence only. All six historical claims remain consumed.
+The tests in this section are offline evidence. The separate controlled
+success and seven consumed allowances are recorded above.
 The dedicated fresh non-ephemeral home and approved retention conditions
 remain unchanged; the wire does not open old sessions or query history.
 No new trial, merge, Gate A acceptance or T02 admission is authorized.

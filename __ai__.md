@@ -55,13 +55,14 @@ external resources or start work. No public Python API is defined.
 - [src/lighthouse/cli.py](src/lighthouse/cli.py): parses help and version arguments.
 - [tests/test_cli.py](tests/test_cli.py): tests the real installed entry point.
 - [docs/README.md](docs/README.md): index of the adopted architecture and plan.
-- [Codex review experiment](experiments/codex-review/__ai__.md): offline-verified, separately gated adapter composition and recovery evidence; no live capability claimed.
+- [Codex review experiment](experiments/codex-review/__ai__.md): offline recovery evidence and one exact-head controlled live proof, not production readiness.
 - [Verification contract](docs/development/verification-contract.md): commands and evidence limits.
 
 ## Known Gaps / Future-State Notes
 
-No orchestration engine, profile schema, storage, adapters, live integrations,
-or CI are implemented. Compatibility is targeted to CPython 3.14.x on Windows
+No production orchestration engine, profile schema, storage, production
+adapters or CI are implemented. The separately gated T01 experiment is not
+a production integration. Compatibility is targeted to CPython 3.14.x on Windows
 AMD64, not asserted for other environments. Integration proofs and production
 activation retain their approval gates in the
 [decision register](docs/decisions/open-questions.md). Basic branch protection

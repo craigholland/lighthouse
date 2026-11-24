@@ -11,8 +11,8 @@ and personal settings are not tracked.
 
 ## Purpose
 
-Prove conservative recovery and selected SDK schema compatibility offline. Do
-not represent synthetic receipts as GitHub reviews.
+Verify conservative recovery and public protocol compatibility offline.
+Keep synthetic receipts distinct from the one [controlled live proof](README.md#controlled-live-proof-2026-11-24).
 
 ## Architectural Rules
 
@@ -40,14 +40,16 @@ Local help/dry-run and separately held opt-in operator entry; no public package 
   synthetic recovery, safety fences and SDK schema fixtures.
 - [authorization.py](authorization.py): canonical packet, trusted evidence validation and claim.
 - [supervisor.py](supervisor.py): injected, deadline-bound control of distinct proof jobs.
-- [windows_job.py](windows_job.py): native Job Object operations scoped to the harmless fixture.
+- [windows_job.py](windows_job.py): owned native Job Object handling; offline native tests use a harmless fixture.
 - [live.py](live.py) and [live_stage.py](live_stage.py): gated role composition and private control.
 - [sdk_worker.py](sdk_worker.py) and [github_transport.py](github_transport.py): deferred, role-separated provider boundaries.
-- [README.md](README.md): offline capability report and disabled approval template.
+- [README.md](README.md): capability report, exact controlled proof and disabled approval template.
 
 ## Known Gaps / Future-State Notes
 
-No live capability, controlled review, production ledger or approval is proved.
+One controlled exact-head review and separate COMMENT succeeded. The allowance
+is consumed and readiness retired. No production ledger, general capability,
+Gate A acceptance, merge authority or T02 admission follows from the proof.
 
 ## Cross-Folder Contracts
 
@@ -65,7 +67,7 @@ prompt, the public review, or publication. A missing or mismatched trusted
 checkout proof holds, as does a conflicting provider Git annotation. The
 [checkout verifier](checkout_proof.py) runs fixed read-only Git operations
 with a private canonical operator binding; it does not grant authority.
-The historical Phase B claims remain consumed. Persistent review history
+All seven Phase B allowances remain consumed. Persistent review history
 is private to a new dedicated home and authorized only by a new exact
 owner-approved packet with explicit retention terms. Never inspect or reuse
 existing history. Collection failure does not permit another start or publication.
