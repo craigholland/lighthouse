@@ -40,7 +40,7 @@ None. The sequence and future fake verification plan are proposals.
 ## Known Gaps / Future-State Notes
 
 Custom tunneled Events-to-Dot availability, exact event-triggered local target
-binding, durable pre-effect claim boundary and cost are unresolved. T02 is
+binding, durable pre-effect claim enforcement, exact lost-receipt recovery and cost are unresolved. See the report inventory for capability-level evidence. T02 is
 not proven and Gate A is open.
 
 ## Cross-Folder Contracts

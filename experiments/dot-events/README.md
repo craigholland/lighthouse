@@ -92,6 +92,33 @@ No product settings, private sessions, credentials or callback endpoints were
 probed for that assessment. Ordinary read-only repository and draft-PR
 coordination use the existing Dot GitHub App, not a prospective T02 credential.
 
+## Coordinator interface inventory
+
+This is a metadata-only follow-up to the approved feasibility report, under
+[Lead's renewed Phase A assignment](https://github.com/craigholland/lighthouse/issues/5#issuecomment-7146613425).
+Lead's [pinned client assessment](https://github.com/craigholland/lighthouse/issues/5#issuecomment-7146613425)
+found generic JSON-RPC forwarding at v0.0.21. This resolves the client-side
+method-list question at source level, not hosted discovery or target eligibility.
+
+| Boundary | Documented or directly visible | Unknown or unsupported on this surface |
+| --- | --- | --- |
+| Caller and build | Cloud Dot coordinator inspected its native interface definitions and observed an eligible Windows computer online, separately from its managed cloud. The attached Windows executor independently confirmed its isolated Lighthouse checkout, branch, clean tracked state, and task revision `7f4154fa8ac3920d782e7bbfc808df9737c21b87`. The latter is a manual local-work observation, not a cloud interface test. | No applicable desktop app build, coordinator build or workspace event entitlement verified through inert metadata. |
+| Local selection | Native coordinator metadata describes selection of a connected computer by exact environment identity or a freshly listed index, with optional strict identity check and an absolute working directory within the existing grant. Desktop default may allocate a new workspace; it does not prove the intended checkout. A different selector starts a saved cloud environment, not the local checkout. Project ID is not an effective selector on this surface. | No demonstrated path from a custom-plugin event wake to these controls, no automatic identity binding to the intended checkout, and no public API/UI contract exposing these exact internal task fields for Lighthouse. |
+| Launch result | Return contract distinguishes admitted execution (task and turn identities), admission unconfirmed after task creation (first turn may still start), and explicit selected-executor-offline with no task created. Environment setup can still be pending after admission. | No caller-provided idempotency key, durable reservation reference, or claim-enforcing provider input is exposed in the visible creation contract. Admission identifiers are not proof of local acceptance or completion. No create was called. |
+| Claim before effect | A Lighthouse-owned reservation could guard calls made through an enforcement boundary **if** that owner actually controls the creation effect. | No visible native task-creation check of Lighthouse's durable reservation and no evidence all paths to that effect can be constrained to such an owner. Model instructions and acquiring a lock inside the already created worker do not enforce one creation. This is a blocker for implementation, not a design to work around. |
+| Known status and output | Native read by exact task identity can provide recorded turn outcome and task-visible messages; records may lag. Completion/failure/interruption/disconnection notifications exist for owning task, according to the visible contract. A disconnect does not establish an ended turn. | No observed execution or receipt. The native record is not an authenticated Lighthouse acceptance/completion receipt binding dispatch, local target, checkout and revision. No existing thread content or histories read. |
+| Lost acknowledgement | If the provider returned a task identity and admits uncertainty, inspect that exact task rather than creating another. | If the identity was lost, no visible exact lookup by caller dispatch or reservation, and no safe create retry. A title, time, prompt marker or thread list cannot restore identity. Retain unknown-held; owner disposition unless conclusive provider evidence appears. |
+| Stop and final state | For an exact eligible visible cloud task, the archival contract describes stopping active work; return errors may leave result uncertain, and archived state can be read back for eligible targets. | Not a general stop for a local-only task, not a strong guarantee of native executor shutdown, no effect cancellation inferred, and no stop called. A future proof must bind final status to the same exact run. |
+| Existing connection | Public docs describe separately enabled plugins and event-eligible connections. The coordinator's visible event surface names a closed set of built-in connector sources; it does not expose a generic custom MCP selector. | No permitted existing metadata established a matching enabled custom MCP/Tunnel connection for this coordinator. Unknown, not absent; no rescan, discovery request, activation or callback probe. |
+
+Operation and field shapes above are capability summaries, not published
+Lighthouse invocation instructions or guarantees of public access. The
+outstanding decision is who can enforce the one durable claim at task creation
+and conclusively reconcile lost identity. Keep the route on hold until Lead
+identifies a supported boundary and intended event-target eligibility, or
+records the route inconclusive. A fake can test a proposed contract but cannot
+prove native enforcement, connectivity or a real status lookup.
+
 ## Proposed bounded proof (not authorized)
 
 1. The owner approves one test workspace/coordinator, one existing Windows
