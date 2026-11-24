@@ -173,6 +173,11 @@ def test_receiver_persists_attention_without_waiting_for_rpc(
                 clients[0].request_permission()
                 clients[0].request_permission()
                 assert not worker.done() and not release.is_set()
+                collection = read_signal(control / "review.collection.json")
+                assert collection["outcome"] == "collection_permission_requested"
+                assert collection["thread_id"] == "fixture-thread"
+                assert collection["turn_id"] == "fixture-turn"
+                assert collection["dispatch_id"] == packet.dispatch_id
             else:
                 worker.result(timeout=2)
                 assert not blocked.is_set()

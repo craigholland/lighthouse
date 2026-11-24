@@ -167,3 +167,9 @@ cannot reach account, thread or review activity. The correlated fixed
 initialization failure must survive a fake close failure. Do not read a
 private SDK version attribute or use the client-requested version as
 runtime evidence.
+
+For review collection, use the installed public SDK method through an inert
+RPC double. Check effective persistent session mode, initial bounded visibility,
+exact thread/turn attribution, one dispatch, hold diagnostics surviving failed
+cleanup, independent permission attention, and no publication or replay.
+Never read existing private provider history or launch the runtime.

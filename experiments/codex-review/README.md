@@ -156,6 +156,7 @@ attributed through a separate narrowly scoped Lead publisher.
 | Owner approval and renewed readiness | Craig's concrete approval reference and Lead's renewed attributed readiness covering these exact fields. |
 | Exact test target | One Lighthouse PR URL, exact head, repository/base, expected Dot author and approved Issue/repository instruction snapshot. Recheck head and authority immediately before any effect. |
 | Execution boundary | Separate Lead checkout/context, selected pinned SDK and bundled runtime, effective read-only access, denial of automatic escalation, existing approved managed sign-in/model policy, concrete maximum calls and elapsed time. No fallback identity or settings. |
+| Private history retention | Explicit owner approval for one fresh non-ephemeral thread in the dedicated private Codex home. Disclose that it may contain the approved input and output; identify the access and retention/deletion plan in the exact private packet. Never inspect existing sessions, publish raw history, or reuse the home/thread as a review target. |
 | Receipt/recovery | Private receipt location, bounded stable dispatch marker, thread/turn IDs if confirmed, final status and interruption/hold evidence. No automatic replay if acceptance is unknown. |
 | Only proposed GitHub action | One exact-head COMMENT review as the verified Codex App, via separate scoped publisher; no approval, change request, merge or release. Observe and reconcile its attributed review ID. |
 | Evidence and stopping | Report real provider/model/runtime and exact-head receipts only if executed and verified. Do not admit T02; Gate A acceptance and merge remain Craig's. |
@@ -258,3 +259,25 @@ or wrong build metadata retains the fixed private initialization failure
 and does not reach account, thread, or review effects. No raw metadata
 is retained. A pinned SDK method with an inert RPC double demonstrates
 the wire shape; this is not evidence of a live runtime or available model.
+
+### Private history collection (offline correction)
+
+The [Lead outcome](https://github.com/craigholland/lighthouse/issues/4#issuecomment-7138364585)
+records startup and an attributed review acknowledgement at `9028e60`,
+followed by a hold. Completion, provider cancellation and a trial COMMENT
+were not established. The pinned runtime rejects full turn history for an
+ephemeral thread. The repaired collector requires a fresh non-ephemeral
+thread in the dedicated private Codex home, with no older thread or turns
+reused. The next exact packet must disclose private history retention,
+access and removal terms to Craig for separate approval. Do not open or
+inspect existing history locations; only the one acknowledged thread is
+queried through the public SDK. Both prior gates and all three historical
+claims remain intact.
+
+Initial unmaterialized or empty visibility may be observed again with the
+same thread ID under the existing deadline and a finite initial poll cap.
+Foreign, multiple or vanishing established turns hold. A post-start hold
+records a fixed correlated collection disposition separately from permission
+attention and cleanup, with no raw response, history or machine path.
+No history read repeats review/start; neither local cleanup nor its receipt
+proves remote cancellation. Offline SDK-method fixtures are not live proof.

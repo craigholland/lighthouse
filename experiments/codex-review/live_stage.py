@@ -371,8 +371,15 @@ def run_stage(
 
         def record_diagnostic(value: str) -> None:
             name = "review.cleanup.json" if value.startswith("cleanup_") else "review.startup.json"
+            correlation: dict[str, object] = {}
+            if value.startswith("collection_"):
+                if matched_thread is None or matched_turn is None:
+                    raise StageHold("Private collection result is not correlated.")
+                name = "review.collection.json"
+                correlation = {"thread_id": matched_thread, "turn_id": matched_turn}
             with diagnostic_lock:
                 write_signal(control / name, {
+                    **correlation,
                     **base, "dispatch_id": packet.dispatch_id, "outcome": value,
                 })
 

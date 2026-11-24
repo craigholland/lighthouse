@@ -53,7 +53,7 @@ class FakeClient:
     def thread(self, turns: list[object]) -> dict[str, object]:
         payload: dict[str, object] = {
             "id": "fixture-thread", "sessionId": "fixture-session", "createdAt": 0,
-            "updatedAt": 0, "cwd": str(self.root), "cliVersion": "0.171.0", "ephemeral": True,
+            "updatedAt": 0, "cwd": str(self.root), "cliVersion": "0.171.0", "ephemeral": self.failure == "ephemeral",
             "modelProvider": "openai", "preview": "", "source": "cli",
             "status": {"type": "idle"},
             "turns": turns,
@@ -86,6 +86,7 @@ class FakeClient:
         if self.failure == "thread-start":
             raise OSError("private fixture path")
         assert parameters["sandbox"] == "read-only"
+        assert parameters["ephemeral"] is False
         assert parameters["approvalPolicy"] == "never"
         assert parameters["approvalsReviewer"] == "user"
         assert parameters["developerInstructions"] and _CONTEXT.decode() not in str(parameters)
@@ -230,7 +231,7 @@ def test_cooperative_interrupt_targets_returned_run_only(tmp_path: Path) -> None
         "context_sha256": hashlib.sha256(_CONTEXT).hexdigest(),
         "instructions_sha256": hashlib.sha256(_INSTRUCTIONS).hexdigest(),
     })
-    with pytest.raises(ReviewHold, match="attention"):
+    with pytest.raises(ReviewHold, match="remote outcome is unknown"):
         review(
             packet, _CONTEXT, _INSTRUCTIONS, workspace=tmp_path, managed_env={},
             before_review=lambda _thread: client.events.append("intent"),
