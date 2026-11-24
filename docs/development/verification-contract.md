@@ -180,3 +180,12 @@ deadlines, exact interruption and failed cleanup. Assert no replay,
 no publication on holds and no bypass of parent-confirmed shutdown even
 for an exact terminal and private completion. Do not inspect existing
 private history, start the actual runtime or infer the old mismatching ID.
+
+For the custom-target budget, synthetic request, acknowledgement
+userMessage and enteredReviewMode must share the same complete target.
+Exercise at least 383,589 raw input bytes with escaping and multibyte
+text, accepted raw and encoded boundaries, and the first unsupported
+encoding. Verify outgoing thread/review envelope sizes and both known
+pinned echoes before verifier/claim, with no provider imports in inert
+entry. Test raw-frame, retained-projection and event-count limits
+separately. The sixth observed overflow is not raw provider-frame evidence.

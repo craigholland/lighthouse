@@ -73,7 +73,10 @@ The experiment-local public JSONL adapter captures before dispatch and
 binds only the acknowledged thread/turn's explicit item and terminal
 signals. Never consult public or private history as fallback, infer
 identity from item IDs, or replace the owned Job Object shutdown gate.
-Retain fixed codes and existing correlation only on holds.
+Retain fixed codes and existing correlation only on holds. Check the
+actual custom request and both pinned echoes with the shared wire budget
+before verifier/claim and again in the worker. Do not count discarded
+entered echo text as retained lifecycle output. Preserve full snapshots.
 Persist only fixed collection categories with exact acknowledged IDs and
 approval correlation. Keep primary attribution evidence separate from late
 permission attention and cleanup; a display fallback is not review output.

@@ -1,6 +1,10 @@
 """Validate exact, approved, bounded UTF-8 evidence without I/O."""
 
 from hashlib import sha256
+from pathlib import Path
+
+from authorization import ExecutionPacket
+from protocol_budget import ReviewInput, build_review_input
 
 CONTEXT_LIMIT = 524_288
 INSTRUCTIONS_LIMIT = 262_144
@@ -21,3 +25,15 @@ def validate_snapshot(data: bytes, digest: str, limit: int) -> str:
     if not text.strip() or "\0" in text:
         raise SnapshotError("Approved review snapshot is invalid.")
     return text
+
+
+def admit_review_input(packet: ExecutionPacket, workspace: Path, context: bytes, instructions: bytes) -> ReviewInput:
+    """Validate exact bytes and known wire shapes before an allowance can be consumed."""
+    material = build_review_input(
+        packet.head, packet.model, str(workspace),
+        validate_snapshot(context, packet.context_sha256, CONTEXT_LIMIT),
+        validate_snapshot(instructions, packet.instructions_sha256, INSTRUCTIONS_LIMIT),
+    )
+    if not material.fits():
+        raise SnapshotError("Approved review input exceeds the encoded protocol budget.")
+    return material

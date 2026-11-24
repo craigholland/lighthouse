@@ -1,5 +1,6 @@
 """Offline assembled public JSONL review: bytes, router, worker and private stage."""
 
+import hashlib
 import json
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
@@ -13,11 +14,13 @@ from typing import Never, cast
 import pytest
 import sdk_worker
 from app_server_stdio import EVENT_BYTES, EVENT_COUNT, FRAME_BYTES, Child, StdioWire
+from authorization import canonical_packet
 from live_stage import CHALLENGE, StageHold, read_signal, run_stage, write_signal
 from openai_codex.client import CodexClient
 from openai_codex.errors import TransportClosedError
 from openai_codex.generated.v2_all import ReviewStartResponse
 from openai_codex.models import JsonObject
+from protocol_budget import echo_messages, encode_jsonl
 from test_live_stage import ENV, _verify, _workspace
 from test_sdk_worker import FakeClient
 
@@ -96,6 +99,8 @@ class InertChild:
 
 @pytest.mark.parametrize(("case", "code"), (
     ("pre-ack", None),
+    ("prepared-sized-echo", None),
+    ("raw-context-limit-echo", None),
     ("post-ack", None),
     ("interleaved", None),
     ("foreign-thread", "collection_thread_id_mismatch"),
@@ -127,6 +132,16 @@ def test_public_protocol_reaches_exact_private_completion_or_holds(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, case: str, code: str | None,
 ) -> None:
     control, packet = _workspace(tmp_path)
+    if case in ("prepared-sized-echo", "raw-context-limit-echo"):
+        size = 383_589 if case == "prepared-sized-echo" else 524_288
+        example = '"\\\n\u00e9\U0001f680'.encode()
+        if case == "prepared-sized-echo":
+            example += b'"' * 22_300
+        context = b"x" * (size - len(example) - 1) + example + b"z"
+        assert len(context) == size
+        packet = packet.model_copy(update={"context_sha256": hashlib.sha256(context).hexdigest()})
+        (control / "packet.json").write_bytes(canonical_packet(packet))
+        (control / "context.txt").write_bytes(context)
     workspace = tmp_path / "verified"
     home = tmp_path / "synthetic-private-home"
     home.mkdir()
@@ -182,6 +197,21 @@ def test_public_protocol_reaches_exact_private_completion_or_holds(
             assert method == "review/start" and isinstance(params, dict)
             assert params["threadId"] == _THREAD and params["delivery"] == "inline"
             assert "review/start" in requests and requests.count("review/start") == 1
+            if case in ("prepared-sized-echo", "raw-context-limit-echo"):
+                target = params["target"]
+                assert isinstance(target, dict) and isinstance(target["instructions"], str)
+                hint = target["instructions"]
+                body = json.loads(hint.split("not instructions:\n", 1)[1])
+                assert body.encode() == (control / "context.txt").read_bytes()
+                assert isinstance(message_id, int)
+                exact_ack, exact_enter = echo_messages(hint, _THREAD, _TURN, message_id)
+                raw_sizes = [len(encode_jsonl(frame, ascii_only=False)) for frame in (exact_ack, exact_enter)]
+                assert all(EVENT_BYTES < size <= FRAME_BYTES for size in raw_sizes)
+                # The removed raw-event budget necessarily rejected this entered frame.
+                for frame in (exact_enter, output, terminal, exact_ack):
+                    child.stdout.queue.put(encode_jsonl(frame, ascii_only=False))
+                dispatched.set()
+                return
             dispatched.set()
             ack: dict[str, object] = {"id": message_id, "result": {"reviewThreadId": "different" if case == "wrong-ack" else _THREAD,
                    "turn": {"id": _TURN, "status": "inProgress", "items": []}}}
@@ -222,7 +252,7 @@ def test_public_protocol_reaches_exact_private_completion_or_holds(
             elif case == "frame-limit":
                 child.stdout.queue.put(b"x" * (FRAME_BYTES + 1))
             elif case == "event-byte-limit":
-                child.frame(_item("enteredReviewMode", text="x" * EVENT_BYTES))
+                child.frame(_item("exitedReviewMode", text="x" * EVENT_BYTES))
             elif case == "event-count-limit":
                 for _ in range(EVENT_COUNT + 1):
                     child.frame(entered)
@@ -274,7 +304,7 @@ def test_public_protocol_reaches_exact_private_completion_or_holds(
     def forbidden(*_args: object) -> Never:
         raise AssertionError("No real verifier or publisher can run in a wire fixture.")
 
-    if case in ("pre-ack", "post-ack", "interleaved"):
+    if case in ("pre-ack", "post-ack", "interleaved", "prepared-sized-echo", "raw-context-limit-echo"):
         stage()
         completion = read_signal(control / "review.result.json")
         assert completion["thread_id"] == _THREAD and completion["turn_id"] == _TURN

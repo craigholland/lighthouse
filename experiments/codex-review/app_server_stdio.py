@@ -3,16 +3,16 @@
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import StrEnum
-from json import dumps, loads
+from json import loads
 from subprocess import TimeoutExpired
 from threading import Condition, Event, Lock, Thread
 from time import monotonic
 from typing import IO, Protocol
 
+from protocol_budget import FRAME_BYTES as FRAME_BYTES
+from protocol_budget import REQUEST_BYTES, encode_jsonl, request_message
 from pydantic import BaseModel
 
-FRAME_BYTES = 1_048_576
-REQUEST_BYTES = 4_194_304
 EVENT_BYTES = 262_144
 EVENT_COUNT = 16
 _PERMISSION_REPLIES: dict[str, dict[str, object]] = {
@@ -140,7 +140,7 @@ class StdioWire:
 
     def _write(self, message: dict[str, object]) -> None:
         try:
-            data = (dumps(message, ensure_ascii=True, allow_nan=False, separators=(",", ":")) + "\n").encode()
+            data = encode_jsonl(message)
             if len(data) > REQUEST_BYTES:
                 raise ProtocolHold(Fault.OVERFLOW)
             with self._writer:
@@ -173,7 +173,7 @@ class StdioWire:
             request_id = self._next_id
             self._pending.add(request_id)
         try:
-            self._write({"id": request_id, "method": method, "params": parameters})
+            self._write(request_message(request_id, method, parameters))
             with self._state:
                 while request_id not in self._responses:
                     self._guard(ignore_permission=allow_interrupt)
@@ -248,7 +248,8 @@ class StdioWire:
                 message = loads(frame.decode("utf-8"), object_pairs_hook=_object, parse_constant=_nonfinite)
                 if not isinstance(message, dict):
                     raise ProtocolHold(Fault.FRAME)
-                self._route(message, len(frame))
+                self._route(message)
+                del frame, message  # Do not retain the last raw echo while waiting for the next line.
         except ProtocolHold as exc:
             self._hold(exc.fault)
         except (ValueError, RecursionError, TypeError):
@@ -256,7 +257,7 @@ class StdioWire:
         except OSError:
             self._hold(Fault.TRANSPORT)
 
-    def _route(self, message: dict[str, object], frame_bytes: int) -> None:
+    def _route(self, message: dict[str, object]) -> None:
         if "jsonrpc" in message and message["jsonrpc"] != "2.0":
             raise ProtocolHold(Fault.FRAME)
         method = message.get("method")
@@ -273,7 +274,7 @@ class StdioWire:
                     raise ProtocolHold(Fault.FRAME)
                 self._server_request(method, request_id)
             elif isinstance(params, dict):
-                self._notification(method, params, frame_bytes)
+                self._notification(method, params)
             elif method in ("item/completed", "turn/completed", "error"):
                 raise ProtocolHold(Fault.FRAME)
             return
@@ -306,7 +307,7 @@ class StdioWire:
             with self._state:
                 self._state.notify_all()
 
-    def _notification(self, method: str, params: dict[str, object], frame_bytes: int) -> None:
+    def _notification(self, method: str, params: dict[str, object]) -> None:
         from openai_codex.generated.v2_all import (
             ItemCompletedNotification,
             TurnCompletedNotification,
@@ -334,9 +335,14 @@ class StdioWire:
             terminal = TurnCompletedNotification.model_validate(params)
             signal = Signal(terminal.thread_id, terminal.turn.id, "terminal",
                             "failed" if terminal.turn.error is not None else terminal.turn.status.value)
+        if not 0 < len(signal.thread) <= 128 or not 0 < len(signal.turn) <= 128:
+            raise ProtocolHold(Fault.FRAME)
+        # Raw input is bounded by FRAME_BYTES. Only the retained projection
+        # counts toward the separate lifecycle budget; entered text is not kept.
+        retained = 128 + sum(len(text.encode()) for text in (signal.thread, signal.turn, signal.kind, signal.value))
         with self._state:
-            if len(self._signals) >= EVENT_COUNT or self._signal_bytes + frame_bytes > EVENT_BYTES:
+            if len(self._signals) >= EVENT_COUNT or self._signal_bytes + retained > EVENT_BYTES:
                 raise ProtocolHold(Fault.OVERFLOW)
             self._signals.append(signal)
-            self._signal_bytes += frame_bytes
+            self._signal_bytes += retained
             self._state.notify_all()

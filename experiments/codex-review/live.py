@@ -15,7 +15,7 @@ from typing import Literal, Protocol
 
 from authorization import ExecutionPacket, canonical_packet, private_receipt_binding
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
-from snapshots import CONTEXT_LIMIT, INSTRUCTIONS_LIMIT, validate_snapshot
+from snapshots import CONTEXT_LIMIT, INSTRUCTIONS_LIMIT, admit_review_input
 from supervisor import Action, Observation, Role, Supervisor
 
 Stage = Role | Literal["reverify"]
@@ -92,8 +92,7 @@ def load_request(config_path: Path, command: str) -> Request:
         raise ValueError("Proof packet is not bound to this operator invocation.")
     context = _read(source / "context.txt", CONTEXT_LIMIT)
     instructions = _read(source / "instructions.txt", INSTRUCTIONS_LIMIT)
-    validate_snapshot(context, packet.context_sha256, CONTEXT_LIMIT)
-    validate_snapshot(instructions, packet.instructions_sha256, INSTRUCTIONS_LIMIT)
+    admit_review_input(packet, workspace, context, instructions)
     return Request(config, packet, packet_bytes, context, instructions, root, workspace, git_executable,
                    hashlib.sha256(packet_bytes).hexdigest())
 

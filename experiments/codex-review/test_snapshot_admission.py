@@ -5,6 +5,7 @@ import os
 from collections.abc import Callable
 from functools import partial
 from pathlib import Path
+from typing import Never
 
 import pytest
 import sdk_worker
@@ -13,8 +14,10 @@ from live import LiveJobs, load_request, run
 from live_stage import CHALLENGE, PARENT, StageHold, read_signal, run_stage
 from openai_codex.generated.v2_all import ReviewStartResponse, ThreadStartResponse
 from openai_codex.models import JsonObject
+from protocol_budget import build_review_input
+from snapshots import CONTEXT_LIMIT
 from test_live import Job, _operator_request
-from test_live_stage import _verify
+from test_live_stage import ENV, _verify, _workspace
 from test_sdk_worker import FakeClient
 
 
@@ -133,3 +136,59 @@ def test_preflight_bytes_survive_assembled_private_stage_without_truncation(
         assert read_signal(control / "review.result.json")["head"] == packet.head
 
     assert not (control / "publisher.result.json").exists()
+
+
+
+def test_preclaim_escaped_echo_admission_is_inclusive_and_inert(tmp_path: Path) -> None:
+    # Quotes quadruple across the custom target and the provider's outer string.
+    valid = tmp_path / "valid"
+    valid.mkdir()
+    _, config, packet = _material(valid, b"seed", b"fixture instructions")
+    pinned = load_request(config, "fixture-command")
+
+    def fits(size: int) -> bool:
+        return build_review_input(packet.head, packet.model, str(pinned.workspace),
+                                  '"' * size, "fixture instructions").fits()
+
+    low, high = 1, CONTEXT_LIMIT
+    assert fits(low) and not fits(high)
+    while low + 1 < high:
+        midpoint = (low + high) // 2
+        if fits(midpoint):
+            low = midpoint
+        else:
+            high = midpoint
+    synthetic = b'"' * low
+    config.with_name("context.txt").write_bytes(synthetic)
+    approved = packet.model_copy(update={"context_sha256": hashlib.sha256(synthetic).hexdigest()})
+    config.with_name("packet.json").write_bytes(canonical_packet(approved))
+    checked = load_request(config, "fixture-command")
+    assert checked.context == synthetic and low < CONTEXT_LIMIT
+
+    oversized_encoding = synthetic + b'"'
+    invalid = tmp_path / "invalid"
+    invalid.mkdir()
+    env, config, _ = _material(invalid, oversized_encoding, b"fixture instructions")
+
+    def no_factory() -> Job:
+        raise AssertionError("Unadmitted wire size reached a role factory.")
+
+    with pytest.raises(ValueError, match=r"^Approved review input exceeds the encoded protocol budget\.$"):
+        load_request(config, "fixture-command")
+    assert run(0, command="fixture-command", environ=env, factory=no_factory) == 1
+    assert not tuple((invalid / "receipt").iterdir())
+
+    copied = tmp_path / "copied"
+    copied.mkdir()
+    control, original = _workspace(copied)
+    changed = original.model_copy(update={"context_sha256": hashlib.sha256(oversized_encoding).hexdigest()})
+    (control / "packet.json").write_bytes(canonical_packet(changed))
+    (control / "context.txt").write_bytes(oversized_encoding)
+
+    def no_verify(*_arguments: object) -> Never:
+        raise AssertionError("Out-of-budget copied input reached the verifier.")
+
+    with pytest.raises(StageHold, match="snapshot validation"):
+        run_stage("verifier", control, env=ENV, clock=lambda: 102, parent_pid=lambda: 123,
+                  verify_call=no_verify)
+    assert not tuple(control.parent.glob("*.claim"))

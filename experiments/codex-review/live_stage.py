@@ -248,6 +248,15 @@ def _default_publish(env: Mapping[str, str]) -> PublishCall:
     return deferred
 
 
+def _admit_copied_inputs(control: Path, packet: ExecutionPacket, workspace: Path) -> tuple[bytes, bytes]:
+    from snapshots import CONTEXT_LIMIT, INSTRUCTIONS_LIMIT, admit_review_input
+
+    context = read_bounded(control / "context.txt", CONTEXT_LIMIT)
+    instructions = read_bounded(control / "instructions.txt", INSTRUCTIONS_LIMIT)
+    admit_review_input(packet, workspace, context, instructions)
+    return context, instructions
+
+
 def _default_review(
     packet: ExecutionPacket, context: bytes, instructions: bytes, *,
     workspace: Path, managed_env: dict[str, str], before_review: Callable[[str], None],
@@ -346,6 +355,10 @@ def run_stage(
             raise StageHold("Private review allowance not confirmed.")
 
     if role == "verifier":
+        try:
+            _admit_copied_inputs(control, packet, request.workspace)
+        except (OSError, ValueError, StageHold):
+            raise StageHold("Private review snapshot validation failed.") from None
         authority = checked()
         require_unexpired()
         claim(authority, request.receipt_root)
@@ -359,13 +372,6 @@ def run_stage(
         checked()
         result("reverify.result.json", verified_at=clock(), thread_id=_identifier(ready.get("thread_id")))
     elif role == "review":
-        from snapshots import (
-            CONTEXT_LIMIT,
-            INSTRUCTIONS_LIMIT,
-            SnapshotError,
-            validate_snapshot,
-        )
-
         require("verifier.result.json")
         diagnostic_lock = Lock()
         primary_collection_recorded = False
@@ -391,11 +397,8 @@ def run_stage(
                     primary_collection_recorded = True
 
         try:
-            context = read_bounded(control / "context.txt", CONTEXT_LIMIT)
-            instructions = read_bounded(control / "instructions.txt", INSTRUCTIONS_LIMIT)
-            validate_snapshot(context, packet.context_sha256, CONTEXT_LIMIT)
-            validate_snapshot(instructions, packet.instructions_sha256, INSTRUCTIONS_LIMIT)
-        except (OSError, SnapshotError, StageHold):
+            context, instructions = _admit_copied_inputs(control, packet, request.workspace)
+        except (OSError, ValueError, StageHold):
             record_diagnostic("snapshot_validation_failed")
             raise StageHold("Private review snapshot validation failed.") from None
         matched_thread: str | None = None

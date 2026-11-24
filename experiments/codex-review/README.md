@@ -320,8 +320,11 @@ terminal turn identify the run. The terminal can have no items.
 
 One ordered reader arms capture before the review request is written.
 Before and after acknowledgement it retains only review-mode item
-completions and terminal signals, limited to 16 events and 256 KiB total
-wire size. The frame cap is 1 MiB, outgoing request cap 4 MiB and at most
+completions and terminal signals, limited to 16 events and 256 KiB of
+retained UTF-8 projection (plus a per-record reserve charged to that cap).
+An entered-review hint is parsed under the raw frame cap but its text is
+not retained or charged as lifecycle text. The frame cap is 1 MiB,
+outgoing request cap is 4 MiB, and at most
 two request IDs are pending (one reserved for cooperative interruption).
 The existing parent cutoff remains authoritative. Only one matching
 entered/exited pair with substantive review text and a successful matching
@@ -332,7 +335,29 @@ receipts apply. Reader shutdown and validation precede the worker's result;
 the parent must still observe worker exit and zero active job processes
 before publication. Local shutdown does not establish provider cancellation.
 
-This is offline evidence only. All five historical claims remain consumed.
+The [sixth held attempt](https://github.com/craigholland/lighthouse/issues/4#issuecomment-7143181216)
+acknowledged review/start and reported collection_buffer_overflow, without
+completion or publication. The pinned native custom target uses the full
+instructions as a display hint, both in acknowledgement userMessage and
+enteredReviewMode. The actual provider frame was not retained. The prior
+raw-frame accounting reproduced the hold offline with a 383,589-byte
+synthetic context. Its target was 406,068 UTF-8 bytes, compact shaped ack
+451,016 bytes, entered frame 451,006 bytes and outgoing request 450,825
+bytes (all figures are synthetic). The repaired wire attributes that
+same source-shaped echo sequence.
+
+The shared pure budget owner checks the actual thread/review writes,
+compact pinned acknowledgement and entered representations (including
+worst allowed ID lengths and a 1 KiB envelope reserve) before any verifier
+or claim, and repeats validation for the copied inputs and worker.
+Raw snapshots remain capped at 512/256 KiB, but heavily escaped evidence
+can exceed the encoded echo budget before the raw cap. A synthetic
+all-quote context admits 261,667 bytes and rejects 261,668 with no claim.
+The worker sends the entire decoded approved input, using UTF-8 inside
+the JSON text rather than escaping ordinary Unicode twice. Output caps,
+exact IDs, one dispatch, permissions and shutdown gates are unchanged.
+
+This is offline evidence only. All six historical claims remain consumed.
 The dedicated fresh non-ephemeral home and approved retention conditions
 remain unchanged; the wire does not open old sessions or query history.
 No new trial, merge, Gate A acceptance or T02 admission is authorized.
