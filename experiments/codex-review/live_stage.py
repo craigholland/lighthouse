@@ -368,8 +368,10 @@ def run_stage(
 
         require("verifier.result.json")
         diagnostic_lock = Lock()
+        primary_collection_recorded = False
 
         def record_diagnostic(value: str) -> None:
+            nonlocal primary_collection_recorded
             name = "review.cleanup.json" if value.startswith("cleanup_") else "review.startup.json"
             correlation: dict[str, object] = {}
             if value.startswith("collection_"):
@@ -378,10 +380,15 @@ def run_stage(
                 name = "review.collection.json"
                 correlation = {"thread_id": matched_thread, "turn_id": matched_turn}
             with diagnostic_lock:
+                if value == "collection_permission_requested" and primary_collection_recorded:
+                    # The independent attention receipt remains authoritative for permission.
+                    return
                 write_signal(control / name, {
                     **correlation,
                     **base, "dispatch_id": packet.dispatch_id, "outcome": value,
                 })
+                if name == "review.collection.json" and value != "collection_permission_requested":
+                    primary_collection_recorded = True
 
         try:
             context = read_bounded(control / "context.txt", CONTEXT_LIMIT)

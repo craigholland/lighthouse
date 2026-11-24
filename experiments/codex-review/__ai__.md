@@ -69,5 +69,8 @@ The historical Phase B claims remain consumed. Persistent review history
 is private to a new dedicated home and authorized only by a new exact
 owner-approved packet with explicit retention terms. Never inspect or reuse
 existing history. Collection failure does not permit another start or publication.
+Persist only fixed collection categories with exact acknowledged IDs and
+approval correlation. Keep primary attribution evidence separate from late
+permission attention and cleanup; a display fallback is not review output.
 
 The shared [snapshot admission validator](snapshots.py) governs inert preflight, operator entry, copied private review input, and worker. It validates approved UTF-8 bytes without changing or trimming them. Keep admission before the claim and record only the fixed correlated diagnostic for copied-input rejection.

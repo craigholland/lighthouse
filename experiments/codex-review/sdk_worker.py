@@ -34,6 +34,8 @@ _SAFE_ENV = frozenset({
     "APPDATA", "LOCALAPPDATA", "TEMP", "TMP", "SYSTEMDRIVE",
     "PROGRAMFILES", "PROGRAMFILES(X86)", "PROGRAMDATA",
 })
+# The pinned App Server uses this display text when no review output exists.
+_REVIEW_FALLBACK = "Reviewer failed to output a response."
 _ID = re.compile(r"[A-Za-z0-9_-]{1,128}")
 _RUNTIME_USER_AGENT = re.compile(
     r"(?P<product>[A-Za-z0-9][A-Za-z0-9._-]*)/"
@@ -66,7 +68,11 @@ class StartupOutcome(StrEnum):
     GIT_IDENTITY_MISMATCH = auto()
     PRE_REVIEW_CHECKING = auto()
     COLLECTION_READ_FAILED = auto()
-    COLLECTION_ATTRIBUTION_FAILED = auto()
+    COLLECTION_THREAD_ID_MISMATCH = auto()
+    COLLECTION_THREAD_MODE_MISMATCH = auto()
+    COLLECTION_TURN_COUNT_MISMATCH = auto()
+    COLLECTION_TURN_ID_MISMATCH = auto()
+    COLLECTION_TURN_DISAPPEARED = auto()
     COLLECTION_RUNTIME_FAILED = auto()
     COLLECTION_INTERRUPTED = auto()
     COLLECTION_OUTPUT_FAILED = auto()
@@ -253,7 +259,7 @@ def _review_result(client: ReviewClient, packet: ExecutionPacket,
         nonlocal pending
         if seen:
             raise _CollectionHold(
-                StartupOutcome.COLLECTION_ATTRIBUTION_FAILED, "Known review disappeared.",
+                StartupOutcome.COLLECTION_TURN_DISAPPEARED, "Known review disappeared.",
             )
         pending += 1
         if pending >= 20:
@@ -294,9 +300,13 @@ def _review_result(client: ReviewClient, packet: ExecutionPacket,
                 StartupOutcome.COLLECTION_READ_FAILED, "Managed review history read failed.",
             ) from None
         check_attention()
-        if response.id != thread or response.ephemeral is not False:
+        if response.id != thread:
             raise _CollectionHold(
-                StartupOutcome.COLLECTION_ATTRIBUTION_FAILED, "Review thread is not attributable.",
+                StartupOutcome.COLLECTION_THREAD_ID_MISMATCH, "Review thread ID does not match.",
+            )
+        if response.ephemeral is not False:
+            raise _CollectionHold(
+                StartupOutcome.COLLECTION_THREAD_MODE_MISMATCH, "Review thread mode does not match.",
             )
         status = response.status.root
         if status.type == "systemError":
@@ -315,9 +325,17 @@ def _review_result(client: ReviewClient, packet: ExecutionPacket,
         if not response.turns and status.type in ("idle", "active"):
             wait_for_visibility()
             continue
-        if len(response.turns) != 1 or response.turns[0].id != turn:
+        if not response.turns and seen:
             raise _CollectionHold(
-                StartupOutcome.COLLECTION_ATTRIBUTION_FAILED, "Review turn is not attributable.",
+                StartupOutcome.COLLECTION_TURN_DISAPPEARED, "Known review disappeared.",
+            )
+        if len(response.turns) != 1:
+            raise _CollectionHold(
+                StartupOutcome.COLLECTION_TURN_COUNT_MISMATCH, "Expected exactly one review turn.",
+            )
+        if response.turns[0].id != turn:
+            raise _CollectionHold(
+                StartupOutcome.COLLECTION_TURN_ID_MISMATCH, "Review turn ID does not match.",
             )
         seen = True
         current = response.turns[0]
@@ -325,8 +343,10 @@ def _review_result(client: ReviewClient, packet: ExecutionPacket,
             outputs = [
                 item.root.review for item in current.items if item.root.type == "exitedReviewMode"
             ]
-            if len(outputs) != 1 or not outputs[0].strip() or len(outputs[0]) > 60_000 or any(
-                ord(char) < 32 and char not in "\r\n\t" for char in outputs[0]
+            if (
+                len(outputs) != 1 or len(outputs[0]) > 60_000
+                or outputs[0].strip() in ("", _REVIEW_FALLBACK)
+                or any(ord(char) < 32 and char not in "\r\n\t" for char in outputs[0])
             ):
                 raise _CollectionHold(
                     StartupOutcome.COLLECTION_OUTPUT_FAILED, "Review lacks one acceptable output.",

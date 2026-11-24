@@ -169,7 +169,12 @@ private SDK version attribute or use the client-requested version as
 runtime evidence.
 
 For review collection, use the installed public SDK method through an inert
-RPC double. Check effective persistent session mode, initial bounded visibility,
-exact thread/turn attribution, one dispatch, hold diagnostics surviving failed
-cleanup, independent permission attention, and no publication or replay.
+RPC double. Check pinned legacy and paginated full-history response shapes,
+including initial bounded visibility and exact ongoing and completed turn
+identity. Reject the pinned missing-output display fallback. Verify distinct
+fixed receipts for wrong thread ID, effective mode, turn count or ID, and
+disappearance of the established turn. Check acknowledged-ID correlation,
+failed cleanup, late and independently received permission attention,
+one dispatch, and no publication or replay. Do not infer which guard
+fired in the fourth live attempt from source or offline fixtures.
 Never read existing private provider history or launch the runtime.

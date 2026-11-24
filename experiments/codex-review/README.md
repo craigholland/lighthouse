@@ -271,13 +271,29 @@ thread in the dedicated private Codex home, with no older thread or turns
 reused. The next exact packet must disclose private history retention,
 access and removal terms to Craig for separate approval. Do not open or
 inspect existing history locations; only the one acknowledged thread is
-queried through the public SDK. Both prior gates and all three historical
-claims remain intact.
+queried through the public SDK. Both prior gates remain intact.
+
+The [fourth live outcome](https://github.com/craigholland/lighthouse/issues/4#issuecomment-7140050881)
+records an acknowledgement at 70362da followed by a generic attribution
+hold. The exact failing check is not known. All four historical claims and
+attestations remain intact. The public pinned
+[review/start handler](https://github.com/openai/codex/blob/rust-v0.171.0/codex-rs/app-server/src/request_processors/turn_processor.rs#L415-L438)
+returns the submitted turn ID on the requested thread. The
+[loaded-thread history reader](https://github.com/openai/codex/blob/rust-v0.171.0/codex-rs/app-server/src/request_processors/thread_processor.rs#L3368-L3430)
+returns reconstructed legacy turns or hydrated paginated turns. Pinned
+[review item reconstruction](https://github.com/openai/codex/blob/rust-v0.171.0/codex-rs/app-server-protocol/src/protocol/thread_history.rs#L2334-L2407)
+shows that a completed turn may carry fixed display fallback text instead
+of review output. The collector rejects that fallback. Source and inert
+fixtures support matching history shapes, not an alternate ID mapping or
+a recovered cause for the prior live hold.
 
 Initial unmaterialized or empty visibility may be observed again with the
 same thread ID under the existing deadline and a finite initial poll cap.
-Foreign, multiple or vanishing established turns hold. A post-start hold
-records a fixed correlated collection disposition separately from permission
-attention and cleanup, with no raw response, history or machine path.
+Foreign thread ID, conflicting effective persistent mode, incorrect turn
+count, unrelated turn ID and disappearance of an established turn hold
+with distinct fixed codes. The receipt retains only acknowledged IDs
+and existing approval correlation. Late permission attention and failed
+cleanup cannot erase the primary collection disposition. No raw response,
+history, provider errors, prompts or machine paths are retained.
 No history read repeats review/start; neither local cleanup nor its receipt
 proves remote cancellation. Offline SDK-method fixtures are not live proof.
