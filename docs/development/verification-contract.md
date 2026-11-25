@@ -258,11 +258,14 @@ witness timings for the same process owner used by the fixed vendor role:
 .\experiments\codex-review\.venv\Scripts\python.exe -m pytest -q -s experiments/dot-events/test_t02_event_native.py
 ```
 
-There are two sequential cases, explicit stop and owner-process loss. Each
+There are three sequential cases: explicit stop, owner-process loss, and a
+fixture-only negative control with kill-on-close disabled. Each
 has at most three fixed harmless Python processes (supervisor, root and
 descendant), a 20-second outer deadline plus a 3-second cleanup reserve.
 No vendor, sockets, credentials, installation or runtime setup is involved.
 The parent witness holds both exact process handles before release and
-requires both exit signals; the shutdown request alone is not proof. The
+requires both exit signals within a separate two-second causal window before
+helper fallback. The negative control must fail that same condition, and its
+separate fixture-owned cleanup must be witnessed. A request is not proof. The
 backend network and Win32 exception tests and the capture tests remain fake
 only. Run the full suite and prior inert CLI checks unchanged.

@@ -12,6 +12,7 @@ from ctypes import wintypes as w
 from pathlib import Path
 from typing import cast
 
+import t02_event_windows as windows
 from t02_event_windows import _OwnedWindowsJob
 
 _FIXTURE = Path(__file__).resolve()
@@ -58,7 +59,30 @@ def _publish(path: Path, value: object) -> None:
     scratch.replace(path)
 
 
+def _disable_kill_on_close_for_negative_fixture() -> c.WinDLL:
+    kernel = _ORIGINAL_KERNEL()
+    native = kernel.SetInformationJobObject
+
+    def configure(job: int, info_class: int, record: c.c_void_p, size: int) -> int:
+        if info_class != 9:
+            raise RuntimeError("unexpected fixture job setup")
+        limits = c.cast(record, c.POINTER(windows._ExtendedLimits)).contents
+        if limits.basic.flags != 0x2000:
+            raise RuntimeError("unexpected baseline fixture flags")
+        limits.basic.flags = 0
+        return int(native(job, info_class, record, size))
+
+    setattr(kernel, "SetInformationJobObject", configure)
+    return kernel
+
+
+_ORIGINAL_KERNEL = windows._kernel
+
+
 def _owner(directory: Path, case: str) -> None:
+    if case == "owner-loss-negative":
+        # Private test subprocess only, never reachable by the vendor role.
+        windows._kernel = _disable_kill_on_close_for_negative_fixture
     k = _api()
     role = _OwnedWindowsJob(_ms)
     deadline = _ms() + 12_000
@@ -91,7 +115,7 @@ def _owner(directory: Path, case: str) -> None:
             _publish(directory / "owned.json", [root_pid, leaf_pid])
             if _wait_file(directory / "release.json", deadline - 2500) != '"release"':
                 raise RuntimeError("invalid fixture control")
-            if case == "owner-loss":
+            if case in ("owner-loss", "owner-loss-negative"):
                 # Kernel closes the sole job handle as this supervisor exits.
                 # Its parent has separate handles to the exact two owned children.
                 os._exit(0)
@@ -122,7 +146,10 @@ def _tree(directory: Path) -> None:
     )
     try:
         _publish(directory / "tree.json", [os.getpid(), leaf.pid])
-        time.sleep(16)
+        expiry = _ms() + 16_000
+        while _ms() < expiry and not (directory / "fixture-cleanup.json").is_file():
+            time.sleep(0.01)
+        _publish(directory / "fixture-natural-cleanup.json", True)
     finally:
         if leaf.poll() is None:
             leaf.kill()
@@ -137,7 +164,7 @@ def _entry() -> None:
     directory = Path(target).resolve(strict=True)
     if not directory.is_dir() or not directory.name.startswith("native-t02-"):
         raise RuntimeError("only disposable native test directory accepted")
-    if kind == "owner" and rest in (["explicit"], ["owner-loss"]):
+    if kind == "owner" and rest in (["explicit"], ["owner-loss"], ["owner-loss-negative"]):
         _owner(directory, rest[0])
     elif kind == "tree" and not rest:
         _tree(directory)
