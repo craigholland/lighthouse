@@ -47,8 +47,19 @@ def witness(k: c.WinDLL, pid: int) -> int:
 
 def _wait_file(path: Path, deadline: int) -> str:
     while _ms() < deadline:
-        if path.is_file():
-            return path.read_text(encoding="ascii")
+        try:
+            contents = path.read_text(encoding="ascii")
+        except FileNotFoundError:
+            pass
+        except PermissionError:
+            # The atomic publisher or Windows scanning can transiently deny an
+            # open of this exact fixture marker. Keep the original deadline.
+            if path.name != "owned.json":
+                raise
+        else:
+            if _ms() < deadline:
+                return contents
+            break
         time.sleep(0.01)
     raise RuntimeError("native fixture witness deadline")
 

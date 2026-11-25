@@ -87,3 +87,6 @@ Only the designated harmless fixture processes and disposable state are used.
 - [t02_event_capture.py](t02_event_capture.py) and
   [test_t02_event_capture.py](test_t02_event_capture.py): dormant capture-only
   authenticated RPC-to-private-store experiment; no network/sender or activation.
+
+- [t02_capture_evidence.py](t02_capture_evidence.py): offline fixed-scope approval policy, with no default provider.
+- [t02_capture_operator.py](t02_capture_operator.py): inert entry; operational selectors always hold.

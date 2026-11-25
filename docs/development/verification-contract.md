@@ -269,3 +269,22 @@ helper fallback. The negative control must fail that same condition, and its
 separate fixture-owned cleanup must be witnessed. A request is not proof. The
 backend network and Win32 exception tests and the capture tests remain fake
 only. Run the full suite and prior inert CLI checks unchanged.
+
+## Offline capture-only preparation
+
+Use the dedicated hold-only entry in both retained Windows environments:
+
+```powershell
+.\experiments\codex-review\.venv\Scripts\python.exe experiments/dot-events/t02_capture_operator.py --help
+.\experiments\codex-review\.venv\Scripts\python.exe experiments/dot-events/t02_capture_operator.py --dry-run
+.\experiments\codex-review\.venv\Scripts\python.exe experiments/dot-events/t02_capture_operator.py --execute
+```
+
+The last command must exit 2. No packet reads, networking, listener, runtime,
+subscription, or callback transport belongs to this entry. The capture evidence
+fixture verifies the fixed approval scope, current issue/PR metadata, trusted
+records and expiry, including oversized UTF-8 envelopes under the existing 32 KiB
+cap. It checks an exact digest projection only; it does not parse a real operator
+packet, attest a local host or checkout, prepare or admit a one-use run, or
+prove startup, durable stop and independently bounded shutdown. No operational
+prepare/status/run commands exist yet. Do not infer vendor or hosted readiness.
