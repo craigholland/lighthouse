@@ -112,9 +112,11 @@ The future release must supply approved fixed Git/Python/host/checkout
 pins and authenticate capability origins for the coordinator, supervisor,
 and listener. Windows handle type checks alone, a same-user interpreter
 image, and the handoff MAC do not prove who delegated the capabilities.
-Keep the build held until a separately reviewed trusted launcher or
-equivalent OS confinement provides that attribution and the full native
-graph is verified. The earlier closed stand-in fixture is not that proof.
+Keep the build held until Craig and Lead choose and review the operating
+trust boundary, define its exact capability checks, and verify the full
+native graph. No protected launcher, new identity or OS confinement model
+has been selected or authorized. The earlier closed stand-in fixture is not
+that proof.
 Old store layouts are held rather than migrated or reset.
 
 See the [capability-provenance decision note](t02-capture-provenance-design.md)

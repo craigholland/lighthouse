@@ -15,6 +15,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Protocol
 
+from t02_capture_file_metadata import require_stable_metadata
 from t02_capture_local import LocalCaptureObservation
 from t02_capture_packet import MAX_PACKET_BYTES, CapturePacket
 from t02_event_types import Hold, decode
@@ -42,10 +43,14 @@ def _digest(path: Path, clock: Callable[[], int], deadline: int) -> str:
     checksum = hashlib.sha256()
     read = 0
     with path.open("rb") as stream:
+        opened = os.fstat(stream.fileno())
+        require_stable_metadata(before, opened, "capture artifact inspection held at open", path_to_descriptor=True)
         while clock() < deadline:
             data = stream.read(min(1024 * 1024, _MAX_ARTIFACT_BYTES - read + 1))
             if not data:
-                if (read == before.st_size and path.stat() == before
+                require_stable_metadata(opened, os.fstat(stream.fileno()), "capture artifact inspection held after read")
+                require_stable_metadata(before, path.stat(), "capture artifact inspection held at path recheck")
+                if (read == before.st_size
                     and _canonical(path, directory=False) == str(path) and clock() < deadline):
                     return checksum.hexdigest()
                 break

@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from t02_capture_bootstrap import InheritedCapture
+from t02_capture_file_metadata import require_stable_metadata
 from t02_capture_handoff import (
     AcceptedHandoff,
     read_handoff,
@@ -95,12 +96,11 @@ def _read_capture_secret(packet: CapturePacket, field: str, clock: Callable[[], 
             raise Hold("capture private input held")
         with path.open("rb") as stream:
             opened = os.fstat(stream.fileno())
-            if opened != before:
-                raise Hold("capture private input held")
+            require_stable_metadata(before, opened, "capture private input held at open", path_to_descriptor=True)
             data = stream.read(size + 3)
-            if os.fstat(stream.fileno()) != opened:
-                raise Hold("capture private input held")
-        if (len(data) != before.st_size or path.lstat() != before
+            require_stable_metadata(opened, os.fstat(stream.fileno()), "capture private input held after read")
+        require_stable_metadata(before, path.lstat(), "capture private input held at path recheck")
+        if (len(data) != before.st_size
             or _canonical(path, directory=False) != raw_path or clock() >= deadline):
             raise Hold("capture private input held")
         content = data[:-2] if data.endswith(b"\r\n") else data.removesuffix(b"\n")

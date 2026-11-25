@@ -272,6 +272,34 @@ only. Run the full suite and prior inert CLI checks unchanged.
 
 ## Offline capture-only preparation
 
+The [operator runbook](../../experiments/dot-events/t02-capture-operator-runbook.md)
+describes the current fixed composition. Historical component checkpoints below
+record what was verified at their respective stages; they do not supersede
+current runnable tests or certify the selected native process graph.
+
+For file stability checks, ignore only access time changes caused by reading.
+Retain exact opened/current identity, length, type, write/change and birth
+metadata, and Windows attributes. Synthetic regressions must prove access-only
+drift does not false-hold and meaningful stable metadata drift still holds.
+On Windows, do not equate legacy path-observed creation time with a handle's
+change time: require the explicit birth timestamp to match in the cross-view
+identity check, and compare change-time metadata before and after within each
+view. See [Python stat metadata](https://docs.python.org/3.14/library/os.html#os.stat_result).
+Diagnostics identify the kind of check that failed without exposing a path,
+private file metadata values, content or credential.
+
+Run the [selected-topology proof](../../experiments/dot-events/test_t02_selected_topology.py)
+with normal offline pytest. It traverses the selected operator,
+coordinator, supervisor, listener and runtime adapters with fake
+provider/provenance and native I/O boundaries and a disposable real SQLite
+store. This does not start a process or socket. It is not native evidence
+of capability origin. Keep the release binding absent until the operating
+trust model, exact pins, and a separately scoped native proof are reviewed.
+Codex's historical 1c45d7a result was 474 passed/1 failed in the primary
+environment and 475 passed in the secondary; the controlled access-only
+mechanism was reproduced in both, but the first failed run was not rerun
+and its original metadata difference was not captured.
+
 Use the dedicated hold-only entry in both retained Windows environments:
 
 ```powershell

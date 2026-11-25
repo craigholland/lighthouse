@@ -10,6 +10,7 @@ from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import Never
 
+from t02_capture_file_metadata import CaptureMetadataHold, require_stable_metadata
 from t02_capture_local_windows import _canonical
 from t02_capture_packet import MAX_PACKET_BYTES, CapturePacket, _fixed_path
 from t02_event_capture import CaptureBinding, CaptureStore
@@ -66,11 +67,14 @@ def read_packet(path: Path) -> CapturePacket:
     before = path.stat()
     with path.open("rb") as stream:
         opened = os.fstat(stream.fileno())
-        raw = stream.read(MAX_PACKET_BYTES + 1)
-        if not raw or len(raw) > MAX_PACKET_BYTES or len(raw) != before.st_size or opened != before:
+        require_stable_metadata(before, opened, "Private capture packet read held at open", path_to_descriptor=True)
+        if not 0 < before.st_size <= MAX_PACKET_BYTES:
             raise Hold("Private capture packet read held.")
-        if os.fstat(stream.fileno()) != opened or path.stat() != opened:
-            raise Hold("Private capture packet changed.")
+        raw = stream.read(MAX_PACKET_BYTES + 1)
+        if not raw or len(raw) > MAX_PACKET_BYTES or len(raw) != before.st_size:
+            raise Hold("Private capture packet read held.")
+        require_stable_metadata(opened, os.fstat(stream.fileno()), "Private capture packet changed after read")
+        require_stable_metadata(before, path.stat(), "Private capture packet changed at path recheck")
     _canonical(path, directory=False)
     packet = CapturePacket.parse(raw)
     if raw != packet.canonical:
@@ -143,8 +147,7 @@ def main(argv: Sequence[str] | None = None, *, execute: Execute | None = None) -
             before = store.path.stat()
             state, disposition = store.status()
             _canonical(store.path, directory=False)
-            if store.path.stat() != before:
-                raise Hold("Private capture store changed during status.")
+            require_stable_metadata(before, store.path.stat(), "Private capture store changed during status")
             if state not in _STATES or disposition not in _DISPOSITIONS:
                 raise Hold("Private capture store disposition held.")
             print(f"Capture store: {state}; candidate disposition: {disposition}.")
@@ -152,6 +155,9 @@ def main(argv: Sequence[str] | None = None, *, execute: Execute | None = None) -
     except SelectorError:
         print("Held: invalid or incomplete capture selectors.", file=sys.stderr)
         return 2
+    except CaptureMetadataHold as exc:
+        print(f"Held: {exc}.", file=sys.stderr)
+        return 1
     except (Hold, OSError, RuntimeError, ValueError, KeyboardInterrupt):
         print("Held: private capture operation not confirmed.", file=sys.stderr)
         return 1

@@ -81,6 +81,20 @@ Only the designated harmless fixture processes and disposable state are used.
 
 ## Native ownership and dormant capture preparation
 
+Current source wiring is described in the
+[capture-only operator runbook](t02-capture-operator-runbook.md). The fixed
+operator selects the standalone coordinator, not a controller-owned role
+route. The coordinator rechecks exact approval and local facts, consumes one
+durable reservation, then creates original Jobs before the role launch lane.
+The transferred supervisor selects the fixed listener and runtime adapters.
+Channel and receipt binding do not by themselves prove Windows capability
+origin. The installed release binding is absent; direct entries stay held.
+A protected broker remains a [decision proposal](t02-capture-provenance-design.md),
+not an authorized dependency or release feature.
+
+The component notes below describe their independently reviewed offline scope;
+they are not a claim of native selected-process or operational readiness.
+
 - [t02_event_native_fixture.py](t02_event_native_fixture.py) and
   [test_t02_event_native.py](test_t02_event_native.py): only the fixed local
   Python ownership fixture and independent witness, not vendor execution.
@@ -88,18 +102,18 @@ Only the designated harmless fixture processes and disposable state are used.
   [test_t02_event_capture.py](test_t02_event_capture.py): dormant capture-only
   authenticated RPC-to-private-store experiment; no network/sender or activation.
 
-- [t02_capture_evidence.py](t02_capture_evidence.py): offline fixed-scope approval policy, with no default provider.
+- [t02_capture_evidence.py](t02_capture_evidence.py): offline fixed-scope approval policy, with a fixed credentialless reader selected only by the held composition.
 - [t02_capture_operator.py](t02_capture_operator.py): inert entry; operational selectors always hold.
 
 - [t02_capture_packet.py](t02_capture_packet.py): strict capture-only packet and canonical digest, no local attestation.
-- [t02_capture_lifecycle.py](t02_capture_lifecycle.py): synthetic guarded sequencing, no concrete role owner or CLI wiring.
+- [t02_capture_lifecycle.py](t02_capture_lifecycle.py): injected guarded sequencing used for offline proof; the selected executable uses the standalone coordinator.
 - [t02_capture_watchdog.py](t02_capture_watchdog.py): inert deadline policy; no scheduled or native watchdog host.
-- [t02_capture_local.py](t02_capture_local.py): compare injected exact checkout and file facts; no native observer.
+- [t02_capture_local.py](t02_capture_local.py): compare exact checkout and file facts; the native local observer is separately bounded and release-held.
 
 - [t02_capture_windows_host.py](t02_capture_windows_host.py): dormant fixed supervisor Job containment, mock-only checks.
-- [t02_capture_supervisor.py](t02_capture_supervisor.py) and [t02_capture_host_channel.py](t02_capture_host_channel.py): fixed role control and status policy; no native transport or activation.
+- [t02_capture_supervisor.py](t02_capture_supervisor.py) and [t02_capture_host_channel.py](t02_capture_host_channel.py): fixed role control and status over the bounded transport, with activation held.
 
-- [t02_capture_pipe_owner.py](t02_capture_pipe_owner.py), [t02_capture_windows_pipe.py](t02_capture_windows_pipe.py), and [t02_capture_private_channel.py](t02_capture_private_channel.py): private channel provisioning, bounded I/O, and fixed command frames, not connected to the helper entry.
+- [t02_capture_pipe_owner.py](t02_capture_pipe_owner.py), [t02_capture_windows_pipe.py](t02_capture_windows_pipe.py), and [t02_capture_private_channel.py](t02_capture_private_channel.py): private channel provisioning, bounded I/O, and fixed command frames for the selected helper graph.
 - [t02_capture_role_handles.py](t02_capture_role_handles.py): exact locally owned Job/root handoff and stop witness; not an integrated live role.
 - [t02_capture_peer.py](t02_capture_peer.py): guarded peer bootstrap through fake capability events; no native helper entry activation.
 
