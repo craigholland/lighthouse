@@ -163,6 +163,7 @@ class BoundLifecycle:
         self._source: EventSource | None = None
         self._local: Role | None = None
         self._runtime: Role | None = None
+        self._stop_requested: set[int] = set()
 
     def verify_private_binding(self, packet: Packet, deadline_ms: int) -> bool:
         if packet != self._private.packet or self._clock() >= deadline_ms:
@@ -211,21 +212,29 @@ class BoundLifecycle:
             raise Hold("missing admitted roles")
         self._effects.observe_source(self._source, deadline_ms)
 
+    def _request_stop(self, role: Role | None, deadline_ms: int) -> None:
+        if role is None or id(role) in self._stop_requested:
+            return
+        self._stop_requested.add(id(role))
+        try:
+            role.request_stop(deadline_ms)
+        except (OSError, ValueError, TypeError, Hold):
+            # The stop result is not the independently observed terminal state.
+            pass
+
     def _stop(self, role: Role | None, deadline_ms: int) -> bool:
         if role is None:
             return True  # No launch attempt can occur before obtaining the role.
-        try:
-            role.request_stop(deadline_ms)
-        except (OSError, Hold):
-            # Observation could still prove terminal status, independently of
-            # whether the cleanup request returned a result.
-            pass
+        self._request_stop(role, deadline_ms)
         return role.confirmed_quiescent(deadline_ms) is True and self._clock() <= deadline_ms
 
     def confirm_runtime_stopped(self, deadline_ms: int) -> bool:
         return self._stop(self._runtime, deadline_ms)
 
     def confirm_source_stopped(self, deadline_ms: int) -> bool:
+        # Signal both owned roles before any durability or confirmation wait.
+        self._request_stop(self._local, deadline_ms)
+        self._request_stop(self._runtime, deadline_ms)
         source = self._source
         if source is None:
             return self._stop(self._local, deadline_ms)

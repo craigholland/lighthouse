@@ -7,8 +7,9 @@ and is not evidence of real event delivery or worker dispatch.
 
 ## Scope
 
-T02 Phase A records, offline known-worker/marker proof, and separate inert event source; no
-dormant fixed transport adapters, with no live connection, setup or settings.
+T02 Phase A records, an offline known-worker/marker proof, and a separate
+worker-free event source with dormant fixed transport adapters. No live
+connection, setup or settings.
 
 ## Purpose
 
@@ -54,7 +55,9 @@ it has no worker creation operation.
 - [t02_event_https.py](t02_event_https.py), [t02_event_loopback.py](t02_event_loopback.py),
   and [t02_event_windows.py](t02_event_windows.py): dormant fixed stdlib backends.
 - [t02_event_production.py](t02_event_production.py): fixed composition, unreachable from CLI.
-- [test_t02_event_backends.py](test_t02_event_backends.py): fake-only low-level I/O checks.
+- [t02_event_dns.py](t02_event_dns.py): owned Windows overlapped resolver and cancellation acknowledgement.
+- [test_t02_event_backends.py](test_t02_event_backends.py) and
+  [test_t02_event_deadlines.py](test_t02_event_deadlines.py): fake-only low-level I/O and readiness checks.
 - [test_t02_event_probe.py](test_t02_event_probe.py) and
   [test_t02_event_assembly.py](test_t02_event_assembly.py): effect, denial and deadline evidence.
 

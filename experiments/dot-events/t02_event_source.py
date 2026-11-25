@@ -259,10 +259,20 @@ class EventSource:
             db.execute("UPDATE event_probe SET stopped=1 WHERE slot=1")
 
     def subscription_ready(self) -> bool:
-        """Observe admission without extending or recreating a subscription."""
-        with self._edit() as db:
-            state = self._read(db)
-            return self._live(state) and state.url is not None and state.pending is None
+        """Read a consistent snapshot without contending for the writer's lock."""
+        try:
+            with closing(sqlite3.connect(self.path.as_uri() + "?mode=ro", uri=True, timeout=0)) as db:
+                db.execute("BEGIN")
+                state = self._read(db)
+                if not self._live(state):
+                    raise Hold("subscription no longer authorized")
+                if state.pending == "send":
+                    raise Hold("previous delivery still uncertain")
+                return state.url is not None and state.pending is None
+        except sqlite3.Error as error:
+            if getattr(error, "sqlite_errorcode", 0) & 0xff == sqlite3.SQLITE_BUSY:
+                return False  # Wait under observe_source's original deadline.
+            raise Hold("subscription snapshot unavailable") from None
 
     def reserve_restart(self) -> None:
         """Consume the one planned source-restart allowance; never launch it."""

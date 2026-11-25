@@ -10,7 +10,12 @@ from dataclasses import astuple
 from pathlib import Path
 
 import pytest
-from t02_event_assembly import LoopbackHttp, Resources, run_injected_assembly
+from t02_event_assembly import (
+    LoopbackHttp,
+    Resources,
+    TlsConnection,
+    run_injected_assembly,
+)
 from t02_event_evidence import API_ROOT, PREFIX, PrivatePacket, ProviderReply
 from t02_event_gate import LEAD, LEAD_APP, OWNER, RUNTIME, SCOPE, Packet
 from t02_event_rpc import SOURCE_PATH
@@ -143,7 +148,7 @@ class Lab:
         self.trace.append("DNS")
         return ("8.8.8.8",)
 
-    def open_verified_tls(self, *, ip: str, port: int, hostname: str, deadline_ms: int) -> Tls:
+    def open_verified_tls(self, *, ip: str, port: int, hostname: str, deadline_ms: int) -> TlsConnection:
         assert (ip, port, hostname) == ("8.8.8.8", 443, BINDING.callback_host)
         self.trace.append("verified TLS")
         return Tls(self)
@@ -193,7 +198,7 @@ def test_real_composition_with_fake_effect_order_and_owned_cleanup(tmp_path: Pat
         "DNS", "verified TLS", "challenge", "TLS-close",
         "DNS", "verified TLS", "delivery", "TLS-close",
         "DNS", "verified TLS", "delivery", "TLS-close",
-        "source-request", "source-confirmed", "runtime-request", "runtime-confirmed",
+        "source-request", "runtime-request", "source-confirmed", "runtime-confirmed",
     ]
     assert len(lab.event_bodies) == 2 and lab.event_bodies[0] == lab.event_bodies[1]
 
@@ -224,7 +229,7 @@ def test_cleanup_has_to_observe_failed_or_ambiguous_runtime(tmp_path: Path) -> N
     lab.clean = False
     assert "shutdown not confirmed" in lab.run()
     assert "observe" not in lab.trace and not lab.event_bodies
-    assert lab.trace[-4:] == ["source-request", "source-confirmed", "runtime-request", "runtime-confirmed"]
+    assert lab.trace[-4:] == ["source-request", "runtime-request", "source-confirmed", "runtime-confirmed"]
 
 
 def counters(path: Path) -> object:
@@ -275,7 +280,7 @@ def test_uncertain_stop_requires_independent_record_and_still_stops_roles(
     result = lab.run()
     assert result == ("held: incomplete source window" if committed
                       else "held: shutdown not confirmed within the original deadline")
-    assert lab.trace[-4:] == ["source-request", "source-confirmed", "runtime-request", "runtime-confirmed"]
+    assert lab.trace[-4:] == ["source-request", "runtime-request", "source-confirmed", "runtime-confirmed"]
     assert counters(lab.fixture.path) == (int(committed), 1, 1, 1, None)
     assert attempts == (1 if committed else 2)
     assert len(lab.event_bodies) == 1

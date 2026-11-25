@@ -87,9 +87,14 @@ calls; no actual credentials, service, process, DNS or socket are used.
 Future authorized preflight must confirm the exact platform and callback
 binding, on-host native process containment, effective executable identity
 and runtime configuration, and bounded behavior of the real DNS and HTTP
-stack. Socket inactivity limits and local time checks are not proof of
-absolute native resolver cancellation. This is not live eligibility,
-successful coordinator delivery, or CI.
+stack. The Windows resolver owns one overlapped request, reserves cancellation
+time, and checks for completion. Missing acknowledgement holds and quarantines
+its buffers; it is not evidence that the native resolver stopped. Every raw
+TLS input read refreshes the remaining absolute deadline, including HTTP
+status and headers. Cleanup signals both owned roles before independently
+checking their terminal states. The observer uses a read-only SQLite snapshot:
+a pending valid challenge can finish without retry or resend. This is not
+live eligibility, successful coordinator delivery, or CI.
 
 
 ## Offline known-worker proof

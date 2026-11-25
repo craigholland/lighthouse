@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import http.client
+import io
 import ipaddress
 import re
 import socket
 import ssl
-from collections.abc import Callable, Mapping
+from collections.abc import Buffer, Callable, Mapping
+from typing import BinaryIO
 
+from t02_event_dns import resolve
 from t02_event_evidence import API_ROOT, MAX_PROVIDER_BYTES, ProviderReply
 from t02_event_types import HOST, MAX_BODY, MAX_RESPONSE, Hold, Reply
 
@@ -23,6 +26,49 @@ def remaining(clock: Callable[[], int], deadline: int) -> float:
     return value / 1000
 
 
+class _DeadlineRaw(io.RawIOBase):
+    """Give the stdlib HTTP parser absolute bounds on every raw read."""
+
+    def __init__(
+        self, sock: socket.socket, clock: Callable[[], int], deadline: int, lifetime: BinaryIO,
+    ) -> None:
+        self._sock = sock
+        self._lifetime = lifetime
+        self._clock = clock
+        self._deadline = deadline
+
+    def close(self) -> None:
+        self._lifetime.close()
+        super().close()
+
+    def readable(self) -> bool:
+        return True
+
+    def readinto(self, buffer: Buffer) -> int:
+        self._sock.settimeout(remaining(self._clock, self._deadline))
+        count = self._sock.recv_into(buffer)
+        remaining(self._clock, self._deadline)
+        return count
+
+
+def _numeric(ip: str, port: int, clock: Callable[[], int], deadline: int) -> socket.socket:
+    address = ipaddress.ip_address(ip)
+    if (
+        not address.is_global or address.is_multicast or address.is_reserved
+        or (isinstance(address, ipaddress.IPv6Address) and (address.ipv4_mapped or address.scope_id))
+    ):
+        raise Hold("HTTPS address not public")
+    raw = socket.socket(socket.AF_INET if address.version == 4 else socket.AF_INET6, socket.SOCK_STREAM)
+    try:
+        raw.settimeout(remaining(clock, deadline))
+        raw.connect((ip, port) if address.version == 4 else (ip, port, 0, 0))
+        raw.settimeout(remaining(clock, deadline))
+        return raw
+    except BaseException:
+        raw.close()
+        raise
+
+
 def _bounded(
     connection: http.client.HTTPConnection, *, clock: Callable[[], int], deadline: int, limit: int,
 ) -> Reply:
@@ -30,6 +76,15 @@ def _bounded(
     if sock is None:
         raise Hold("HTTP connection not established")
     sock.settimeout(remaining(clock, deadline))
+    class DeadlineResponse(http.client.HTTPResponse):
+        def __init__(self, transport: socket.socket, *args: object, method: str | None = None) -> None:
+            # HTTPResponse's only socket operation during construction is
+            # makefile; take ownership of this adapter-owned read buffer.
+            super().__init__(transport, method=method)
+            assert self.fp is not None
+            self.fp = io.BufferedReader(_DeadlineRaw(transport, clock, deadline, self.fp))
+
+    connection.response_class = DeadlineResponse
     with connection.getresponse() as response:
         if 300 <= response.status < 400:
             raise Hold("HTTP redirects are disabled")
@@ -59,6 +114,17 @@ class GitHubHttps:
             timeout=remaining(self._clock, deadline_ms),
         )
         try:
+            def connect_numeric(
+                endpoint: tuple[str, int], timeout: object, address: object,
+            ) -> socket.socket:
+                if endpoint != (_API, 443) or address is not None:
+                    raise Hold("unexpected public HTTPS endpoint")
+                answers = resolve(_API, deadline_ms, self._clock)
+                if not answers:
+                    raise Hold("public GitHub DNS unavailable")
+                return _numeric(answers[0], 443, self._clock, deadline_ms)
+
+            setattr(connection, "_create_connection", connect_numeric)
             connection.connect()
             if connection.sock is None:
                 raise Hold("GitHub connection unavailable")
@@ -120,15 +186,7 @@ class CallbackSockets:
     def addresses(self, hostname: str, deadline_ms: int) -> tuple[str, ...]:
         if hostname != self._hostname:
             raise Hold("callback host mismatch")
-        remaining(self._clock, deadline_ms)
-        try:
-            answers = socket.getaddrinfo(hostname, 443, type=socket.SOCK_STREAM)
-        except OSError:
-            raise Hold("callback DNS unavailable") from None
-        remaining(self._clock, deadline_ms)
-        if not 0 < len(answers) <= 16:
-            raise Hold("callback DNS answer count outside bound")
-        return tuple(dict.fromkeys(str(row[4][0]) for row in answers))
+        return resolve(hostname, deadline_ms, self._clock)
 
     def open_verified_tls(
         self, *, ip: str, port: int, hostname: str, deadline_ms: int,
