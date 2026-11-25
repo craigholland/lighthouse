@@ -50,7 +50,7 @@ class _PipeTrace:
     _STAGES = {
         "CreateNamedPipe": "server-create", "CreateFile": "client-open",
         "ConnectNamedPipe": "connect-begin", "GetCurrentProcess": "current-process",
-        "DuplicateHandle": "handle-duplicate",
+        "DuplicateHandle": "handle-duplicate", "WaitForSingleObject": "connect-wait",
     }
 
     def __init__(self, api: object, event: Callable[[], int]) -> None:
@@ -85,6 +85,10 @@ class _ConnectTrace:
         self.trace = trace
         self.result = result
 
+    @property
+    def event(self) -> int:
+        return self.result.event
+
     def GetOverlappedResult(self, wait: bool) -> tuple[int, int]:
         self.trace.stage = "connect-confirm"
         result = self.result.GetOverlappedResult(wait)
@@ -98,6 +102,7 @@ class _ConnectTrace:
         ("CreateNamedPipe", "server-create"), ("CreateFile", "client-open"),
         ("ConnectNamedPipe", "connect-begin"), ("confirm", "connect-confirm"),
         ("pending", "connect-unconfirmed"), ("event", "stop-event"),
+        ("WaitForSingleObject", "connect-wait"),
         ("DuplicateHandle", "handle-duplicate"),
     ],
 )
@@ -105,6 +110,7 @@ def test_pipe_trace_fault_labels_are_fixed(operation: str, expected: str) -> Non
     api = Mock()
     api.CreateNamedPipe.side_effect = [11, 21]
     api.CreateFile.side_effect = [12, 22]
+    api.WaitForSingleObject.return_value = 0
     api.ConnectNamedPipe.return_value.GetOverlappedResult.return_value = (0, 0)
     event = Mock(return_value=31)
     cause = OSError("untrusted detail")

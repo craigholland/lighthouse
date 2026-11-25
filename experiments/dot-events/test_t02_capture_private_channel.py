@@ -117,12 +117,20 @@ def test_os_provisioner_leaves_only_controller_copies_in_the_parent() -> None:
     api = Mock()
     api.CreateNamedPipe.side_effect = [11, 12]
     api.CreateFile.side_effect = [21, 22]
+    api.WaitForSingleObject.return_value = 0
     api.ConnectNamedPipe.return_value.GetOverlappedResult.return_value = (0, 0)
     api.GetCurrentProcess.return_value = -1
     api.DuplicateHandle.side_effect = [41, 42, 43]
     entropy = iter(("a" * 48, "b" * 48))
     owner = CapturePipeOwner(lambda: 1, api=api, make_event=lambda: 31, nonce=entropy.__next__)
     handles = owner.prepare(20)
+    operations = [call[0] for call in api.mock_calls]
+    assert operations[:5] == [
+        "CreateNamedPipe", "ConnectNamedPipe", "CreateFile",
+        "WaitForSingleObject", "ConnectNamedPipe().GetOverlappedResult",
+    ]
+    assert [call.args[1] for call in api.WaitForSingleObject.call_args_list] == [19, 19]
+    assert all(call.args == (False,) for call in api.ConnectNamedPipe.return_value.GetOverlappedResult.call_args_list)
     assert handles.controller == (11, 22, 31) and handles.supervisor == (41, 42, 43)
     assert "(41, 42, 43)" not in repr(handles)
     for call in api.CreateNamedPipe.call_args_list:
@@ -135,6 +143,23 @@ def test_os_provisioner_leaves_only_controller_copies_in_the_parent() -> None:
         owner.prepare(20)
     owner.close()
     assert {call.args[0] for call in api.CloseHandle.call_args_list} == {11, 12, 21, 22, 31, 41, 42, 43}
+
+
+def test_pipe_connect_wait_timeout_is_not_retried_or_promoted() -> None:
+    api = Mock()
+    api.CreateNamedPipe.return_value = 11
+    api.CreateFile.return_value = 21
+    api.WaitForSingleObject.return_value = 258
+    event = Mock(return_value=31)
+    owner = CapturePipeOwner(lambda: 10, api=api, make_event=event, nonce=lambda: "a" * 48)
+    with pytest.raises(Hold):
+        owner.prepare(20)
+    with pytest.raises(Hold):
+        owner.prepare(20)
+    api.WaitForSingleObject.assert_called_once_with(api.ConnectNamedPipe.return_value.event, 10)
+    api.ConnectNamedPipe.return_value.GetOverlappedResult.assert_not_called()
+    event.assert_not_called()
+    assert {call.args[0] for call in api.CloseHandle.call_args_list} == {11, 21}
 
 
 def test_guarded_bootstrap_uses_only_exact_child_capabilities_and_stops_both_roles() -> None:

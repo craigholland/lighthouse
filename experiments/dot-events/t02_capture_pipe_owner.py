@@ -14,6 +14,9 @@ from t02_event_types import Hold
 
 
 class _Connect(Protocol):
+    @property
+    def event(self) -> int: ...
+
     def GetOverlappedResult(self, wait: bool) -> tuple[int, int]: ...
 
 
@@ -24,6 +27,7 @@ class _ChannelApi(Protocol):
                    mode: int, template: int) -> int: ...
     def ConnectNamedPipe(self, handle: int, overlapped: bool) -> _Connect: ...
     def GetCurrentProcess(self) -> int: ...
+    def WaitForSingleObject(self, handle: int, timeout: int) -> int: ...
     def DuplicateHandle(self, source: int, handle: int, target: int, access: int,
                         inherit: bool, options: int) -> int: ...
     def CloseHandle(self, handle: int) -> None: ...
@@ -82,11 +86,19 @@ class CapturePipeOwner:
         server = self._retain(self._api.CreateNamedPipe(address, 0x40080001, 8, 1, 0, 2048, 10, 0))
         if self._clock() >= deadline:
             raise Hold("capture channel provision expired")
-        client = self._retain(self._api.CreateFile(address, 0x40000000, 0, 0, 3, 0x40000000, 0))
-        # The sole client is already attached; nonblocking confirmation only.
+        # Post the overlapped connect before opening the local client. When
+        # the client opens first, CPython can signal the already-connected
+        # event without there being a completed overlapped request to query.
         result = self._api.ConnectNamedPipe(server, True)
         self._quarantine.append(result)
-        if result.GetOverlappedResult(False)[1] != 0 or self._clock() >= deadline:
+        if self._clock() >= deadline:
+            raise Hold("capture channel provision expired")
+        client = self._retain(self._api.CreateFile(address, 0x40000000, 0, 0, 3, 0x40000000, 0))
+        remaining = deadline - self._clock()
+        # Never use INFINITE or a blocking GetOverlappedResult.
+        if remaining <= 0 or self._api.WaitForSingleObject(result.event, min(remaining, 0xFFFFFFFE)) != 0:
+            raise Hold("capture channel connection unknown")
+        if self._clock() >= deadline or result.GetOverlappedResult(False)[1] != 0 or self._clock() >= deadline:
             raise Hold("capture channel connection unknown")
         self._quarantine.remove(result)
         return server, client

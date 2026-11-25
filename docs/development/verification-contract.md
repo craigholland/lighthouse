@@ -502,3 +502,14 @@ processes; only the fixture setup marker and synthetic store existed. This is
 not exact process or Job cessation proof. The specific operation within IPC
 preparation did not surface, so no code fix or passing native result is claimed.
 No other case, environment, or rerun was attempted.
+
+The next separately approved primary-only normal diagnostic at
+`a299a94d5cf530ed0de73337ef42033ee935c807` failed once in 0.36 s.
+The last IPC stage was `connect-unconfirmed`; process bootstrap did not
+start, no terminal/root/Job witness existed, and the scoped read-only
+census found zero matching fixture processes. Only the setup marker and
+synthetic database existed. No other case, environment or rerun ran.
+The offline correction posts overlapped connect before opening the client,
+waits only within the original deadline, then checks the result without a
+blocking call. Injected fakes cover order, timeout, non-success and
+ownership cleanup; this is not native acceptance of the correction.
