@@ -395,3 +395,5 @@ A separately authorized event run would bind one independently reviewed exact
 destination and provenance; a different subsequent URL must hold. URL reuse
 after rejected subscribe is not established, and capture and event approvals
 are not interchangeable.
+
+See the [capture-only operator runbook](t02-capture-operator-runbook.md) for the guarded commands, offline validation, and remaining release prerequisites.

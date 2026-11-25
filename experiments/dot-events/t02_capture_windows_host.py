@@ -45,6 +45,22 @@ class CaptureSupervisorHost(_OwnedWindowsJob):
             bind_at_creation=True, inherited=inherited,
         )
 
+    def start_owned_transfer(
+        self, descriptor: InheritedCapture, jobs: tuple[int, int], supervisor_job: int,
+        before_resume: Callable[[int, int], None],
+    ) -> bool:
+        # The detached owner passes only a duplicate of its own supervisor Job.
+        inherited = (*descriptor.peer.handles, *jobs)
+        if (len(inherited) != 5 or min(inherited) <= 0 or len(set(inherited)) != 5
+            or supervisor_job <= 0 or supervisor_job in inherited):
+            raise Hold("capture owned supervisor allowlist held")
+        return self._start_owned(
+            self._python, ["-I", str(_HOST)], descriptor.to_environment(), descriptor.peer.intake_ms,
+            bind_at_creation=True, inherited=inherited, preowned_job=supervisor_job,
+            before_resume=before_resume,
+        )
+
+
 class CaptureListenerHost(_OwnedWindowsJob):
     """Own a distinct fixed listener helper before either role runs."""
 

@@ -71,6 +71,9 @@ class OwnedCaptureJobs:
                 self._native.CloseHandle(value)
             raise Hold("capture Job handoff held") from None
 
+    def confirm_child_copies(self, jobs: tuple[int, int]) -> bool:
+        return not self._signaled and self._child_copies == jobs
+
     def signal_both(self) -> None:
         """Terminate both owned Jobs before waiting even if one signal fails."""
         if self._handles is None or self._signaled:

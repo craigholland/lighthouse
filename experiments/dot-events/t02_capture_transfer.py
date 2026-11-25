@@ -68,11 +68,13 @@ def start_transferred_host(
     pipe_owner: CapturePipeOwner,
     mono: Callable[[], int],
     job_owner: OwnedCaptureJobs,
+    *, spawn: Callable[[InheritedCapture, tuple[int, int]], bool] | None = None,
 ) -> WindowsCapturePipe:
     """Start the fixed helper once, then deliver only its authenticated private packet."""
     deadline = transfer.descriptor.peer.intake_ms
+    start = host.start_transferred if spawn is None else spawn
     try:
-        if mono() >= deadline or not host.start_transferred(transfer.descriptor, transfer.jobs):
+        if mono() >= deadline or not start(transfer.descriptor, transfer.jobs):
             raise Hold("capture supervisor start unknown")
     finally:
         try:

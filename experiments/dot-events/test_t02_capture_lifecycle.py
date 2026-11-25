@@ -118,6 +118,7 @@ def test_guarded_capture_holds_and_never_relaunches(tmp_path: Path, mode: str, r
     packet = CapturePacket.parse(encode(record()))
     target = packet.approval
     provider = Provider()
+    provider.expected_deadline = packet.intake_cutoff_ms
     for ref in (1, 2):
         provider.records[f"/issues/comments/{ref}"]["body"] = PREFIX + encode({
             "head": target.head, "digest": target.digest, "scope": SCOPE,

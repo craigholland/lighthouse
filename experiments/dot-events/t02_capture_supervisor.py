@@ -122,8 +122,16 @@ class CaptureSupervisor:
 
 def main() -> int:
     """Refuse direct invocation without an admitted private control channel."""
-    return 2
+    from t02_capture_composition import run_native_supervisor_entry
+
+    return run_native_supervisor_entry()
 
 
 if __name__ == "__main__":
+    import sys
+    from pathlib import Path
+
+    if not sys.flags.isolated or len(sys.argv) != 1:
+        raise SystemExit(2)
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
     raise SystemExit(main())

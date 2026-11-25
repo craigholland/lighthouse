@@ -33,19 +33,21 @@ def guarded_capture(
     monotonic: Callable[[], int],
     observe_local: Callable[[], LocalCaptureObservation],
     roles: CaptureRoles,
-    *, supervisor_finalizes: bool = False,
+    *, supervisor_finalizes: bool = False, original_window: tuple[int, int] | None = None,
 ) -> str:
     """Sequence an admitted capture over injected roles; no retry or live factory."""
     target = packet.approval
-    sampled_wall = wall()
     sampled_mono = monotonic()
-    intake = sampled_mono + packet.intake_cutoff_ms - sampled_wall
-    cleanup = sampled_mono + target.cutoff_ms - sampled_wall
+    sampled_wall = wall()
+    derived = (sampled_mono + packet.intake_cutoff_ms - sampled_wall, sampled_mono + target.cutoff_ms - sampled_wall)
+    intake, cleanup = original_window if original_window is not None else derived
+    if not sampled_mono < intake < cleanup or intake > derived[0] or cleanup > derived[1]:
+        return "denied"
 
     def authorized() -> bool:
         return (
             monotonic() < intake and wall() < packet.intake_cutoff_ms
-            and evidence.allows(target, owner_ref, lead_ref)
+            and evidence.allows(target, owner_ref, lead_ref, before_ms=packet.intake_cutoff_ms)
             and monotonic() < intake and wall() < packet.intake_cutoff_ms
         )
 
@@ -94,7 +96,8 @@ def guarded_capture(
                 roles.signal_all()
             except (Hold, OSError, KeyboardInterrupt):
                 confirmed = False
-        if not supervisor_finalizes:
+        if not supervisor_finalizes or not attempted:
+            # Before any arm attempt no child can own the terminal write.
             try:
                 store.stop()
                 stop_ok = store.status()[0] == "sealed"
@@ -106,7 +109,7 @@ def guarded_capture(
                 confirmed = observed and confirmed
             except (Hold, OSError, KeyboardInterrupt):
                 confirmed = False
-        if supervisor_finalizes:
+        if supervisor_finalizes and attempted:
             try:
                 stopped, candidate = store.status()
                 stop_ok = attempted and confirmed and stopped == "stopped" and monotonic() < cleanup
