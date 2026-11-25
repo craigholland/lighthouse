@@ -393,3 +393,10 @@ one child transfer before any listener/runtime factory. Offline fakes exercise
 the parent authoring/sending and child transfer/admission/role ordering together.
 No native child graph or production local binding is certified; the executable
 entry remains hard denied, and allocating a Job does not certify role exit.
+
+The transferred supervisor is the sole durable terminal owner. A synthetic
+two-role stop must persist `stopped` only when both exact cessation receipts
+are confirmed; an unconfirmed role persists `cleanup-unknown`. A terminal
+reply without a matching durable store disposition is not success. The
+handoff MAC provides channel binding, not independent authorization of a
+direct child invocation; descriptor values alone cannot unlock either helper.

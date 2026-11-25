@@ -20,8 +20,9 @@ from test_t02_capture_evidence import ACTIVATION
 from test_t02_capture_lifecycle import record
 
 
+@pytest.mark.parametrize("exact_stop", [True, False])
 def test_exact_child_transfer_orders_jobs_state_and_role_starts(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, exact_stop: bool,
 ) -> None:
     packet = CapturePacket.parse(encode(record() | {"state": str(tmp_path / "owner.db")}))
     target = packet.approval
@@ -89,22 +90,24 @@ def test_exact_child_transfer_orders_jobs_state_and_role_starts(
     def runtime(accepted: object, handle: int) -> Mock:
         assert handle == 32
         trace.append("runtime-created")
-        return Mock()
+        return Mock(confirm_exact_stop=Mock(return_value=exact_stop))
 
     def peer(binding: PeerBinding, host: CaptureSupervisor, clock: object) -> HostStatus:
         assert binding == descriptor.peer
         assert trace == ["jobs-exact", "listener-created", "runtime-created"]
         assert binding.intake_ms == 50
         assert host.command(Command.LISTENER).listener_attempted
-        return host.command(Command.RUNTIME)
+        assert host.command(Command.RUNTIME) == HostStatus("runtime-started", True, True)
+        return host.command(Command.STOP)
 
     monkeypatch.setattr(entry, "run_native_peer", peer)
     outcome = entry.run_transferred_supervisor(
         descriptor.to_environment()[ENVIRONMENT_KEY], lambda: 0, lambda: ACTIVATION,
         lambda _: True, lambda _: True, verify_jobs, listener, runtime,
     )
-    assert outcome == HostStatus("runtime-started", True, True)
-    with pytest.raises(Hold, match="already consumed"):
+    assert outcome == HostStatus("confirmed" if exact_stop else "cleanup-unknown", True, True)
+    assert store.status()[0] == ("stopped" if exact_stop else "cleanup-unknown")
+    with pytest.raises(Hold):
         receive_handoff(descriptor, wire, lambda: 0, lambda: ACTIVATION, verify_jobs)
     assert kernel.TerminateJobObject.call_count == 0
     detached_owner.close()

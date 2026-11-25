@@ -69,5 +69,8 @@ def run_transferred_supervisor(
     if not descriptor.verifies_packet_window(accepted.packet, mono, wall):
         raise Hold("capture listener construction crossed cutoff")
     runtime = runtime_factory(accepted, accepted.jobs[1])
-    host = CaptureSupervisor(mono, descriptor.peer.intake_ms, descriptor.peer.cleanup_ms, listener, runtime)
+    host = CaptureSupervisor(
+        mono, descriptor.peer.intake_ms, descriptor.peer.cleanup_ms,
+        listener, runtime, CaptureTerminalOwner(accepted.store),
+    )
     return run_native_peer(descriptor.peer, host, mono)
