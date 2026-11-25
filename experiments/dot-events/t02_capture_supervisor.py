@@ -22,6 +22,13 @@ class HostedRole(Protocol):
     def confirm_exact_stop(self, deadline_ms: int) -> bool: ...
 
 
+class TerminalOwner(Protocol):
+    """Sole owner of capture sealing and terminal disposition."""
+
+    def seal(self) -> bool: ...
+    def finish(self, confirmed: bool) -> bool: ...
+
+
 @dataclass(frozen=True)
 class HostStatus:
     """Only fixed dispositions; no paths, credentials, or process IDs."""
@@ -37,6 +44,7 @@ class CaptureSupervisor:
     def __init__(
         self, clock: Callable[[], int], intake_deadline: int, cleanup_deadline: int,
         listener: HostedRole, runtime: HostedRole,
+        terminal: TerminalOwner | None = None,
     ) -> None:
         # Keep direct script import inert even under isolated Python.
         from t02_capture_watchdog import CaptureWatchdog
@@ -47,7 +55,13 @@ class CaptureSupervisor:
         self._intake = intake_deadline
         self._listener = listener
         self._runtime = runtime
-        self._watchdog = CaptureWatchdog(clock, listener, runtime, intake_deadline, cleanup_deadline)
+        self._terminal = terminal
+        self._cleanup = cleanup_deadline
+        self._finalized = False
+        self._watchdog = CaptureWatchdog(
+            clock, listener, runtime, intake_deadline, cleanup_deadline,
+            terminal.seal if terminal is not None else lambda: True,
+        )
         self._phase = "armed"
         self._listener_attempted = False
         self._runtime_attempted = False
@@ -56,7 +70,7 @@ class CaptureSupervisor:
         """The independent host must call this even without a controller message."""
         outcome = self._watchdog.observe()
         if outcome != "armed":
-            self._phase = outcome
+            self._finish(outcome)
         return self.status()
 
     def status(self) -> HostStatus:
@@ -87,8 +101,23 @@ class CaptureSupervisor:
         return self._stop()
 
     def _stop(self) -> HostStatus:
-        self._phase = self._watchdog.observe(stop_requested=True)
+        self._finish(self._watchdog.observe(stop_requested=True))
         return self.status()
+
+
+    def _finish(self, outcome: str) -> None:
+        from t02_event_types import Hold
+        if self._finalized:
+            return
+        self._finalized = True
+        self._phase = outcome
+        if self._terminal is not None:
+            try:
+                accepted = self._terminal.finish(outcome == "confirmed" and self._clock() < self._cleanup)
+                if not accepted or self._clock() >= self._cleanup:
+                    self._phase = "cleanup-unknown"
+            except (Hold, OSError):
+                self._phase = "cleanup-unknown"
 
 
 def main() -> int:

@@ -102,3 +102,6 @@ Only the designated harmless fixture processes and disposable state are used.
 - [t02_capture_pipe_owner.py](t02_capture_pipe_owner.py), [t02_capture_windows_pipe.py](t02_capture_windows_pipe.py), and [t02_capture_private_channel.py](t02_capture_private_channel.py): private channel provisioning, bounded I/O, and fixed command frames, not connected to the helper entry.
 - [t02_capture_role_handles.py](t02_capture_role_handles.py): exact locally owned Job/root handoff and stop witness; not an integrated live role.
 - [t02_capture_peer.py](t02_capture_peer.py): guarded peer bootstrap through fake capability events; no native helper entry activation.
+
+- [t02_capture_native_peer.py](t02_capture_native_peer.py): dormant fixed native frame/stop wait.
+- [t02_capture_terminal.py](t02_capture_terminal.py), [t02_capture_roles.py](t02_capture_roles.py): sole watchdog terminal owner and fixed role factories; no live entry.

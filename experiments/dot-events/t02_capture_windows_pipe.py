@@ -26,6 +26,7 @@ class _PipeApi(Protocol):
     def WriteFile(self, handle: int, data: bytes, overlapped: bool) -> tuple[_PendingIo, int]: ...
     def WaitForSingleObject(self, handle: int, timeout_ms: int) -> int: ...
     def SetEvent(self, handle: int) -> None: ...
+    def WaitForMultipleObjects(self, handles: list[int], wait_all: bool, timeout_ms: int) -> int: ...
 
 
 class WindowsCapturePipe:
@@ -33,7 +34,7 @@ class WindowsCapturePipe:
 
     def __init__(
         self, read_handle: int, write_handle: int, stop_event: int, clock: Callable[[], int],
-        *, api: _PipeApi | None = None,
+        *, api: _PipeApi | None = None, supervisor: bool = False,
     ) -> None:
         if min(read_handle, write_handle, stop_event) <= 0 or len({read_handle, write_handle, stop_event}) != 3:
             raise Hold("invalid private pipe capability")
@@ -43,6 +44,8 @@ class WindowsCapturePipe:
         self._clock = clock
         self._api = api if api is not None else cast(_PipeApi, importlib.import_module("_winapi"))
         self._held = False
+        self._supervisor = supervisor
+        self._stop_seen = False
         self._quarantine: _PendingIo | None = None
 
     def _begin(
@@ -58,7 +61,15 @@ class WindowsCapturePipe:
                 raise Hold("capture native pipe start unknown")
             if result == _PENDING:
                 delay = deadline - self._clock()
-                if delay <= 0 or self._api.WaitForSingleObject(operation.event, delay) != _WAIT_OBJECT_0:
+                if delay <= 0:
+                    raise Hold("capture native pipe wait expired")
+                if self._supervisor and not self._stop_seen:
+                    state = self._api.WaitForMultipleObjects([operation.event, self._stop], False, delay)
+                    if state == 1:
+                        self._stop_seen = True
+                else:
+                    state = self._api.WaitForSingleObject(operation.event, delay)
+                if state != _WAIT_OBJECT_0:
                     raise Hold("capture native pipe wait unknown")
             transferred, terminal = operation.GetOverlappedResult(False)
             if terminal or self._clock() >= deadline:
@@ -93,6 +104,15 @@ class WindowsCapturePipe:
         if transferred != len(data):
             self._held = True
             raise Hold("capture native write count unknown")
+
+    def stopped(self) -> bool:
+        """Sample the out-of-band stop event without waiting."""
+        if not self._stop_seen:
+            value = self._api.WaitForSingleObject(self._stop, 0)
+            if value not in (0, 258):
+                raise Hold("capture native stop witness unknown")
+            self._stop_seen = value == 0
+        return self._stop_seen
 
     def signal_stop(self) -> None:
         """Independent native event, including when pipe cancellation is unknown."""

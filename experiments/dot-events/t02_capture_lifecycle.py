@@ -33,6 +33,7 @@ def guarded_capture(
     monotonic: Callable[[], int],
     observe_local: Callable[[], LocalCaptureObservation],
     roles: CaptureRoles,
+    *, supervisor_finalizes: bool = False,
 ) -> str:
     """Sequence an admitted capture over injected roles; no retry or live factory."""
     target = packet.approval
@@ -93,18 +94,27 @@ def guarded_capture(
                 roles.signal_all()
             except (Hold, OSError, KeyboardInterrupt):
                 confirmed = False
-        try:
-            store.stop()
-            stop_ok = store.status()[0] == "sealed"
-        except (Hold, OSError, KeyboardInterrupt):
-            stop_ok = False
+        if not supervisor_finalizes:
+            try:
+                store.stop()
+                stop_ok = store.status()[0] == "sealed"
+            except (Hold, OSError, KeyboardInterrupt):
+                stop_ok = False
         if attempted:
             try:
                 observed = roles.confirmed_stopped(cleanup)
                 confirmed = observed and confirmed
             except (Hold, OSError, KeyboardInterrupt):
                 confirmed = False
-        if stop_ok:
+        if supervisor_finalizes:
+            try:
+                stopped, candidate = store.status()
+                stop_ok = attempted and confirmed and stopped == "stopped" and monotonic() < cleanup
+                if disposition == "candidate-held" and candidate != "captured":
+                    disposition = "held"
+            except (Hold, OSError, KeyboardInterrupt):
+                stop_ok = False
+        elif stop_ok:
             terminal = confirmed and monotonic() < cleanup
             try:
                 store.finish_cleanup(confirmed=terminal)

@@ -160,3 +160,17 @@ def test_guarded_bootstrap_uses_only_exact_child_capabilities_and_stops_both_rol
     listener.signal.assert_called_once_with()
     runtime.signal.assert_called_once_with()
     assert events.send.call_count == 4
+
+
+def test_supervisor_waits_for_stop_even_with_no_controller_bytes() -> None:
+    api = Mock()
+    operation = Mock()
+    operation.event = 44
+    api.ReadFile.return_value = (operation, 997)
+    api.WaitForMultipleObjects.return_value = 1
+    pipe = WindowsCapturePipe(11, 12, 13, lambda: 10, api=api, supervisor=True)
+    with pytest.raises(Hold):
+        pipe.read(4, 20)
+    api.WaitForMultipleObjects.assert_called_once_with([44, 13], False, 10)
+    operation.cancel.assert_called_once_with()
+    assert pipe.stopped()

@@ -29,6 +29,7 @@ class CaptureWatchdog:
         runtime: OwnedCessation,
         signal_cutoff_ms: int,
         cleanup_cutoff_ms: int,
+        seal_intake: Callable[[], bool] = lambda: True,
     ) -> None:
         if not clock() < signal_cutoff_ms < cleanup_cutoff_ms:
             raise Hold("capture watchdog bound unavailable")
@@ -36,6 +37,7 @@ class CaptureWatchdog:
         self._roles = (listener, runtime)
         self._signal_cutoff = signal_cutoff_ms
         self._cleanup_cutoff = cleanup_cutoff_ms
+        self._seal_intake = seal_intake
         self._sealed = False
         self._outcome = "armed"
 
@@ -53,7 +55,10 @@ class CaptureWatchdog:
             except (Hold, OSError):
                 signaled = False
 
-        confirmed = True
+        try:
+            confirmed = self._seal_intake()
+        except (Hold, OSError):
+            confirmed = False
         for role in self._roles:
             if self._clock() >= self._cleanup_cutoff:
                 confirmed = False

@@ -341,3 +341,25 @@ does not yet consume a real authenticated descriptor or implement simultaneous
 stop-event / overlapped-command waiting. The separate listener and pinned
 runtime are not bound to that entry. No claim of real readiness or native
 quiescence follows from this checkpoint.
+
+The exact opaque Dot profile route is validated and preserved in the packet
+digest without making a request or deriving worker identity. The vendor archive
+must match the existing tracked pin. The fixed role factories select only the
+capture receiver over local loopback and the reviewed pinned runtime with
+creation-time Job binding.
+
+The native peer can wait on overlapped I/O and the independent stop event
+together; the sole supervisor terminal owner seals and verifies the canonical
+SQLite store, without a controller finalizer in that mode. Test these boundaries
+with fake Win32 and simulated clock/capabilities. These are still dormant code
+components, not a complete native executable graph. The authenticated child
+descriptor/bootstrap, an independently owned listener process and detached
+deadline supervision through stalled native role startup remain open.
+
+The remaining native causal proof requires a closed harmless Python-only fixture
+with two fixed stand-in roles and a deliberately stalled controller, in both
+retained Windows environments. Capture exact handles before the stall, verify
+both root exit signals and empty Job accounting before the original deadline,
+and exercise a no-containment negative followed by separately witnessed cleanup.
+Do not substitute vendor execution, socket binding, real private inputs, or
+self-expiry. No such native case was executed for this checkpoint.

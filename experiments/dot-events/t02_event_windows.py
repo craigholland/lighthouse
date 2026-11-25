@@ -12,8 +12,8 @@ import time
 from collections.abc import Callable
 from ctypes import wintypes as w
 from pathlib import Path
+from typing import Protocol
 
-from t02_event_gate import Packet
 from t02_event_https import remaining
 from t02_event_types import Hold
 
@@ -264,11 +264,23 @@ class _OwnedWindowsJob:
                 k.CloseHandle(process)
 
 
+class FixedRuntimeIdentity(Protocol):
+    """Minimum immutable identity needed by the pinned vendor command."""
+
+    @property
+    def tunnel(self) -> str: ...
+    @property
+    def platform(self) -> str: ...
+    @property
+    def runtime_binary_digest(self) -> str: ...
+
+
 class RuntimeRole(_OwnedWindowsJob):
     """One retained Windows job and process, assigned prior to resume."""
 
     def __init__(
-        self, path: Path, packet: Packet, bearer: str, platform_key: str, clock: Callable[[], int],
+        self, path: Path, packet: FixedRuntimeIdentity, bearer: str, platform_key: str, clock: Callable[[], int],
+        *, atomic_job: bool = False,
     ) -> None:
         if (
             not path.is_absolute() or path.name != "tunnel-client-runtime.exe"
@@ -296,6 +308,7 @@ class RuntimeRole(_OwnedWindowsJob):
         ]
         super().__init__(clock)
         self._candidate_checked = False
+        self._atomic_job = atomic_job
 
     def verified_digest(self, deadline: int) -> str:
         """Read the existing candidate bytes, no subprocess or version probe."""
@@ -318,4 +331,6 @@ class RuntimeRole(_OwnedWindowsJob):
         self._candidate_checked = True
         if self.verified_digest(deadline_ms) != self._digest:
             return False
-        return self._start_owned(self._path, self._args, self._environment, deadline_ms)
+        return self._start_owned(
+            self._path, self._args, self._environment, deadline_ms, bind_at_creation=self._atomic_job,
+        )
