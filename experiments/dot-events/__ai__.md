@@ -89,8 +89,11 @@ durable reservation, then creates original Jobs before the role launch lane.
 The transferred supervisor selects the fixed listener and runtime adapters.
 Channel and receipt binding do not by themselves prove Windows capability
 origin. The installed release binding is absent; direct entries stay held.
-A protected broker remains a [decision proposal](t02-capture-provenance-design.md),
-not an authorized dependency or release feature.
+The [approved bounded trust model](t02-capture-provenance-design.md) uses the
+existing trusted operator account, not a protected broker or hostile
+same-account isolation. The separately scoped
+[selected native proof](test_t02_selected_native.py) is opt-in only and
+does not install or enable any release entry.
 
 The component notes below describe their independently reviewed offline scope;
 they are not a claim of native selected-process or operational readiness.

@@ -7,7 +7,7 @@ import hmac
 import re
 from collections.abc import Callable
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Protocol
 
 if TYPE_CHECKING:
     from t02_capture_bootstrap import InheritedCapture
@@ -16,6 +16,21 @@ if TYPE_CHECKING:
     from t02_capture_packet import CapturePacket
     from t02_capture_private_channel import OwnedPipe
     from t02_event_capture import CaptureStore
+
+
+class ListenerEffect(Protocol):
+    """Final loopback effect, separated from admission and private IPC."""
+
+    def start(self, deadline: int) -> bool: ...
+    def request_stop(self, deadline: int, /) -> None: ...
+    def confirmed_quiescent(self, deadline: int, /) -> bool: ...
+
+
+class ListenerEffectFactory(Protocol):
+    def __call__(
+        self, store: CaptureStore, bearer: str, clock: Callable[[], int], *,
+        rpc_clock: Callable[[], int],
+    ) -> ListenerEffect: ...
 
 
 def listen_bound(
@@ -27,6 +42,7 @@ def listen_bound(
     mono: Callable[[], int],
     wall: Callable[[], int],
     *, on_ready: Callable[[], None] = lambda: None,
+    effect: ListenerEffectFactory | None = None,
 ) -> str:
     """Run the one fixed listener only after exact operation and intake checks."""
     from t02_capture_roles import fixed_capture_listener
@@ -51,7 +67,7 @@ def listen_bound(
     def intake_wall() -> int:
         return max(wall(), packet.intake_cutoff_ms) if mono() >= deadline else wall()
 
-    role = fixed_capture_listener(store, bearer, mono, rpc_clock=intake_wall)
+    role = (fixed_capture_listener if effect is None else effect)(store, bearer, mono, rpc_clock=intake_wall)
     startup = False
     quiescent = False
     try:
@@ -115,6 +131,8 @@ def run_transferred_listener(
     wait_stop: Callable[[int, int], bool],
     evidence: CaptureEvidence,
     *, released: Callable[[], bool],
+    effect: ListenerEffectFactory | None = None,
+    fixture_bearer: Callable[[], str] | None = None,
 ) -> str:
     """Admit independently validated child capabilities and source approvals before I/O."""
     from t02_capture_bootstrap import InheritedCapture
@@ -184,9 +202,11 @@ def run_transferred_listener(
 
     return listen_bound(
         descriptor, packet, store,
-        lambda: _read_capture_secret(packet, "loopback_bearer", mono, deadline),
+        fixture_bearer if fixture_bearer is not None else (
+            lambda: _read_capture_secret(packet, "loopback_bearer", mono, deadline)
+        ),
         wait_stop, mono, wall,
-        on_ready=lambda: write_handoff(pipe, listener_ready_receipt(descriptor), deadline),
+        on_ready=lambda: write_handoff(pipe, listener_ready_receipt(descriptor), deadline), effect=effect,
     )
 
 

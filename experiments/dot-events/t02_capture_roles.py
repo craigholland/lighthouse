@@ -196,6 +196,9 @@ class _HostedListener(_HostedCaptureRole):
         super().__init__(descriptor, mono)
         self._accepted, self._job, self._python, self._wall = accepted, job, python, wall
 
+    def _new_listener_host(self) -> CaptureListenerHost:
+        return CaptureListenerHost(self._python, self._mono)
+
     def request_start(self, deadline: int) -> bool:
         self._begin(deadline)
         packet = self._accepted.packet
@@ -213,7 +216,7 @@ class _HostedListener(_HostedCaptureRole):
         )
         self._pipe = WindowsCapturePipe(*handles.controller, self._mono)
         body = make_listener_handoff(descriptor, self._accepted, self._mono, self._wall, store_identity)
-        role = CaptureListenerHost(self._python, self._mono)
+        role = self._new_listener_host()
         self._remember(role)
         try:
             started = role.start_bound(descriptor, deadline, preowned_job=self._job)
@@ -239,6 +242,14 @@ class _HostedRuntime(_HostedCaptureRole):
         super().__init__(descriptor, mono)
         self._accepted, self._job, self._local, self._wall = accepted, job, local, wall
 
+    def _read_runtime_input(self, field: str, deadline: int) -> str:
+        return _read_capture_secret(self._accepted.packet, field, self._mono, deadline)
+
+    def _new_runtime(self, bearer: str, key: str) -> RuntimeRole:
+        return fixed_capture_runtime(
+            self._accepted.packet, self._local, bearer, key, self._mono, preowned_job=self._job,
+        )
+
     def request_start(self, deadline: int) -> bool:
         self._begin(deadline)
         packet = self._accepted.packet
@@ -248,11 +259,11 @@ class _HostedRuntime(_HostedCaptureRole):
             or self._accepted.store.status()[0] != "claimed"
         ):
             return False
-        bearer = _read_capture_secret(packet, "loopback_bearer", self._mono, deadline)
-        key = _read_capture_secret(packet, "platform_key", self._mono, deadline)
+        bearer = self._read_runtime_input("loopback_bearer", deadline)
+        key = self._read_runtime_input("platform_key", deadline)
         if not self._descriptor.verifies_packet_window(packet, self._mono, self._wall):
             return False
-        role = fixed_capture_runtime(packet, self._local, bearer, key, self._mono, preowned_job=self._job)
+        role = self._new_runtime(bearer, key)
         self._remember(role)
         started = role.start(deadline)
         if started:

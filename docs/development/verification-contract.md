@@ -454,3 +454,41 @@ original cleanup cutoff; the disabled-signal control checks both remain
 alive and both Jobs remain nonempty at that cutoff, then independently
 confirms explicit cleanup. This is a stand-in proof, not a live role launch,
 production local attestation, or a certification of the full production graph.
+
+### Selected trusted-account Windows native witness
+
+The [Lead contract](https://github.com/craigholland/lighthouse/issues/5#issuecomment-7177426900)
+scopes this evidence to the existing trusted Windows operator, reviewed code,
+interpreter/configuration and local machine. It does not establish resistance
+to hostile code under that identity. Do not add a broker, principal, ACL,
+service, production credential or operational release binding.
+
+Run [the selected native group](../../experiments/dot-events/test_t02_selected_native.py)
+from the root with `LIGHTHOUSE_T02_SELECTED_NATIVE_PROOF=1` only in the test
+process:
+
+~~~powershell
+.\experiments\codex-review\.venv\Scripts\python.exe -m pytest -q -s experiments/dot-events/test_t02_selected_native.py
+~~~
+
+Repeat with the exact second retained Python executable. Scope: sequential
+cases, four fixed harmless helpers at most, 20 seconds for each case plus
+a separate 5-second emergency teardown, 120 seconds per environment total.
+Observe exact roots alive and corresponding Jobs nonempty before attributing
+termination; verify root exits and empty Jobs within the original cutoffs.
+Disabled termination must fail the positive witness, with independently
+confirmed explicit cleanup. Missing/unconfirmed roots remain durably
+`cleanup-unknown`, with no rearm or upgrade. Fixture expiry and empty
+accounting alone are never success evidence. Only the capture effects,
+authority/local deployment facts and private test inputs are synthetic;
+no live socket, provider, vendor, real credential or production pin.
+
+The first selected native run on the 2026-11-25 implementation stopped in the
+primary environment at the normal case: exact outer cessation was not
+confirmed (one failure, 0.40 s; later cases and the second environment were not
+run). Read-only scope checks found no matching fixture Pythonw process, no
+child or root witness, and the synthetic store remained claimed/new with no
+handoff. Those facts do not reconstruct an exact root or successful teardown.
+Do not overwrite that result with subsequent evidence. Diagnostic-only
+follow-up records local IPC preparation, bootstrap and exact witness stages
+without emitting handles, paths, packet fields or exception text.

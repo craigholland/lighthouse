@@ -108,16 +108,16 @@ correlated receipt and a matching durable store disposition. If native
 startup does not yield an exact root witness, emergency containment holds
 the run as `cleanup-unknown`; empty Jobs alone do not certify root cessation.
 
-The future release must supply approved fixed Git/Python/host/checkout
-pins and authenticate capability origins for the coordinator, supervisor,
-and listener. Windows handle type checks alone, a same-user interpreter
-image, and the handoff MAC do not prove who delegated the capabilities.
-Keep the build held until Craig and Lead choose and review the operating
-trust boundary, define its exact capability checks, and verify the full
-native graph. No protected launcher, new identity or OS confinement model
-has been selected or authorized. The earlier closed stand-in fixture is not
-that proof.
-Old store layouts are held rather than migrated or reset.
+Craig selected the [existing trusted operator account](t02-capture-provenance-design.md)
+for the bounded feasibility fixture only. It checks exact run/role inheritance,
+object type and owned duplicate relationships within that premise; it does
+not isolate hostile code sharing the same principal. A protected broker,
+new account, ACL or privilege change is out of scope. The release binding
+stays absent, and a live operation remains separately gated. Prior closed
+fixtures do not prove this selected graph. Old store layouts remain held
+rather than migrated.
 
-See the [capability-provenance decision note](t02-capture-provenance-design.md)
-for the proposed principal, trust boundary and remaining acceptance checks.
+For the exact offline native witness, use only the separately opt-in
+[selected native test](test_t02_selected_native.py) under the limits in the
+[verification contract](../../docs/development/verification-contract.md).
+The flag does not enable this operator or its helpers.

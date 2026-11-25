@@ -1,10 +1,23 @@
 # T02 Windows capability provenance: decision note
 
-**Proposal only.** The release binding and direct entry points stay disabled.
+**Bounded feasibility proof decision.** The release binding and direct entry points stay disabled.
 This note specifies no installation procedure and grants no use of native
 processes, real capture credentials, provider access, or a live operation.
 
-## Decision
+## Approved proof boundary
+
+Craig selected the existing trusted Windows operator account solely for the
+bounded T02 feasibility proof ([Lead contract][lead]). The operator,
+reviewed source/configuration, interpreter and local machine are in its
+trusted computing base. Hostile code already running as that same principal
+is out of scope, and this is not an isolation claim. The launch ledger binds
+role, original deadlines, exact run and ordered inherited capabilities
+separately from type checks. Ownership operates only on fixture-created
+objects and their exact duplicates. Independent exact source approvals and
+one-use state are still required. No protected broker or separate principal
+is a prerequisite for this bounded proof.
+
+## Deferred model decision (not selected)
 
 Decide whether a process running as the interactive Windows user is outside
 the trusted computing base. Recommended: **yes**. Have Lead choose a narrowly
@@ -54,6 +67,9 @@ independent same-user provenance.
    production keys, or operational packet. An earlier fixture testing a
    different graph does not count.
 
-Lead must supply the approved trust boundary and supported protected-executor
-model, plus the exact harmless native fixture contract. Deployment, release
-pins for real assets, and operation approval remain separate.
+The new closed native group in the [verification contract][verify] uses
+only the approved trusted-account premise; an actual deployment, expanded
+threat model and live operation would require separate review and approval.
+
+[lead]: https://github.com/craigholland/lighthouse/issues/5#issuecomment-7177426900
+[verify]: ../../docs/development/verification-contract.md
