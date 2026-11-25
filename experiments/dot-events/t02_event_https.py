@@ -164,8 +164,20 @@ class _PinnedConnection:
             sock = self._connection.sock
             if sock is None:
                 raise Hold("callback TLS connection unavailable")
+            # http.client otherwise writes the headers and bytes in separate
+            # sendall calls under one inactivity timeout. Treat each as an
+            # independent write under the same absolute cutoff.
+            conn = self._connection
+            conn.putrequest("POST", target)
+            for name, value in headers.items():
+                conn.putheader(name, value)
+            conn.putheader("Connection", "close")
+            conn.putheader("Content-Length", str(len(body)))
             sock.settimeout(remaining(self._clock, deadline_ms))
-            self._connection.request("POST", target, body, dict(headers) | {"Connection": "close"})
+            conn.endheaders()
+            if body:
+                sock.settimeout(remaining(self._clock, deadline_ms))
+                conn.send(body)
             return _bounded(self._connection, clock=self._clock, deadline=deadline_ms, limit=limit)
         except (OSError, http.client.HTTPException, ValueError):
             raise Hold("callback HTTPS unavailable") from None

@@ -82,9 +82,12 @@ def test_callback_connects_numeric_peer_and_verifies_original_sni(monkeypatch: p
     socket_factory.return_value.connect.assert_called_once_with(("8.8.8.8", 443))
     context.wrap_socket.assert_called_once_with(socket_factory.return_value, server_hostname="callback.example.test")
     assert sock.post("/probe", {"Content-Type": "application/json"}, b"{}", limit=16, deadline_ms=2000).body == b"{}"
-    conn.request.assert_called_once_with(
-        "POST", "/probe", b"{}", {"Content-Type": "application/json", "Connection": "close"},
-    )
+    conn.putrequest.assert_called_once_with("POST", "/probe")
+    assert [record.args for record in conn.putheader.call_args_list] == [
+        ("Content-Type", "application/json"), ("Connection", "close"), ("Content-Length", "2"),
+    ]
+    conn.endheaders.assert_called_once_with()
+    conn.send.assert_called_once_with(b"{}")
     sock.close()
     conn.close.assert_called_once()
 

@@ -193,3 +193,56 @@ def test_slow_headers_close_transport_and_both_roles_in_assembled_probe(tmp_path
     sock.close.assert_called_once()
     assert lab.trace[-4:] == ["source-request", "runtime-request", "source-confirmed", "runtime-confirmed"]
     assert not lab.event_bodies and lab.fixture.reopen().observe_stop()
+
+
+@pytest.mark.parametrize("expired_after_headers", [True, False])
+def test_callback_body_has_its_own_remaining_budget_and_no_retry(
+    tmp_path: Path, expired_after_headers: bool,
+) -> None:
+    calls: list[tuple[bytes, float]] = []
+    body_completed = False
+    sock = Mock()
+
+    class WriteLab(Lab):
+        def open_verified_tls(
+            self, *, ip: str, port: int, hostname: str, deadline_ms: int,
+        ) -> https._PinnedConnection:
+            conn = http.client.HTTPConnection(hostname, port)
+            conn.sock = sock
+            conn.auto_open = 0
+
+            def raw_write(frame: bytes) -> None:
+                nonlocal body_completed
+                timeout = float(sock.settimeout.call_args.args[0])
+                calls.append((frame, timeout))
+                if len(calls) == 1:
+                    self.fixture.now = deadline_ms + 1 if expired_after_headers else deadline_ms - 500
+                elif timeout < 0.9:
+                    self.fixture.now += int(timeout * 1000)
+                    raise TimeoutError("fake body exceeds its refreshed budget")
+                else:
+                    self.fixture.now += 900
+                    body_completed = True
+
+            sock.sendall.side_effect = raw_write
+            return https._PinnedConnection(conn, lambda: self.fixture.now)
+
+        def observe_source(self, source: EventSource, deadline_ms: int) -> None:
+            try:
+                super().observe_source(source, deadline_ms)
+            except AssertionError:
+                raise Hold("synthetic challenge did not complete") from None
+
+    lab = WriteLab(tmp_path / "state.sqlite")
+    assert lab.run() == "held: incomplete source window"
+    assert calls[0][0].startswith(b"POST /probe HTTP/1.1\r\n")
+    assert len(calls) == (1 if expired_after_headers else 2)
+    if not expired_after_headers:
+        frame, timeout = calls[1]
+        assert b'"type":"verification"' in frame
+        assert timeout == 0.5
+    assert not body_completed
+    sock.close.assert_called_once()
+    assert lab.trace[-4:] == ["source-request", "runtime-request", "source-confirmed", "runtime-confirmed"]
+    assert lab.trace.count("DNS") == 1
+    assert not lab.event_bodies and lab.fixture.reopen().observe_stop()
