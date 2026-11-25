@@ -56,7 +56,7 @@ external resources or start work. No public Python API is defined.
 - [tests/test_cli.py](tests/test_cli.py): tests the real installed entry point.
 - [docs/README.md](docs/README.md): index of the adopted architecture and plan.
 - [Codex review experiment](experiments/codex-review/__ai__.md): offline recovery evidence and one exact-head controlled live proof, not production readiness.
-- [Dot Events assessment](experiments/dot-events/__ai__.md): Phase A feasibility only; notification-to-local-worker handoff remains unproven.
+- [Dot Events assessment](experiments/dot-events/__ai__.md): Phase A evidence and an offline known-worker proof; live notification-to-local-worker handoff remains unproven.
 - [Verification contract](docs/development/verification-contract.md): commands and evidence limits.
 
 ## Known Gaps / Future-State Notes

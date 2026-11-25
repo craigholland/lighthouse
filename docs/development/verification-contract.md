@@ -6,7 +6,7 @@ The project contains governing documentation and an installable Python CLI
 foundation. Verification commands below remain offline. The [T01 capability
 report](../../experiments/codex-review/README.md) separately records one exact-head,
 owner-authorized live proof and COMMENT. This contract grants no live authority.
-The [T02 Phase A assessment](../../experiments/dot-events/README.md) is documentation only and authorizes no setup or execution. No production orchestration or CI is configured.
+The [T02 Phase A assessment](../../experiments/dot-events/README.md) and known-worker experiment authorize no live setup or execution. No production orchestration or CI is configured.
 
 Run the following commands from the repository root in PowerShell. A failed
 command is a failed check. Record the checked commit and working-tree state in
@@ -194,3 +194,24 @@ encoding. Verify outgoing thread/review envelope sizes and both known
 pinned echoes before verifier/claim, with no provider imports in inert
 entry. Test raw-frame, retained-projection and event-count limits
 separately. The sixth observed overflow is not raw provider-frame evidence.
+
+## Offline Dot known-worker experiment
+
+Use the unchanged Windows experiment lock in both existing verification
+environments. From the root, extend the existing offline suite and run:
+
+```powershell
+.\experiments\codex-review\.venv\Scripts\python.exe -m pytest -q tests experiments/codex-review experiments/dot-events
+.\experiments\codex-review\.venv\Scripts\python.exe -m mypy src/lighthouse experiments/codex-review experiments/dot-events
+.\experiments\codex-review\.venv\Scripts\python.exe experiments/dot-events/t02_proof.py --help
+.\experiments\codex-review\.venv\Scripts\python.exe experiments/dot-events/t02_proof.py --dry-run
+```
+
+Repeat with the other environment's exact executable and retain both pip checks,
+package/version comparison, Ruff, T01 help/dry-run, outside-checkout installed
+foundation CLI smoke, local Markdown targets, whitespace and exact-head checks.
+Record the SQLite library version and observe actual fixture effects after
+contention and restart. A fake acknowledgement, attributable fake turn,
+committed intent and local marker receipt are distinct observations. Only
+bounded Python test helpers may spawn; no real task continuation, service,
+history, runtime, network or credentials belong to these checks.

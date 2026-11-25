@@ -1,8 +1,56 @@
 # T02 Phase A: Dot notification-to-local-worker feasibility
 
-Issue [#5](https://github.com/craigholland/lighthouse/issues/5) assigns assessment
+## Offline known-worker proof
+
+The [renewed Issue #5 contract](https://github.com/craigholland/lighthouse/issues/5#issuecomment-7148129087)
+replaces the prospective creation boundary in the historical report below. The
+experiment starts with one prebound synthetic worker; events are hints only.
+The injected port has exact-known continuation and status, no creation,
+replacement or fallback. The local receiver owns the fixed marker, not an
+arbitrary shell command or a bare token handed to a model.
+
+The immutable reservation binds the project, repository, Issue, work/dispatch
+identity, scope, revision, role, worker, host, checkout, authority, expiry,
+canonical state file and fixed marker. Runtime opens existing state only.
+Availability and the exact current trusted fixture observations are checked
+before either intent. SQLite serializes write transactions with
+`BEGIN IMMEDIATE` and full synchronous commit; the winner commits continuation
+intent before calling the fake port, or start intent before the fixed marker.
+The marker file is separate from SQLite. A persisted start without completion
+remains held even when the marker file exists: observing a side effect is not
+the same as a trusted final receipt. Reconciliation can record exact known
+acceptance without inventing transport acknowledgement or completion.
+Completion and deadlines never free the single reservation.
+
+The facility assumes a single, private, non-replaced state path on a local
+filesystem with ordinary SQLite locking and crash durability. The test-only
+synthetic seed is explicit, separate from runtime, and cannot overwrite a
+state file. This is not a guarantee against manual modification, deliberate
+state rollback, unrelated actions, arbitrary device write failure, or
+production runtime behavior. After lost commit confirmation, no effect is
+performed by that call. A committed bit is visible on reopen and precludes
+replay; lock contention with no admitted write reports a hold. Treat state
+loss, corruption, or persistence which cannot be trusted as operator
+attention, not permission to provision another file. See the
+[SQLite transaction contract](https://www.sqlite.org/lang_transaction.html)
+and [atomic-commit limits](https://www.sqlite.org/atomiccommit.html).
+
+The [verification contract](../../docs/development/verification-contract.md)
+exercises real disposable SQLite with multiple connections and bounded Python
+processes, counting actual fake continuation and marker invocations, including
+process exits before/after the marker and before the acceptance receipt.
+Every provider boundary is inert. Imports and help start no work; dry-run
+creates only disposable synthetic artifacts and uses no child worker.
+No live selector, account, credential, installer, network, native worker or
+T01-private data is involved. This proves neither actual private event
+eligibility nor exact native continuation, production guard integration or
+Gate A acceptance. Those remain separate Lead/owner gates.
+
+## Phase A feasibility record
+
+The original Issue [#5](https://github.com/craigholland/lighthouse/issues/5) packet assigned assessment
 only. Baseline is merged development `d3450a3694499cd2178a19f8f0796522a9ab8186`.
-Gate A remains open. This folder contains no executable bridge or active settings.
+Gate A remains open. At that phase this folder contained only documentation.
 
 ## Finding
 

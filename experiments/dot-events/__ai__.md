@@ -1,56 +1,60 @@
-# Dot Events Assessment Local Contract
+# Dot Events Experiment Local Contract
 
 ## Last Verified (CI)
 
-No CI configured. Local Phase A check evidence belongs to the exact draft PR
-head and is not proof of event delivery or worker dispatch.
+No CI is configured. Local check evidence belongs to the exact draft PR head
+and is not evidence of real event delivery or worker dispatch.
 
 ## Scope
 
-This folder contains the T02 Phase A documentation only. No bridge, fixtures,
-runtime, active settings, dependencies or credentials are in scope.
+T02 Phase A records and the isolated offline one-worker/one-marker proof; no
+native provider, transport implementation, live connection, setup or settings.
 
 ## Purpose
 
-Assess whether the existing Dot coordinator and attached local worker can be
-reached by the documented MCP Events and Secure MCP Tunnel candidate. Make
-the missing interoperability and authorization evidence explicit.
+Model the known-worker handoff and receiver-owned pre-effect claim, and keep
+the unresolved hosted integration evidence explicit.
 
 ## Architectural Rules
 
-Keep signal receipt, dispatch identity, a durable experimental claim, worker
-acceptance and completion distinct. Treat unknown outcomes as holds, never
-as retry authority. No live setup, worker trigger or substituted transport.
+Signal, continuation intent, acknowledgement, attributable known-worker
+acceptance, local start and completion are separate. Use one immutable
+synthetic reservation; unknown outcomes hold without automatic retry,
+replacement, fallback or reinitialization. The receiver owns the fixed marker.
 
 ## Allowed Dependencies
 
-Markdown and linked first-party documentation only; no new package, build
-configuration or credential dependency. Repository coordination from the
-isolated existing checkout remains separate from any future T02 runtime.
+Standard library and existing test tools; no runtime or package dependency.
+Use private disposable SQLite state, not the production ledger.
 
 ## Public API / Key Exports
 
-None. The sequence and future fake verification plan are proposals.
+No installable API. The experiment's entry provides only help and synthetic
+dry-run. The in-process fake port can continue and inspect one bound worker;
+it has no worker creation operation.
 
 ## File Index
 
-- [README.md](README.md): assessment, source evidence, proposed bounded proof,
-  failure matrix, owner decisions and next Lead gate.
+- [README.md](README.md): proof scope, durability limits and historic assessment.
+- [t02_receiver.py](t02_receiver.py): immutable work, local durable owner and marker.
+- [t02_fixture.py](t02_fixture.py): synthetic work and fake known-worker port.
+- [t02_proof.py](t02_proof.py): inert entry.
+- [t02_process_fixture.py](t02_process_fixture.py) and
+  [test_t02_receiver.py](test_t02_receiver.py): bounded Python and SQLite evidence.
 
 ## Known Gaps / Future-State Notes
 
-Custom tunneled Events-to-Dot availability, exact event-triggered local target
-binding, durable pre-effect claim enforcement, exact lost-receipt recovery and cost are unresolved. See the report inventory for capability-level evidence. T02 is
-not proven and Gate A is open.
+Custom tunneled event eligibility and exact event-triggered native continuation
+are unproved. Proof authority, live access, retention, cost and acceptance
+require later contracts. This is not a general guarantee against manual work.
 
 ## Cross-Folder Contracts
 
 Follow the adopted [architecture](../../docs/architecture/proposal.md) and
-[initial plan](../../docs/development/initial-plan.md); this experiment does
-not adopt a transport or change either document.
+[initial plan](../../docs/development/initial-plan.md); no new transport
+selection, packaging, dependency, production orchestration or T01 changes.
 
 ## Verification Contract
 
-Apply the [project verification contract](../../docs/development/verification-contract.md):
-existing inert checks plus explicit Markdown file targets. Verify claims and
-anchors against official sources. No live T02 action during ordinary checks.
+Use the [Windows inert checks](../../docs/development/verification-contract.md#offline-dot-known-worker-experiment).
+Only the designated harmless fixture processes and disposable state are used.
