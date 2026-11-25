@@ -366,3 +366,32 @@ Proposed commands for that future slice (test path does not exist today):
 Phase A itself uses only the existing inert checks and the expanded local
 Markdown file-target list in the [verification contract](../../docs/development/verification-contract.md).
 It claims no T02 implementation, live proof, full acceptance or Gate A completion.
+
+
+### Native ownership and dormant capture preparation
+
+The designated Windows fixture uses the same private Job Object owner as the
+fixed vendor role, with a fixed Python-only supervisor, root and descendant.
+The separate pytest witness acquires the exact child handles before either
+explicit stop or supervisor loss, then observes both exiting. This verifies
+local Job ownership and containment for the designated fixture, not vendor,
+provider, or hosted behavior. Failed or uncertain confirmation closes owned
+handles without treating their prior numeric values as current handles.
+
+The capture-only receiver reuses authentication and RPC framing; it records
+at most one exact candidate in a separate private store and always refuses
+subscription. It cannot build a sender, resolve a hostname, contact the URL,
+emit an event, or dispatch a worker. The candidate is not provider ownership
+evidence. The capture retains private proof/principal, filter, head and time
+but discards the signing secret. Conflict and unresolved reservation hold
+durably. Unsupported URL forms are refused rather than normalized.
+
+A future capture packet must specify the exact source head, separate capture
+authority and private binding digest, intended account/workspace/tunnel/host,
+fixed proof/filter, time window and candidate store, plus independent
+owned-role termination. That packet, a distinct reviewed activation entry, and
+Craig/Lead approval are required before any listener, tunnel or connection.
+A separately authorized event run would bind one independently reviewed exact
+destination and provenance; a different subsequent URL must hold. URL reuse
+after rejected subscribe is not established, and capture and event approvals
+are not interchangeable.

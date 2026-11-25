@@ -16,11 +16,10 @@ from typing import Protocol
 
 from t02_event_evidence import GitHubEvidence, PrivatePacket, PublicGitHub
 from t02_event_gate import RUNTIME, Packet, ProbeGate
-from t02_event_rpc import PROBE_HOST, ProbeRpc, RpcResponse
+from t02_event_rpc import PROBE_HOST, ProbeIdentity, ProbeRpc, RpcResponse
 from t02_event_source import EventSource
 from t02_event_types import (
     MAX_BODY,
-    Binding,
     Callback,
     Hold,
     Network,
@@ -90,7 +89,7 @@ class PinnedTls(Network):
 class LoopbackHttp:
     """Authenticate a single proof principal on non-browser loopback requests."""
 
-    def __init__(self, rpc: ProbeRpc, binding: Binding, bearer: str) -> None:
+    def __init__(self, rpc: ProbeRpc, binding: ProbeIdentity, bearer: str) -> None:
         if not re.fullmatch(r"[a-zA-Z0-9_-]{32,128}", bearer):
             raise Hold("invalid private HTTP binding")
         self._rpc = rpc

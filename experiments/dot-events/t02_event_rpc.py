@@ -5,8 +5,8 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass
 from threading import Lock
+from typing import Protocol
 
-from t02_event_source import EventSource
 from t02_event_types import EVENT, MARKER, VERSION, Hold, decode, encode
 
 SOURCE_PATH = "/mcp"
@@ -19,10 +19,27 @@ class RpcResponse:
     body: bytes = b""
 
 
+class ProbeIdentity(Protocol):
+    @property
+    def proof_id(self) -> str: ...
+
+    @property
+    def principal(self) -> str: ...
+
+
+class ProbeSource(Protocol):
+    @property
+    def binding(self) -> ProbeIdentity: ...
+
+    def check_principal(self, caller: str | None, *, allow_stopped: bool = False) -> None: ...
+    def subscribe(self, caller: str | None, params: dict[str, object]) -> dict[str, object]: ...
+    def unsubscribe(self, caller: str | None, params: dict[str, object]) -> None: ...
+
+
 class ProbeRpc:
     """No tools are available; the external auth adapter owns caller identity."""
 
-    def __init__(self, source: EventSource) -> None:
+    def __init__(self, source: ProbeSource) -> None:
         self._source = source
         self._initialized = False
         self._ready = False

@@ -247,3 +247,22 @@ library HTTP, TLS, socket and Win32 operations at their boundaries. Count real
 adapter-method calls under fakes. The disabled public entry must reject before
 opening private files or constructing a provider or process role. No successful
 live admission or provider compatibility is asserted by the offline checks.
+
+
+### Designated T02 native ownership fixture
+
+On Windows and in each retained environment, run this named group to retain
+witness timings for the same process owner used by the fixed vendor role:
+
+```powershell
+.\experiments\codex-review\.venv\Scripts\python.exe -m pytest -q -s experiments/dot-events/test_t02_event_native.py
+```
+
+There are two sequential cases, explicit stop and owner-process loss. Each
+has at most three fixed harmless Python processes (supervisor, root and
+descendant), a 20-second outer deadline plus a 3-second cleanup reserve.
+No vendor, sockets, credentials, installation or runtime setup is involved.
+The parent witness holds both exact process handles before release and
+requires both exit signals; the shutdown request alone is not proof. The
+backend network and Win32 exception tests and the capture tests remain fake
+only. Run the full suite and prior inert CLI checks unchanged.

@@ -77,3 +77,13 @@ selection, packaging, dependency, production orchestration or T01 changes.
 
 Use the [Windows inert checks](../../docs/development/verification-contract.md#offline-dot-known-worker-experiment).
 Only the designated harmless fixture processes and disposable state are used.
+
+
+## Native ownership and dormant capture preparation
+
+- [t02_event_native_fixture.py](t02_event_native_fixture.py) and
+  [test_t02_event_native.py](test_t02_event_native.py): only the fixed local
+  Python ownership fixture and independent witness, not vendor execution.
+- [t02_event_capture.py](t02_event_capture.py) and
+  [test_t02_event_capture.py](test_t02_event_capture.py): dormant capture-only
+  authenticated RPC-to-private-store experiment; no network/sender or activation.

@@ -94,7 +94,112 @@ def _kernel() -> c.WinDLL:
 
 
 
-class RuntimeRole:
+class _OwnedWindowsJob:
+    """Single native owner shared by the fixed vendor role and inert fixture."""
+
+    def __init__(self, clock: Callable[[], int]) -> None:
+        self._clock = clock
+        self._k: c.WinDLL | None = None
+        self._job: int | None = None
+        self._process: int | None = None
+        self._assigned = False
+        self._attempted = False
+        self._terminal: bool | None = None
+
+    def _start_owned(
+        self, path: Path, args: list[str], environment: dict[str, str], deadline_ms: int,
+        *, before_resume: Callable[[int, int], None] | None = None,
+    ) -> bool:
+        if self._attempted or self._terminal is not None:
+            return False
+        self._attempted = True
+        k = _kernel()
+        self._k = k
+        system_root = os.environ.get("SystemRoot")
+        if not system_root or not Path(system_root).is_absolute():
+            raise Hold("Windows root unavailable")
+        env = c.create_unicode_buffer("\0".join(
+            f"{key}={value}" for key, value in sorted(
+                (environment | {"SystemRoot": system_root}).items(), key=lambda pair: pair[0].casefold(),
+            )
+        ) + "\0\0")
+        exe = str(path)
+        argv = c.create_unicode_buffer(subprocess.list2cmdline([exe, *args]))
+        startup = _Startup()
+        startup.cb = c.sizeof(startup)
+        proc = _Process()
+        self._job = k.CreateJobObjectW(None, None)
+        if not self._job:
+            return False
+        limits = _ExtendedLimits()
+        limits.basic.flags = 0x2000  # Kill on close; no breakaway.
+        if not k.SetInformationJobObject(self._job, 9, c.byref(limits), c.sizeof(limits)):
+            return False
+        remaining(self._clock, deadline_ms)
+        if not k.CreateProcessW(
+            exe, argv, None, None, False, 0x08000404,
+            env, str(path.parent), c.byref(startup), c.byref(proc),
+        ):
+            return False
+        self._process = proc.process
+        try:
+            if not k.AssignProcessToJobObject(self._job, self._process):
+                return False
+            self._assigned = True
+            if before_resume is not None:
+                before_resume(self._job, self._process)
+            remaining(self._clock, deadline_ms)
+            return int(k.ResumeThread(proc.thread)) == 1
+        finally:
+            k.CloseHandle(proc.thread)
+
+    def request_stop(self, deadline_ms: int) -> None:
+        k = self._k
+        if k is not None and self._process:
+            if self._assigned:
+                k.TerminateJobObject(self._job, 1)
+            elif k.WaitForSingleObject(self._process, 0) != 0:
+                k.TerminateProcess(self._process, 1)
+
+    def confirmed_quiescent(self, deadline_ms: int) -> bool:
+        if self._terminal is not None:
+            return self._terminal
+        k = self._k
+        try:
+            if k is None:
+                self._terminal = self._process is None and self._clock() <= deadline_ms
+                return self._terminal
+            accounting = _Accounting()
+            while self._clock() <= deadline_ms:
+                exited = self._process is None or k.WaitForSingleObject(self._process, 0) == 0
+                empty = not self._job or (
+                    bool(k.QueryInformationJobObject(self._job, 1, c.byref(accounting), c.sizeof(accounting), None))
+                    and accounting.active == 0
+                )
+                if exited and empty:
+                    self._terminal = True
+                    return True
+                time.sleep(min(0.01, remaining(self._clock, deadline_ms)))
+            return False
+        finally:
+            if self._terminal is None:
+                self._terminal = False
+            self._close_owned_handles()
+
+    def _close_owned_handles(self) -> None:
+        job, process = self._job, self._process
+        self._job = self._process = None
+        k = self._k
+        if k is not None:
+            if job:
+                k.CloseHandle(job)
+            if process:
+                if self._terminal is not True and not self._assigned and k.WaitForSingleObject(process, 0) != 0:
+                    k.TerminateProcess(process, 1)
+                k.CloseHandle(process)
+
+
+class RuntimeRole(_OwnedWindowsJob):
     """One retained Windows job and process, assigned prior to resume."""
 
     def __init__(
@@ -124,12 +229,8 @@ class RuntimeRole:
             "--mcp.oauth-discovery", "disabled", "--health.listen-addr", "127.0.0.1:0",
             "--log.level", "warn",
         ]
-        self._clock = clock
-        self._k: c.WinDLL | None = None
-        self._job: int | None = None
-        self._process: int | None = None
-        self._assigned = False
-        self._attempted = False
+        super().__init__(clock)
+        self._candidate_checked = False
 
     def verified_digest(self, deadline: int) -> str:
         """Read the existing candidate bytes, no subprocess or version probe."""
@@ -147,76 +248,9 @@ class RuntimeRole:
         raise Hold("runtime binary outside size bound")
 
     def start(self, deadline_ms: int) -> bool:
-        if self._attempted:
+        if self._candidate_checked or self._terminal is not None:
             return False
-        self._attempted = True
+        self._candidate_checked = True
         if self.verified_digest(deadline_ms) != self._digest:
             return False
-        k = _kernel()
-        self._k = k
-        system_root = os.environ.get("SystemRoot")
-        if not system_root or not Path(system_root).is_absolute():
-            raise Hold("Windows root unavailable")
-        env = c.create_unicode_buffer("\0".join(
-            f"{key}={value}" for key, value in sorted(
-                (self._environment | {"SystemRoot": system_root}).items(), key=lambda pair: pair[0].casefold(),
-            )
-        ) + "\0\0")
-        exe = str(self._path)
-        argv = c.create_unicode_buffer(subprocess.list2cmdline([exe, *self._args]))
-        startup = _Startup()
-        startup.cb = c.sizeof(startup)
-        proc = _Process()
-        self._job = k.CreateJobObjectW(None, None)
-        if not self._job:
-            return False
-        limits = _ExtendedLimits()
-        limits.basic.flags = 0x2000  # Kill on close; no breakaway.
-        if not k.SetInformationJobObject(self._job, 9, c.byref(limits), c.sizeof(limits)):
-            return False
-        remaining(self._clock, deadline_ms)
-        if not k.CreateProcessW(
-            exe, argv, None, None, False, 0x08000404,
-            env, str(self._path.parent), c.byref(startup), c.byref(proc),
-        ):
-            return False
-        self._process = proc.process
-        try:
-            if not k.AssignProcessToJobObject(self._job, self._process):
-                return False
-            self._assigned = True
-            remaining(self._clock, deadline_ms)
-            return int(k.ResumeThread(proc.thread)) == 1
-        finally:
-            k.CloseHandle(proc.thread)
-
-    def request_stop(self, deadline_ms: int) -> None:
-        k = self._k
-        if k is not None and self._process:
-            if self._assigned:
-                k.TerminateJobObject(self._job, 1)
-            elif k.WaitForSingleObject(self._process, 0) != 0:
-                k.TerminateProcess(self._process, 1)
-
-    def confirmed_quiescent(self, deadline_ms: int) -> bool:
-        k = self._k
-        try:
-            if k is None:
-                return self._process is None and self._clock() <= deadline_ms
-            accounting = _Accounting()
-            while self._clock() <= deadline_ms:
-                exited = self._process is None or k.WaitForSingleObject(self._process, 0) == 0
-                empty = not self._job or (
-                    bool(k.QueryInformationJobObject(self._job, 1, c.byref(accounting), c.sizeof(accounting), None))
-                    and accounting.active == 0
-                )
-                if exited and empty:
-                    return True
-                time.sleep(min(0.01, remaining(self._clock, deadline_ms)))
-            return False
-        finally:
-            if k is not None:
-                if self._job:
-                    k.CloseHandle(self._job)
-                if self._process:
-                    k.CloseHandle(self._process)
+        return self._start_owned(self._path, self._args, self._environment, deadline_ms)

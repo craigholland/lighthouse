@@ -198,3 +198,37 @@ def test_production_observation_sequences_restart_between_deliveries(
         "listener.restart_once", "source.deliver",
     ]
     assert source.deliver.call_args.kwargs == {"duplicate": True}
+
+
+
+def test_windows_resume_failure_cannot_reuse_closed_handles_or_certify_unknown(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    packet = Packet("a" * 40, "workspace", "dot", "org-test", "tunnel_" + "z" * 32,
+                    "b" * 64, "c" * 64, "host", 1000)
+    role = windows.RuntimeRole(tmp_path / "tunnel-client-runtime.exe", packet, "a" * 32, "inert-key", lambda: 1000)
+    monkeypatch.setattr(role, "verified_digest", lambda _: packet.runtime_binary_digest)
+    monkeypatch.setenv("SystemRoot", str(tmp_path))
+    k = Mock()
+    k.CreateJobObjectW.return_value = 11
+
+    def create(*args: object) -> bool:
+        proc = getattr(args[-1], "_obj")
+        proc.process = 22
+        proc.thread = 33
+        return True
+
+    k.CreateProcessW.side_effect = create
+    k.AssignProcessToJobObject.return_value = True
+    k.ResumeThread.return_value = 0xFFFFFFFF
+    monkeypatch.setattr(windows, "_kernel", lambda: k)
+    assert not role.start(2000)
+    role.request_stop(2000)
+    k.TerminateJobObject.assert_called_once_with(11, 1)
+    assert not role.confirmed_quiescent(999)
+    assert [x.args[0] for x in k.CloseHandle.call_args_list] == [33, 11, 22]
+    calls = k.mock_calls.copy()
+    role.request_stop(2000)
+    assert not role.confirmed_quiescent(2000)
+    assert not role.start(2000)
+    assert k.mock_calls == calls
