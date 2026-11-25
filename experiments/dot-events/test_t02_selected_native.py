@@ -2,19 +2,28 @@
 
 from __future__ import annotations
 
+import importlib
 import os
 import sys
 import uuid
+from collections.abc import Callable
 from pathlib import Path
 from queue import Empty, Queue
 from threading import Thread
+from typing import cast
 from unittest.mock import Mock
 
 import pytest
 import t02_capture_native_composition as release
 from t02_capture_composition import execute_capture, open_existing_capture
 from t02_capture_packet import CapturePacket
-from t02_capture_pipe_owner import CapturePipeHandles, CapturePipeOwner
+from t02_capture_pipe_owner import (
+    CapturePipeHandles,
+    CapturePipeOwner,
+    _ChannelApi,
+    _Connect,
+    _event,
+)
 from t02_event_types import Hold, encode
 from t02_selected_native_context import (
     ACTIVATION,
@@ -29,12 +38,92 @@ from t02_selected_native_fixture import FixtureCoordinatorHost, fixture_provider
 from t02_selected_native_roles import RPC_CAPTURED
 from test_t02_capture_lifecycle import local_observation, record
 
-pytestmark = pytest.mark.skipif(
+_native_only = pytest.mark.skipif(
     sys.platform != "win32" or os.environ.get("LIGHTHOUSE_T02_SELECTED_NATIVE_PROOF") != "1",
     reason="explicitly selected offline native topology only",
 )
 
 
+class _PipeTrace:
+    """Only fixed operation labels; never arguments, handles or exception text."""
+
+    _STAGES = {
+        "CreateNamedPipe": "server-create", "CreateFile": "client-open",
+        "ConnectNamedPipe": "connect-begin", "GetCurrentProcess": "current-process",
+        "DuplicateHandle": "handle-duplicate",
+    }
+
+    def __init__(self, api: object, event: Callable[[], int]) -> None:
+        self.api = api
+        self.event = event
+        self.stage = "none"
+
+    def __getattr__(self, name: str) -> object:
+        original = getattr(self.api, name)
+        if name not in self._STAGES:
+            return original
+
+        def call(*args: object) -> object:
+            self.stage = self._STAGES[name]
+            result = original(*args)
+            self.stage += "-returned"
+            if name == "ConnectNamedPipe":
+                return _ConnectTrace(self, cast(_Connect, result))
+            return result
+
+        return call
+
+    def make_event(self) -> int:
+        self.stage = "stop-event"
+        handle = self.event()
+        self.stage = "stop-event-returned"
+        return handle
+
+
+class _ConnectTrace:
+    def __init__(self, trace: _PipeTrace, result: _Connect) -> None:
+        self.trace = trace
+        self.result = result
+
+    def GetOverlappedResult(self, wait: bool) -> tuple[int, int]:
+        self.trace.stage = "connect-confirm"
+        result = self.result.GetOverlappedResult(wait)
+        self.trace.stage = "connect-confirmed" if result[1] == 0 else "connect-unconfirmed"
+        return result
+
+
+@pytest.mark.parametrize(
+    ("operation", "expected"),
+    [
+        ("CreateNamedPipe", "server-create"), ("CreateFile", "client-open"),
+        ("ConnectNamedPipe", "connect-begin"), ("confirm", "connect-confirm"),
+        ("pending", "connect-unconfirmed"), ("event", "stop-event"),
+        ("DuplicateHandle", "handle-duplicate"),
+    ],
+)
+def test_pipe_trace_fault_labels_are_fixed(operation: str, expected: str) -> None:
+    api = Mock()
+    api.CreateNamedPipe.side_effect = [11, 21]
+    api.CreateFile.side_effect = [12, 22]
+    api.ConnectNamedPipe.return_value.GetOverlappedResult.return_value = (0, 0)
+    event = Mock(return_value=31)
+    cause = OSError("untrusted detail")
+    if operation == "event":
+        event.side_effect = cause
+    elif operation == "confirm":
+        api.ConnectNamedPipe.return_value.GetOverlappedResult.side_effect = cause
+    elif operation == "pending":
+        api.ConnectNamedPipe.return_value.GetOverlappedResult.return_value = (0, 996)
+    else:
+        getattr(api, operation).side_effect = cause
+    trace = _PipeTrace(api, event)
+    owner = CapturePipeOwner(lambda: 0, api=cast(_ChannelApi, trace), make_event=trace.make_event)
+    with pytest.raises(Hold, match="capture private channel setup held"):
+        owner.prepare(1)
+    assert trace.stage == expected
+
+
+@_native_only
 @pytest.mark.parametrize("mode", ("normal", "stall", "no-signal", "missing-root"))
 def test_fixed_selected_native_topology(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mode: str) -> None:
     root = tmp_path / ("lighthouse-native-" + uuid.uuid4().hex)
@@ -58,8 +147,12 @@ def test_fixed_selected_native_topology(tmp_path: Path, monkeypatch: pytest.Monk
     ctx = FixtureContext.load(root, mode, gui)
     controller = FixtureCoordinatorHost(ctx)
     ipc_phase = "not-attempted"
+    ipc_trace = _PipeTrace(importlib.import_module("_winapi"), _event)
 
     class DiagnosticPipeOwner(CapturePipeOwner):
+        def __init__(self, clock: Callable[[], int]) -> None:
+            super().__init__(clock, api=cast(_ChannelApi, ipc_trace), make_event=ipc_trace.make_event)
+
         def prepare(self, deadline: int) -> CapturePipeHandles:
             nonlocal ipc_phase
             ipc_phase = "enter-prepare"
@@ -112,7 +205,7 @@ def test_fixed_selected_native_topology(tmp_path: Path, monkeypatch: pytest.Monk
             raise result
         independently_stopped = controller.exact_outer_stopped(min(mono() + 250, started + 20_000))
         assert independently_stopped, (
-            ipc_phase, controller.bootstrap_phase, controller._terminal,
+            ipc_phase, ipc_trace.stage, controller.bootstrap_phase, controller._terminal,
             controller._outer_job is not None, controller._outer_root is not None, result,
         )
     finally:
