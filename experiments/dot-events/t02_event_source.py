@@ -258,6 +258,12 @@ class EventSource:
         with self._edit() as db:
             db.execute("UPDATE event_probe SET stopped=1 WHERE slot=1")
 
+    def subscription_ready(self) -> bool:
+        """Observe admission without extending or recreating a subscription."""
+        with self._edit() as db:
+            state = self._read(db)
+            return self._live(state) and state.url is not None and state.pending is None
+
     def reserve_restart(self) -> None:
         """Consume the one planned source-restart allowance; never launch it."""
         with self._edit() as db:

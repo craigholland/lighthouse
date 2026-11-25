@@ -77,12 +77,19 @@ for this proof. It preserves consumed limits and pending intent. An unavailable
 stop write that cannot be verified remains a hold; do not reopen or resume that
 state as an operator workaround.
 
-Production activation stays disabled at this head. No real provider-reader
-transport, actual socket/service objects, managed Windows process backend,
-private files or credentials are wired into the CLI. A separately reviewed
-native backend and exact owner-approved operational packet are required
-before live use. This is preparation through real adapter logic with injected
-I/O, not a tested vendor runtime or hosted product result.
+Production activation stays disabled at this head. The dormant composition
+selects a fixed credentialless GitHub HTTPS GET reader, authenticated loopback
+HTTP source, exact numeric-peer TLS callback and Windows Job runtime owner.
+The CLI rejects live activation before reading a packet or constructing these
+adapters. Backend tests replace the low-level HTTP, socket, TLS and Win32
+calls; no actual credentials, service, process, DNS or socket are used.
+
+Future authorized preflight must confirm the exact platform and callback
+binding, on-host native process containment, effective executable identity
+and runtime configuration, and bounded behavior of the real DNS and HTTP
+stack. Socket inactivity limits and local time checks are not proof of
+absolute native resolver cancellation. This is not live eligibility,
+successful coordinator delivery, or CI.
 
 
 ## Offline known-worker proof

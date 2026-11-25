@@ -8,7 +8,7 @@ and is not evidence of real event delivery or worker dispatch.
 ## Scope
 
 T02 Phase A records, offline known-worker/marker proof, and separate inert event source; no
-native provider, transport implementation, live connection, setup or settings.
+dormant fixed transport adapters, with no live connection, setup or settings.
 
 ## Purpose
 
@@ -31,7 +31,7 @@ Use private disposable SQLite state, not the production ledger.
 
 ## Public API / Key Exports
 
-No installable API. The worker-free event probe exposes only the synthetic CLI and typed review boundaries; no live adapter is installed. The experiment's entry provides only help and synthetic
+No installable API. The worker-free event probe exposes only the synthetic CLI and typed review boundaries; concrete backend code is dormant and activation stays disabled. The experiment's entry provides only help and synthetic
 dry-run. The in-process fake port can continue and inspect one bound worker;
 it has no worker creation operation.
 
@@ -51,6 +51,10 @@ it has no worker creation operation.
 - [t02_event_gate.py](t02_event_gate.py): proposed exact-authority and lifecycle ports.
 - [t02_event_evidence.py](t02_event_evidence.py): strict packet and provider evidence parsing.
 - [t02_event_assembly.py](t02_event_assembly.py): fake-only composed loopback, TLS and owned-lifecycle boundaries.
+- [t02_event_https.py](t02_event_https.py), [t02_event_loopback.py](t02_event_loopback.py),
+  and [t02_event_windows.py](t02_event_windows.py): dormant fixed stdlib backends.
+- [t02_event_production.py](t02_event_production.py): fixed composition, unreachable from CLI.
+- [test_t02_event_backends.py](test_t02_event_backends.py): fake-only low-level I/O checks.
 - [test_t02_event_probe.py](test_t02_event_probe.py) and
   [test_t02_event_assembly.py](test_t02_event_assembly.py): effect, denial and deadline evidence.
 

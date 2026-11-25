@@ -127,10 +127,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Offline, worker-free Lighthouse event probe.")
     options = parser.add_mutually_exclusive_group()
     options.add_argument("--dry-run", action="store_true")
-    options.add_argument("--live", action="store_true", help="preflight only; no trusted adapter installed")
+    options.add_argument("--live", action="store_true", help="activation disabled; no live preflight")
     args = parser.parse_args(argv)
     if args.live:
-        parser.exit(2, "Held: trusted exact-packet approval and lifecycle adapters are not installed.\n")
+        parser.exit(2, "Held: live event-probe activation is disabled.\n")
     if args.dry_run:
         return dry_run()
     parser.print_help()

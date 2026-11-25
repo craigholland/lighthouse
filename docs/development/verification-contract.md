@@ -241,3 +241,9 @@ for bad packet/evidence, and deny new effects if any authority read returns
 after expiry. Already-attempted roles still require independent terminal
 confirmation under the original deadline. No actual provider request, socket,
 process, evidence from real approval records or private files is allowed.
+
+Run the dormant backend checks as part of both full suites. Replace standard
+library HTTP, TLS, socket and Win32 operations at their boundaries. Count real
+adapter-method calls under fakes. The disabled public entry must reject before
+opening private files or constructing a provider or process role. No successful
+live admission or provider compatibility is asserted by the offline checks.
