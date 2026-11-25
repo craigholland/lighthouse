@@ -192,9 +192,9 @@ class BoundLifecycle:
             resources.state_file, binding, Callback(self._network, self._clock),
             self._clock, self._random_id, self._principal_current,
         )
+        self._source = source
         if source.observe_stop() or self._clock() >= deadline_ms:
             return False
-        self._source = source
         self._local = self._effects.prepare_loopback(
             "127.0.0.1", 8765, LoopbackHttp(ProbeRpc(source), binding, resources.transport_bearer),
         )
@@ -226,7 +226,35 @@ class BoundLifecycle:
         return self._stop(self._runtime, deadline_ms)
 
     def confirm_source_stopped(self, deadline_ms: int) -> bool:
-        return self._stop(self._local, deadline_ms)
+        source = self._source
+        if source is None:
+            return self._stop(self._local, deadline_ms)
+        persisted = self._persist_and_check(source, deadline_ms)
+        try:
+            quiescent = self._stop(self._local, deadline_ms)
+        except (OSError, Hold):
+            quiescent = False
+        if not persisted and quiescent:
+            # Retry only the idempotent local stop after the listener can no
+            # longer contend for the state. Never retry delivery or startup.
+            persisted = self._persist_and_check(source, deadline_ms)
+        return persisted and quiescent
+
+    def _persist_and_check(self, source: EventSource, deadline_ms: int) -> bool:
+        if self._clock() >= deadline_ms:
+            return False
+        try:
+            source.stop_for_cleanup(min(0.5, max(0, deadline_ms - self._clock()) / 1000))
+        except (OSError, Hold):
+            # An uncertain write could have committed. Prove, do not infer.
+            pass
+        if self._clock() >= deadline_ms:
+            return False
+        try:
+            remaining = min(0.5, max(0, deadline_ms - self._clock()) / 1000)
+            return source.durable_stop_confirmed(remaining) and self._clock() <= deadline_ms
+        except (OSError, Hold):
+            return False
 
 
 def run_injected_assembly(

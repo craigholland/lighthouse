@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import hashlib
+import sqlite3
 from collections.abc import Mapping
+from contextlib import closing
 from dataclasses import astuple
 from pathlib import Path
 
@@ -13,7 +15,7 @@ from t02_event_evidence import API_ROOT, PREFIX, PrivatePacket, ProviderReply
 from t02_event_gate import LEAD, LEAD_APP, OWNER, RUNTIME, SCOPE, Packet
 from t02_event_rpc import SOURCE_PATH
 from t02_event_source import EventSource
-from t02_event_types import EVENT, Reply, decode, encode
+from t02_event_types import EVENT, Hold, Reply, decode, encode
 from t02_events_probe import BINDING, HTTP, Fixture, subscription
 
 BEARER = "synthetic-bearer-" + "x" * 32
@@ -29,6 +31,9 @@ class Owned:
     def start(self, deadline_ms: int) -> bool:
         self.lab.trace.append(self.role + "-start")
         assert deadline_ms == BINDING.send_until
+        if self.role == "source" and self.lab.partial_source:
+            self.lab.subscribe()
+            raise Hold("fixture startup interrupted after subscription")
         return self.role != "runtime" or not self.lab.ambiguous_start
 
     def request_stop(self, deadline_ms: int) -> None:
@@ -81,6 +86,8 @@ class Lab:
         self.mutation = ""
         self.clean = True
         self.ambiguous_start = False
+        self.partial_source = False
+        self.interrupt_observation = False
 
     def read(self, path: str, *, deadline_ms: int, limit: int) -> ProviderReply:
         assert path.startswith(API_ROOT + "/") and deadline_ms <= BINDING.send_until and limit == 32768
@@ -141,8 +148,7 @@ class Lab:
         self.trace.append("verified TLS")
         return Tls(self)
 
-    def observe_source(self, source: EventSource, deadline_ms: int) -> None:
-        self.trace.append("observe")
+    def subscribe(self) -> None:
         handler = self.handler
         assert handler is not None
         req = {"jsonrpc": "2.0", "method": "initialize", "id": 1,
@@ -159,7 +165,13 @@ class Lab:
         ):
             result = handler.respond("127.0.0.1", "POST", SOURCE_PATH, headers, encode(request))
             assert result.status == 202 or (result.status == 200 and "result" in decode(result.body))
+    def observe_source(self, source: EventSource, deadline_ms: int) -> None:
+        self.trace.append("observe")
+        self.subscribe()
+        source.reserve_restart()
         assert source.deliver() == "ack"
+        if self.interrupt_observation:
+            raise Hold("fixture observation interrupted")
         assert source.deliver(duplicate=True) == "ack"
         source.unsubscribe(BINDING.principal, subscription(include_secret=False))
         assert source.observe_stop()
@@ -181,7 +193,7 @@ def test_real_composition_with_fake_effect_order_and_owned_cleanup(tmp_path: Pat
         "DNS", "verified TLS", "challenge", "TLS-close",
         "DNS", "verified TLS", "delivery", "TLS-close",
         "DNS", "verified TLS", "delivery", "TLS-close",
-        "runtime-request", "runtime-confirmed", "source-request", "source-confirmed",
+        "source-request", "source-confirmed", "runtime-request", "runtime-confirmed",
     ]
     assert len(lab.event_bodies) == 2 and lab.event_bodies[0] == lab.event_bodies[1]
 
@@ -212,4 +224,58 @@ def test_cleanup_has_to_observe_failed_or_ambiguous_runtime(tmp_path: Path) -> N
     lab.clean = False
     assert "shutdown not confirmed" in lab.run()
     assert "observe" not in lab.trace and not lab.event_bodies
-    assert lab.trace[-4:] == ["runtime-request", "runtime-confirmed", "source-request", "source-confirmed"]
+    assert lab.trace[-4:] == ["source-request", "source-confirmed", "runtime-request", "runtime-confirmed"]
+
+
+def counters(path: Path) -> object:
+    with closing(sqlite3.connect(path)) as db:
+        return db.execute("SELECT stopped, checks, sent, restarted, pending FROM event_probe").fetchone()
+
+
+@pytest.mark.parametrize("phase, expected", [("observe", (1, 1, 1, 1, None)), ("start", (1, 1, 0, 0, None))])
+def test_cleanup_fences_reopened_source_after_interruption(tmp_path: Path, phase: str, expected: object) -> None:
+    lab = Lab(tmp_path / "state.sqlite")
+    lab.partial_source = phase == "start"
+    lab.interrupt_observation = phase == "observe"
+    assert lab.run() == "held: incomplete source window"
+    assert counters(lab.fixture.path) == expected
+    assert ("delivery" in lab.trace) == (phase == "observe")
+    assert "source-confirmed" in lab.trace
+    assert ("runtime-confirmed" in lab.trace) == (phase == "observe")
+    trace = lab.trace.copy()
+    fixture_requests = lab.fixture.network.calls.copy()
+    reopened = lab.fixture.reopen()
+    with pytest.raises(Hold):
+        reopened.subscribe(BINDING.principal, subscription())
+    with pytest.raises(Hold):
+        reopened.deliver(duplicate=phase == "observe")
+    with pytest.raises(Hold):
+        reopened.reserve_restart()
+    assert lab.trace == trace and lab.fixture.network.calls == fixture_requests
+    assert counters(lab.fixture.path) == expected
+
+
+@pytest.mark.parametrize("committed", [False, True])
+def test_uncertain_stop_requires_independent_record_and_still_stops_roles(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, committed: bool,
+) -> None:
+    lab = Lab(tmp_path / "state.sqlite")
+    lab.interrupt_observation = True
+    original = EventSource.stop_for_cleanup
+    attempts = 0
+
+    def uncertain(source: EventSource, timeout: float) -> None:
+        nonlocal attempts
+        attempts += 1
+        if committed:
+            original(source, timeout)
+        raise Hold("fixture lost stop-write result")
+
+    monkeypatch.setattr(EventSource, "stop_for_cleanup", uncertain)
+    result = lab.run()
+    assert result == ("held: incomplete source window" if committed
+                      else "held: shutdown not confirmed within the original deadline")
+    assert lab.trace[-4:] == ["source-request", "source-confirmed", "runtime-request", "runtime-confirmed"]
+    assert counters(lab.fixture.path) == (int(committed), 1, 1, 1, None)
+    assert attempts == (1 if committed else 2)
+    assert len(lab.event_bodies) == 1

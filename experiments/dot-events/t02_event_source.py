@@ -84,9 +84,9 @@ class EventSource:
             db.execute("INSERT INTO event_probe(slot,binding) VALUES (1,?)", (self.fingerprint,))
 
     @contextmanager
-    def _edit(self, *, check: bool = True) -> Iterator[sqlite3.Connection]:
+    def _edit(self, *, check: bool = True, timeout: float = 0.5) -> Iterator[sqlite3.Connection]:
         try:
-            with closing(sqlite3.connect(self.path.as_uri() + "?mode=rw", uri=True, timeout=0.5)) as db:
+            with closing(sqlite3.connect(self.path.as_uri() + "?mode=rw", uri=True, timeout=timeout)) as db:
                 db.execute("PRAGMA synchronous=FULL")
                 db.execute("BEGIN IMMEDIATE")
                 if check:
@@ -145,6 +145,16 @@ class EventSource:
             if stopped:
                 db.execute("UPDATE event_probe SET stopped=1 WHERE slot=1")
             return stopped
+
+    def stop_for_cleanup(self, timeout: float) -> None:
+        """Close the existing slot without changing its intent or allowances."""
+        with self._edit(timeout=timeout) as db:
+            db.execute("UPDATE event_probe SET stopped=1 WHERE slot=1 AND stopped=0")
+
+    def durable_stop_confirmed(self, timeout: float) -> bool:
+        """Check the stop flag in a separate connection, without inferring expiry."""
+        with self._edit(check=False, timeout=timeout) as db:
+            return self._read(db).stopped == 1
 
     def check_principal(self, caller: str | None, *, allow_stopped: bool = False) -> None:
         if caller != self.binding.principal or self.principal_current() is not True:

@@ -159,16 +159,16 @@ class ProbeGate:
         except (OSError, ValueError, TypeError, Hold):
             active = False
         finally:
-            if attempted_runtime:
-                try:
-                    runtime_down = adapter.confirm_runtime_stopped(total_stop) is True
-                except (OSError, ValueError, TypeError, Hold):
-                    runtime_down = False
             if attempted_source:
                 try:
                     source_down = adapter.confirm_source_stopped(total_stop) is True
                 except (OSError, ValueError, TypeError, Hold):
                     source_down = False
+            if attempted_runtime:
+                try:
+                    runtime_down = adapter.confirm_runtime_stopped(total_stop) is True
+                except (OSError, ValueError, TypeError, Hold):
+                    runtime_down = False
         if not source_down or not runtime_down or self._clock() > total_stop:
             return "held: shutdown not confirmed within the original deadline"
         return "bounded source window observed; Dot receipt unverified" if active else "held: incomplete source window"

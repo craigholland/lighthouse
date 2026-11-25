@@ -70,7 +70,12 @@ and limits the body before dispatch. Callback tests observe exact IP,
 verified hostname, port, request bytes, response bound and closure. The
 offline assembled test uses provider-shaped JSON, a disposable state file,
 and injected socket/TLS/process doubles. It records exactly which effects
-happened, including owned cleanup after ambiguous startup.
+happened, including owned cleanup after ambiguous startup. Final assembly
+cleanup also writes and independently checks the existing subscription's stop
+flag before reporting success; listener/runtime termination cannot substitute
+for this proof. It preserves consumed limits and pending intent. An unavailable
+stop write that cannot be verified remains a hold; do not reopen or resume that
+state as an operator workaround.
 
 Production activation stays disabled at this head. No real provider-reader
 transport, actual socket/service objects, managed Windows process backend,

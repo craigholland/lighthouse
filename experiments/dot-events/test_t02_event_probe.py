@@ -333,7 +333,7 @@ def test_fixed_lifecycle_deadlines_and_confirmation(synthetic: Fixture, start_ok
     expected = ["private-binding", "pinned-binary", "source", "runtime"]
     if start_ok:
         expected.append("measure")
-    assert port.calls == [*expected, "confirm runtime", "confirm source"]
+    assert port.calls == [*expected, "confirm source", "confirm runtime"]
     assert result.startswith("held:") == (not start_ok or not shutdown)
 
 
@@ -377,7 +377,9 @@ def test_slow_evidence_never_admits_expired_effect(synthetic: Fixture, phase: in
     if phase > 2:
         prior += ["source"]
     if phase > 3:
-        prior += ["runtime", "confirm runtime"]
+        prior += ["runtime"]
     if phase > 2:
         prior += ["confirm source"]
+    if phase > 3:
+        prior += ["confirm runtime"]
     assert port.calls == prior
