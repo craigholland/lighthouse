@@ -93,10 +93,12 @@ CREATE TABLE proof (
     ack INTEGER NOT NULL DEFAULT 0 CHECK(ack IN (0, 1) AND ack <= attempt),
     turn TEXT CHECK(turn IS NULL OR (attempt = 1 AND length(turn) BETWEEN 1 AND 128)),
     started INTEGER NOT NULL DEFAULT 0 CHECK(started IN (0, 1) AND started <= attempt),
-    marker INTEGER NOT NULL DEFAULT 0 CHECK(marker IN (0, 1) AND marker <= started)
+    marker INTEGER NOT NULL DEFAULT 0 CHECK(marker IN (0, 1) AND marker <= started),
+    conflict INTEGER NOT NULL DEFAULT 0 CHECK(conflict IN (0, 1) AND (conflict = 0 OR turn IS NOT NULL))
 ) STRICT
 """
-_VERSION = 2
+_VERSION = 3
+_CONFLICT_HOLD = "attention: conflicting acceptance for the bound worker"
 _ALLOWED_EFFECT = "fixed synthetic marker v1"
 
 
@@ -159,20 +161,23 @@ class Proof:
             or definitions[0][0].strip() != _SCHEMA.strip()
         ):
             raise StateError("unexpected schema")
-        rows = db.execute("SELECT binding,attempt,ack,turn,started,marker FROM proof").fetchall()
+        rows = db.execute("SELECT binding,attempt,ack,turn,started,marker,conflict FROM proof").fetchall()
         if len(rows) != 1:
             raise StateError("missing or conflicting reservation")
-        binding, attempt, ack, turn, started, marker = rows[0]
+        binding, attempt, ack, turn, started, marker, conflict = rows[0]
         if (
             binding != self._binding
             or any(type(value) is not int or value not in (0, 1)
-                   for value in (attempt, ack, started, marker))
+                   for value in (attempt, ack, started, marker, conflict))
             or ack > attempt or started > attempt or marker > started
+            or (conflict and turn is None)
             or (turn is not None and (not self._valid_turn(turn) or not attempt))
         ):
             raise StateError("unexpected binding or corrupt record")
         hold = None
-        if (attempt and turn is None) or (started and not marker):
+        if conflict:
+            hold = _CONFLICT_HOLD
+        elif (attempt and turn is None) or (started and not marker):
             hold = "attention: unresolved acceptance or effect"
         return Status(bool(attempt), bool(ack), turn, bool(started), bool(marker), hold)
 
@@ -216,12 +221,14 @@ class Proof:
                         or not self._valid_turn(observed.turn)
                         or (observed.dispatch, observed.worker, observed.revision)
                         != (self._work.dispatch, self._work.worker, self._work.revision)
-                        or (current.turn is not None and current.turn != observed.turn)
                     ):
                         return Status(current.attempted, current.acknowledged or acknowledged,
                                       current.turn, current.started, current.marker,
                                       "attention: rejected acceptance evidence")
-                    db.execute("UPDATE proof SET turn=? WHERE slot=1", (observed.turn,))
+                    if current.turn is not None and current.turn != observed.turn:
+                        db.execute("UPDATE proof SET conflict=1 WHERE slot=1")
+                    else:
+                        db.execute("UPDATE proof SET turn=? WHERE slot=1", (observed.turn,))
                 return self._read(db)
         except (sqlite3.Error, StateError, OSError):
             return Status(hold="attention: receipt persistence uncertain")
@@ -264,7 +271,7 @@ class Proof:
         try:
             with self._transaction() as db:
                 current = self._read(db)
-                if current.started:
+                if current.started or current.hold == _CONFLICT_HOLD:
                     return current
                 if not current.attempted or not self._fresh():
                     return Status(current.attempted, current.acknowledged, current.turn,

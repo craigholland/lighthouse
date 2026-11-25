@@ -20,7 +20,9 @@ the unresolved hosted integration evidence explicit.
 Signal, continuation intent, acknowledgement, attributable known-worker
 acceptance, local start and completion are separate. Use one immutable
 synthetic reservation; unknown outcomes hold without automatic retry,
-replacement, fallback or reinitialization. The receiver owns the fixed marker.
+replacement, fallback or reinitialization. Conflicting valid turns for the
+same binding durably block new marker admission and attributed completion;
+repeated observations cannot clear the hold. The receiver owns the fixed marker.
 
 ## Allowed Dependencies
 

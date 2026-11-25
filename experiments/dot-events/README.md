@@ -20,6 +20,13 @@ The marker file is separate from SQLite. A persisted start without completion
 remains held even when the marker file exists: observing a side effect is not
 the same as a trusted final receipt. Reconciliation can record exact known
 acceptance without inventing transport acknowledgement or completion.
+Two otherwise valid acceptances for different turns on the same binding are
+different: the owner durably latches the contradiction, retains the original
+turn and consumed intent, and denies marker admission and attributed
+completion. Status reads, duplicate events, reopen, competing callers and
+even a repeat of either turn do not resolve it. This offline proof exposes no
+conflict-clearing operation; a later owner disposition would require
+conclusive authority outside this experiment.
 Completion and deadlines never free the single reservation.
 
 The facility assumes a single, private, non-replaced state path on a local

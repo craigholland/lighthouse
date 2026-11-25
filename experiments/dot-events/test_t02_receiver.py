@@ -266,3 +266,22 @@ def test_runtime_import_does_not_create_state(tmp_path: Path, monkeypatch: pytes
         main(["--live"])
     assert invalid.value.code == 2
     assert list(tmp_path.iterdir()) == []
+
+
+def test_conflicting_known_turn_holds_marker_after_reopen_and_competition(path: Path) -> None:
+    work = fixture_work(path)
+    worker = FakeKnownWorker(path)
+    proof = Proof(path, work, worker, lambda: Observation(work, True), lambda: 10)
+    accepted = proof.on_event("first")
+    assert accepted.acknowledged and accepted.turn == "fixture-turn"
+    worker.acceptance = Acceptance(work.dispatch, work.worker, work.revision, "contradictory-turn")
+    assert proof.reconcile().hold
+    reopened = fixture_proof(path)
+    assert run_children(path, "receive", 3) == [0, 0, 0]
+    assert counts(path) == (1, 0)
+    for result in (proof.status(), reopened.status(), reopened.on_event("new-id"), reopened.receive()):
+        assert result.hold and result.attempted and result.acknowledged
+        assert result.turn == "fixture-turn" and not result.started and not result.attributed_completion
+    worker.acceptance = Acceptance(work.dispatch, work.worker, work.revision, "fixture-turn")
+    assert proof.reconcile().hold
+    assert counts(path) == (1, 0)
