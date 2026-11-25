@@ -108,3 +108,5 @@ Only the designated harmless fixture processes and disposable state are used.
 
 - [t02_capture_bootstrap.py](t02_capture_bootstrap.py), [t02_capture_host_entry.py](t02_capture_host_entry.py), and [t02_capture_listener.py](t02_capture_listener.py): inherited capabilities, claimed-store binding and fixed listener helper; direct entry held.
 - [t02_capture_detached.py](t02_capture_detached.py) and [t02_capture_local_windows.py](t02_capture_local_windows.py): detached cleanup policy and bounded local evidence, tested with fakes.
+
+- [t02_capture_handoff.py](t02_capture_handoff.py), [t02_capture_transfer.py](t02_capture_transfer.py), and [t02_capture_owned_jobs.py](t02_capture_owned_jobs.py): authenticated one-use pipe transfer and two preowned Jobs; code graph remains held.

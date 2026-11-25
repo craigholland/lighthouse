@@ -21,7 +21,7 @@ class _RuntimeBinding:
 
 def fixed_capture_runtime(
     packet: CapturePacket, local: LocalCaptureObservation, bearer: str, key: str,
-    clock: Callable[[], int],
+    clock: Callable[[], int], *, preowned_job: int | None = None,
 ) -> RuntimeRole:
     """Select only the attested pinned role using creation-time Job assignment."""
     if not matches_local_capture(packet, local):
@@ -34,7 +34,10 @@ def fixed_capture_runtime(
         raise Hold("capture runtime identity unavailable")
     assert isinstance(tunnel, str) and isinstance(org, str)
     assert isinstance(digest, str) and isinstance(executable, str)
-    return RuntimeRole(Path(executable), _RuntimeBinding(tunnel, org, digest), bearer, key, clock, atomic_job=True)
+    options = {} if preowned_job is None else {"preowned_job": preowned_job}
+    return RuntimeRole(
+        Path(executable), _RuntimeBinding(tunnel, org, digest), bearer, key, clock, atomic_job=True, **options,
+    )
 
 
 def fixed_capture_listener(

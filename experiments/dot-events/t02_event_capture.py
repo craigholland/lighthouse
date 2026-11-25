@@ -22,7 +22,8 @@ _SCHEMA = """CREATE TABLE capture (
     disposition TEXT NOT NULL CHECK(disposition IN ('new','reserved','captured','held')),
     candidate TEXT,
     captured_ms INTEGER,
-    run_state TEXT NOT NULL CHECK(run_state IN ('fixture','prepared','claimed','sealed','stopped','cleanup-unknown'))
+    run_state TEXT NOT NULL CHECK(run_state IN ('fixture','prepared','claimed','sealed','stopped','cleanup-unknown')),
+    handed_off INTEGER NOT NULL CHECK(handed_off IN (0,1))
 ) STRICT"""
 
 
@@ -103,7 +104,7 @@ class CaptureStore:
         with self._edit() as db:
             db.execute(_SCHEMA)
             db.execute(
-                "INSERT INTO capture VALUES (1,?,?,'new',NULL,NULL,?)",
+                "INSERT INTO capture VALUES (1,?,?,'new',NULL,NULL,?,0)",
                 (self._fingerprint, self._provenance, state),
             )
 
@@ -120,6 +121,17 @@ class CaptureStore:
                 or not self.binding.not_before_ms <= clock() < self.binding.deadline_ms):
                 raise Hold("capture run unavailable")
             db.execute("UPDATE capture SET run_state='claimed' WHERE slot=1")
+
+    def reserve_handoff(self, clock: Callable[[], int]) -> None:
+        """Commit the one trusted child ownership transfer before role creation."""
+        with self._edit() as db:
+            _, _, _, run = self._read(db)
+            if (self._operation_digest is None or run != "claimed"
+                or not self.binding.not_before_ms <= clock() < self.binding.deadline_ms):
+                raise Hold("capture handoff not admitted")
+            changed = db.execute("UPDATE capture SET handed_off=1 WHERE slot=1 AND handed_off=0")
+            if changed.rowcount != 1:
+                raise Hold("capture handoff already consumed")
 
     def stop(self) -> None:
         """Seal admitted intake under the same lock used when recording candidates."""

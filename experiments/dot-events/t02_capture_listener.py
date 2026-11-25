@@ -27,7 +27,7 @@ def listen_bound(
 
     target = packet.approval
     deadline, cleanup = descriptor.peer.intake_ms, descriptor.peer.cleanup_ms
-    if (descriptor.head != target.head or descriptor.packet_digest != target.digest
+    if (not descriptor.verifies_packet_window(packet, mono, wall)
         or not store.matches_operation(target.head, target.digest, target.activation_ms, packet.intake_cutoff_ms)
         or store.binding.principal != packet.principal or store.binding.proof_id != packet.proof_id
         or not target.activation_ms <= wall() < packet.intake_cutoff_ms

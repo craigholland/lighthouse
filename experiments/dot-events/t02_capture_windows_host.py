@@ -35,6 +35,16 @@ class CaptureSupervisorHost(_OwnedWindowsJob):
         )
 
 
+    def start_transferred(self, descriptor: InheritedCapture, jobs: tuple[int, int]) -> bool:
+        """Inherit only the three private endpoints and exact two preowned Jobs."""
+        inherited = (*descriptor.peer.handles, *jobs)
+        if len(inherited) != 5 or min(inherited) <= 0 or len(set(inherited)) != 5:
+            raise Hold("capture supervisor handle allowlist held")
+        return self._start_owned(
+            self._python, ["-I", str(_HOST)], descriptor.to_environment(), descriptor.peer.intake_ms,
+            bind_at_creation=True, inherited=inherited,
+        )
+
 class CaptureListenerHost(_OwnedWindowsJob):
     """Own a distinct fixed listener helper before either role runs."""
 
@@ -44,11 +54,11 @@ class CaptureListenerHost(_OwnedWindowsJob):
         super().__init__(clock)
         self._python = trusted_python
 
-    def start_bound(self, descriptor: InheritedCapture, deadline_ms: int) -> bool:
+    def start_bound(self, descriptor: InheritedCapture, deadline_ms: int, *, preowned_job: int | None = None) -> bool:
         if deadline_ms != descriptor.peer.intake_ms:
             raise Hold("capture listener startup bound differs")
         script = Path(__file__).with_name("t02_capture_listener.py")
         return self._start_owned(
             self._python, ["-I", str(script)], descriptor.to_environment(), deadline_ms,
-            bind_at_creation=True, inherited=descriptor.peer.handles,
+            bind_at_creation=True, inherited=descriptor.peer.handles, preowned_job=preowned_job,
         )

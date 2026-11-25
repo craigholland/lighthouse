@@ -6,6 +6,7 @@ import re
 from collections.abc import Callable
 from dataclasses import dataclass
 
+from t02_capture_packet import CapturePacket
 from t02_capture_peer import PeerBinding
 from t02_event_types import Hold, decode, encode
 
@@ -20,6 +21,21 @@ class InheritedCapture:
     peer: PeerBinding
     head: str
     packet_digest: str
+
+    def verifies_packet_window(
+        self, packet: CapturePacket, mono: Callable[[], int], wall: Callable[[], int],
+    ) -> bool:
+        """Bound inherited deadlines by the child's conservative wall/monotonic sample."""
+        tick = mono()
+        time = wall()
+        target = packet.approval
+        return (
+            self.head == target.head and self.packet_digest == target.digest
+            and target.activation_ms <= time < packet.intake_cutoff_ms
+            and tick < self.peer.intake_ms <= tick + packet.intake_cutoff_ms - time
+            and self.peer.intake_ms < self.peer.cleanup_ms <= tick + target.cutoff_ms - time
+            and mono() < self.peer.intake_ms
+        )
 
     def to_environment(self) -> dict[str, str]:
         """Export no file paths, credentials, role selection or executable names."""

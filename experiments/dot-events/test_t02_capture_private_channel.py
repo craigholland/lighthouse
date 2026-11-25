@@ -174,3 +174,22 @@ def test_supervisor_waits_for_stop_even_with_no_controller_bytes() -> None:
     api.WaitForMultipleObjects.assert_called_once_with([44, 13], False, 10)
     operation.cancel.assert_called_once_with()
     assert pipe.stopped()
+
+
+def test_normal_stop_has_preserved_overlapped_read_for_terminal_receipt() -> None:
+    api = Mock()
+    operation = Mock()
+    operation.event = 44
+    operation.GetOverlappedResult.return_value = (4, 0)
+    operation.getbuffer.return_value = b"test"
+    api.ReadFile.return_value = (operation, 997)
+    api.WaitForMultipleObjects.return_value = 1
+    api.WaitForSingleObject.return_value = 0
+    stop = Mock()
+    pipe = WindowsCapturePipe(11, 12, 13, lambda: 10, api=api, supervisor=True,
+                              on_stop=stop, cleanup_deadline=30)
+    assert pipe.read(4, 20) == b"test"
+    api.ReadFile.assert_called_once_with(11, 4, True)
+    api.WaitForSingleObject.assert_called_once_with(44, 20)
+    operation.cancel.assert_not_called()
+    stop.assert_called_once_with()

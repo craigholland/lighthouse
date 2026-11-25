@@ -60,12 +60,13 @@ def run_peer(
         for turn in range(4):
             if events.stopped():
                 frames.stop_event()
-            deadline = binding.cleanup_ms if turn == 3 or host.status().phase == "confirmed" else binding.intake_ms
+            deadline = binding.cleanup_ms if turn == 3 or host.status().phase in {"confirmed", "cleanup-unknown"} else binding.intake_ms
             if clock() >= deadline:
                 break
             frame = events.receive(deadline, _MAX_FRAME)
             if events.stopped():
                 frames.stop_event()
+                deadline = binding.cleanup_ms
             if frame is None or clock() >= deadline:
                 break
             response = frames.on_frame(frame)

@@ -59,7 +59,7 @@ def _create_bound_suspended(
     delete.restype, delete.argtypes = None, (_POINTER,)
     size = c.c_size_t()
     count = 2 if inherited else 1
-    if inherited and (len(inherited) != 3 or len(set(inherited)) != 3 or min(inherited) <= 0):
+    if inherited and (len(inherited) not in (3, 5) or len(set(inherited)) != 3 or min(inherited) <= 0):
         return False
     initialize(None, count, 0, c.byref(size))
     if not 0 < size.value <= 64 * 1024:
@@ -161,8 +161,9 @@ class _OwnedWindowsJob:
         *, before_resume: Callable[[int, int], None] | None = None,
         bind_at_creation: bool = False,
         inherited: tuple[int, ...] = (),
+        preowned_job: int | None = None,
     ) -> bool:
-        if self._attempted or self._terminal is not None or (inherited and not bind_at_creation):
+        if self._attempted or self._terminal is not None or ((inherited or preowned_job is not None) and not bind_at_creation):
             return False
         self._attempted = True
         k = _kernel()
@@ -180,13 +181,18 @@ class _OwnedWindowsJob:
         startup = _Startup()
         startup.cb = c.sizeof(startup)
         proc = _Process()
-        self._job = k.CreateJobObjectW(None, None)
-        if not self._job:
-            return False
-        limits = _ExtendedLimits()
-        limits.basic.flags = 0x2000  # Kill on close; no breakaway.
-        if not k.SetInformationJobObject(self._job, 9, c.byref(limits), c.sizeof(limits)):
-            return False
+        if preowned_job is not None:
+            if preowned_job <= 0:
+                return False
+            self._job = preowned_job
+        else:
+            self._job = k.CreateJobObjectW(None, None)
+            if not self._job:
+                return False
+            limits = _ExtendedLimits()
+            limits.basic.flags = 0x2000  # Kill on close; no breakaway.
+            if not k.SetInformationJobObject(self._job, 9, c.byref(limits), c.sizeof(limits)):
+                return False
         remaining(self._clock, deadline_ms)
         if bind_at_creation:
             created = _create_bound_suspended(k, exe, argv, env, str(path.parent), self._job, proc, inherited)
@@ -280,7 +286,7 @@ class RuntimeRole(_OwnedWindowsJob):
 
     def __init__(
         self, path: Path, packet: FixedRuntimeIdentity, bearer: str, platform_key: str, clock: Callable[[], int],
-        *, atomic_job: bool = False,
+        *, atomic_job: bool = False, preowned_job: int | None = None,
     ) -> None:
         if (
             not path.is_absolute() or path.name != "tunnel-client-runtime.exe"
@@ -309,6 +315,7 @@ class RuntimeRole(_OwnedWindowsJob):
         super().__init__(clock)
         self._candidate_checked = False
         self._atomic_job = atomic_job
+        self._preowned_job = preowned_job
 
     def verified_digest(self, deadline: int) -> str:
         """Read the existing candidate bytes, no subprocess or version probe."""
@@ -333,4 +340,5 @@ class RuntimeRole(_OwnedWindowsJob):
             return False
         return self._start_owned(
             self._path, self._args, self._environment, deadline_ms, bind_at_creation=self._atomic_job,
+            preowned_job=self._preowned_job,
         )

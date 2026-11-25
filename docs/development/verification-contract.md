@@ -381,3 +381,15 @@ refuses operation. The native process graph must bridge the trusted child
 descriptor into the admitted packet/store, deliver initial role capabilities
 to a detached watchdog before a blocked start, and prove its termination path
 without substituting the thread-stall fixture for production readiness.
+
+Capture bootstrap now bounds both inherited monotonic cutoffs against a fresh
+conservative sample of the approved wall window. A normal stop preserves the
+one overlapped read for terminal status, with no partial-frame reread.
+The detached Job owner's two original Job handles remain retained; the fixed
+helper launch inherits only the three pipe/event endpoints and two child
+Job duplicates. The canonical packet and exact claimed store file identity
+are authenticated over the same private pipe, and SQLite consumes the
+one child transfer before any listener/runtime factory. Offline fakes exercise
+the parent authoring/sending and child transfer/admission/role ordering together.
+No native child graph or production local binding is certified; the executable
+entry remains hard denied, and allocating a Job does not certify role exit.

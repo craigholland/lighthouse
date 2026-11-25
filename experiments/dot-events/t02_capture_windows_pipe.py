@@ -35,6 +35,7 @@ class WindowsCapturePipe:
     def __init__(
         self, read_handle: int, write_handle: int, stop_event: int, clock: Callable[[], int],
         *, api: _PipeApi | None = None, supervisor: bool = False,
+        on_stop: Callable[[], None] | None = None, cleanup_deadline: int = 0,
     ) -> None:
         if min(read_handle, write_handle, stop_event) <= 0 or len({read_handle, write_handle, stop_event}) != 3:
             raise Hold("invalid private pipe capability")
@@ -46,11 +47,17 @@ class WindowsCapturePipe:
         self._held = False
         self._supervisor = supervisor
         self._stop_seen = False
+        self._on_stop = on_stop
+        self._cleanup_deadline = cleanup_deadline
         self._quarantine: _PendingIo | None = None
+
+    def terminal_deadline(self, normal: int) -> int:
+        return self._cleanup_deadline if self._stop_seen and self._on_stop is not None else normal
 
     def _begin(
         self, start: Callable[[], tuple[_PendingIo, int]], deadline: int,
     ) -> tuple[_PendingIo, int]:
+        deadline = self.terminal_deadline(deadline)
         now = self._clock()
         if self._held or not 0 < deadline - now <= 900_000:
             raise Hold("capture native pipe held")
@@ -67,6 +74,15 @@ class WindowsCapturePipe:
                     state = self._api.WaitForMultipleObjects([operation.event, self._stop], False, delay)
                     if state == 1:
                         self._stop_seen = True
+                        if self._on_stop is not None:
+                            self._on_stop()
+                            # Retain the same overlapped read; restarting would
+                            # lose already-read frame bytes or consume a replay.
+                            deadline = self._cleanup_deadline
+                            delay = deadline - self._clock()
+                            if delay <= 0:
+                                raise Hold("capture terminal receipt deadline")
+                            state = self._api.WaitForSingleObject(operation.event, delay)
                 else:
                     state = self._api.WaitForSingleObject(operation.event, delay)
                 if state != _WAIT_OBJECT_0:

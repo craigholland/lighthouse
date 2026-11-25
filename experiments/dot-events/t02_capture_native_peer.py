@@ -4,7 +4,7 @@ import struct
 from collections.abc import Callable
 
 from t02_capture_peer import PeerBinding, run_peer
-from t02_capture_supervisor import CaptureSupervisor, HostStatus
+from t02_capture_supervisor import CaptureSupervisor, Command, HostStatus
 from t02_capture_windows_pipe import WindowsCapturePipe
 from t02_event_types import Hold
 
@@ -20,9 +20,9 @@ class WindowsPeerEvents:
 
     def _exact(self, count: int, deadline_ms: int) -> bytes:
         result = bytearray()
-        while len(result) < count and self._clock() < deadline_ms:
+        while len(result) < count and self._clock() < self._pipe.terminal_deadline(deadline_ms):
             result.extend(self._pipe.read(count - len(result), deadline_ms))
-        if len(result) != count or self._clock() >= deadline_ms:
+        if len(result) != count or self._clock() >= self._pipe.terminal_deadline(deadline_ms):
             raise Hold("capture peer frame deadline")
         return bytes(result)
 
@@ -43,6 +43,11 @@ class WindowsPeerEvents:
 def run_native_peer(binding: PeerBinding, host: CaptureSupervisor, clock: Callable[[], int]) -> HostStatus:
     """Internal composition only; public and helper entry points remain held."""
     def events(handles: tuple[int, int, int]) -> WindowsPeerEvents:
-        return WindowsPeerEvents(WindowsCapturePipe(*handles, clock, supervisor=True), clock)
+        def stop() -> None:
+            host.command(Command.STOP)
+
+        return WindowsPeerEvents(WindowsCapturePipe(
+            *handles, clock, supervisor=True, on_stop=stop, cleanup_deadline=binding.cleanup_ms,
+        ), clock)
 
     return run_peer(binding, host, events, clock)
