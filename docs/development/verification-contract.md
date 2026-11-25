@@ -234,3 +234,10 @@ probe. Verify request effects, one durable stop, exact-byte signatures and
 shared send budget across synthetic restart. The fake provider/lifecycle
 assertions do not establish actual authority, private eligibility, runtime
 containment or coordinator receipt.
+
+The assembly tests use provider-shaped responses and injected loopback,
+DNS/TLS and lifecycle doubles; assert exact effect order, deny construction
+for bad packet/evidence, and deny new effects if any authority read returns
+after expiry. Already-attempted roles still require independent terminal
+confirmation under the original deadline. No actual provider request, socket,
+process, evidence from real approval records or private files is allowed.

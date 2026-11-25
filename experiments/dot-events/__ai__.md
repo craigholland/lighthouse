@@ -49,7 +49,10 @@ it has no worker creation operation.
 - [t02_event_source.py](t02_event_source.py): durable private subscription and budgets.
 - [t02_event_types.py](t02_event_types.py): strict callback and signing contract.
 - [t02_event_gate.py](t02_event_gate.py): proposed exact-authority and lifecycle ports.
-- [test_t02_event_probe.py](test_t02_event_probe.py): synthetic effect and denial tests.
+- [t02_event_evidence.py](t02_event_evidence.py): strict packet and provider evidence parsing.
+- [t02_event_assembly.py](t02_event_assembly.py): fake-only composed loopback, TLS and owned-lifecycle boundaries.
+- [test_t02_event_probe.py](test_t02_event_probe.py) and
+  [test_t02_event_assembly.py](test_t02_event_assembly.py): effect, denial and deadline evidence.
 
 ## Known Gaps / Future-State Notes
 

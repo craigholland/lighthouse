@@ -110,7 +110,8 @@ class ProbeGate:
         ):
             return False
         current = self._evidence.current()
-        if current is None or current.head != packet.head:
+        now = self._clock()  # The provider call may consume the remaining authorization window.
+        if current is None or current.head != packet.head or not self._active(packet, now):
             return False
         for observed, actor, app in ((current.owner, OWNER, None), (current.lead, LEAD, LEAD_APP)):
             if (
@@ -123,10 +124,14 @@ class ProbeGate:
                 return False
         return True
 
+    @staticmethod
+    def _active(packet: Packet, now: int) -> bool:
+        return packet.activation_ms <= now < packet.activation_ms + 600_000
+
     def run(self, packet: Packet, construct: Callable[[], Lifecycle]) -> str:
         """Return evidence limited to operation/cleanup; never infer Dot receipt."""
         try:
-            if not self._authorizes(packet):
+            if not self._authorizes(packet) or not self._active(packet, self._clock()):
                 return "held: exact approval unavailable"
         except (OSError, ValueError, TypeError, Hold):
             return "held: authority unavailable"
@@ -141,14 +146,14 @@ class ProbeGate:
                 return "held: private source binding unverified"
             if self._clock() >= active_stop or adapter.verify_pinned_binary(packet, active_stop) is not True:
                 return "held: candidate identity unverified"
-            if self._clock() >= active_stop or not self._authorizes(packet):
+            if not self._authorizes(packet) or not self._active(packet, self._clock()):
                 return "held: approval unavailable before setup"
             attempted_source = True
             if adapter.start_source(packet, active_stop) is True and self._clock() < active_stop:
-                if self._authorizes(packet):
+                if self._authorizes(packet) and self._active(packet, self._clock()):
                     attempted_runtime = True
                     if adapter.start_runtime(packet, active_stop) is True and self._clock() < active_stop:
-                        if self._authorizes(packet):
+                        if self._authorizes(packet) and self._active(packet, self._clock()):
                             adapter.measure_probe_window(active_stop)
                             active = self._clock() <= active_stop
         except (OSError, ValueError, TypeError, Hold):

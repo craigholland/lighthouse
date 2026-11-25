@@ -348,3 +348,36 @@ def test_cli_all_ordinary_paths_are_inert(tmp_path: Path, monkeypatch: pytest.Mo
     assert denied.value.code == 2
     assert main(["--dry-run"]) == 0
     assert list(tmp_path.iterdir()) == []
+
+
+@pytest.mark.parametrize("phase", [1, 2, 3, 4])
+def test_slow_evidence_never_admits_expired_effect(synthetic: Fixture, phase: int) -> None:
+    packet, authority = sample_packet()
+    port = LifecyclePort(synthetic)
+    lookups = 0
+    constructed = 0
+
+    class Slow(EvidencePort):
+        def current(self) -> Authority | None:
+            nonlocal lookups
+            lookups += 1
+            if lookups == phase:
+                synthetic.now = BINDING.deadline + 1
+            return super().current()
+
+    def construct() -> LifecyclePort:
+        nonlocal constructed
+        constructed += 1
+        return port
+
+    ProbeGate(Slow(authority), lambda: synthetic.now).run(packet, construct)
+    assert lookups == phase
+    assert constructed == int(phase > 1)
+    prior = ["private-binding", "pinned-binary"] if phase > 1 else []
+    if phase > 2:
+        prior += ["source"]
+    if phase > 3:
+        prior += ["runtime", "confirm runtime"]
+    if phase > 2:
+        prior += ["confirm source"]
+    assert port.calls == prior

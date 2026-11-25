@@ -48,6 +48,38 @@ below remains independently approved at its earlier exact head, not this one.
   or actual Dot receipt. The target account, resource and billing are unverified.
   Full T02 and Gate A remain open.
 
+### Fenced assembly and time-of-use checks
+
+The [offline review repair](https://github.com/craigholland/lighthouse/issues/5#issuecomment-7152494548)
+adds a private packet parser, a bounded read-only public GitHub evidence parser,
+a fixed loopback HTTP adapter, a pinned-IP verified-TLS adapter boundary, and
+one composition that owns source/runtime handles from before start until
+confirmed shutdown. The provider parser checks current open Issue and exact
+draft PR head, binds distinct current source comments to their Issue, asserts
+Craig's numeric identity and the Lead bot plus App, rejects edited/mismatched
+records, and verifies the repeated private packet digest, scope and time window.
+The comment grammar and references are candidate offline evidence only; no
+actual approval is inferred. No secrets or arbitrary URLs are in the packet.
+
+Late provider reads re-sample time before authorizing anything. At every
+effect entrance, the gate checks the current activity deadline. When a role
+has already been attempted it independently requests and observes cleanup
+against the original absolute deadline. The assembled transport authenticates
+only the exact private configured principal from the fixed loopback peer
+and limits the body before dispatch. Callback tests observe exact IP,
+verified hostname, port, request bytes, response bound and closure. The
+offline assembled test uses provider-shaped JSON, a disposable state file,
+and injected socket/TLS/process doubles. It records exactly which effects
+happened, including owned cleanup after ambiguous startup.
+
+Production activation stays disabled at this head. No real provider-reader
+transport, actual socket/service objects, managed Windows process backend,
+private files or credentials are wired into the CLI. A separately reviewed
+native backend and exact owner-approved operational packet are required
+before live use. This is preparation through real adapter logic with injected
+I/O, not a tested vendor runtime or hosted product result.
+
+
 ## Offline known-worker proof
 
 The [renewed Issue #5 contract](https://github.com/craigholland/lighthouse/issues/5#issuecomment-7148129087)
