@@ -116,3 +116,6 @@ Keep the build held until a separately reviewed trusted launcher or
 equivalent OS confinement provides that attribution and the full native
 graph is verified. The earlier closed stand-in fixture is not that proof.
 Old store layouts are held rather than migrated or reset.
+
+See the [capability-provenance decision note](t02-capture-provenance-design.md)
+for the proposed principal, trust boundary and remaining acceptance checks.

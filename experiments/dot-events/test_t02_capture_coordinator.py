@@ -36,9 +36,9 @@ def source(packet: CapturePacket, fake: Provider) -> CaptureEvidence:
     return CaptureEvidence(fake, lambda: fake.now)
 
 
-@pytest.mark.parametrize("stalled", [False, True])
+@pytest.mark.parametrize(("stalled", "cutoff_error"), [(False, False), (True, False), (True, True)])
 def test_dispatch_reaches_independent_coordinator_via_exact_pipe(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, stalled: bool,
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, stalled: bool, cutoff_error: bool,
 ) -> None:
     packet = CapturePacket.parse(encode(record() | {"state": str(tmp_path / "coordinator.db")}))
     state = open_existing_capture(packet)
@@ -54,6 +54,8 @@ def test_dispatch_reaches_independent_coordinator_via_exact_pipe(
     pending, response = bytearray(), bytearray()
     out: list[str] = []
     originals = Mock()
+    if cutoff_error:
+        originals.stop_due.side_effect = Hold("synthetic unconfirmed native shutdown")
     tick = 0
     descriptor = InheritedCapture(PeerBinding((11, 12, 13), "a" * 64, 50, 100),
                                   packet.approval.head, packet.approval.digest)

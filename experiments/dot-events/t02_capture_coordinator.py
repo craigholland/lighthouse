@@ -139,8 +139,7 @@ def detached_drive(
     lane = make_lane(run)
     lane.arm_local_originals()
     if mono() >= binding.intake_ms:
-        lane.stop_at_cutoff()
-        return "cleanup-unknown"
+        return _emergency_hold(lane)
     complete = Event()
     result: list[str] = []
 
@@ -155,8 +154,7 @@ def detached_drive(
     start(role_lane)
     wait(complete, binding.intake_ms)
     if not complete.is_set():
-        lane.stop_at_cutoff()
-        return "cleanup-unknown"
+        return _emergency_hold(lane)
     if store_identity(run.store.path) != run.identity:
         return "cleanup-unknown"
     final, candidate = run.store.status()
@@ -167,6 +165,15 @@ def detached_drive(
         or (outcome == "candidate-held" and candidate != "captured")):
         return "cleanup-unknown"
     return outcome
+
+
+def _emergency_hold(lane: FixedProcessLane) -> str:
+    """Retain the negative receipt even when native shutdown is unconfirmed."""
+    try:
+        lane.stop_at_cutoff()
+    except (Hold, OSError, KeyboardInterrupt):
+        pass
+    return "cleanup-unknown"
 
 
 def start_role_lane(run: Callable[[], None]) -> None:
