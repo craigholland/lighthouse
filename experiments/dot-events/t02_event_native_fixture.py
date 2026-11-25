@@ -45,24 +45,35 @@ def witness(k: c.WinDLL, pid: int) -> int:
     return handle
 
 
+_MARKER_PHASES = {
+    "tree.json": "startup-tree",
+    "owned.json": "ownership-witness",
+    "release.json": "owner-release",
+}
+
+
 def _wait_file(path: Path, deadline: int) -> str:
+    """Read one fixed synchronization marker without extending its deadline."""
+    phase = _MARKER_PHASES.get(path.name)
+    if phase is None:
+        raise RuntimeError("unknown native fixture marker")
+    last = "not-ready"
     while _ms() < deadline:
         try:
             contents = path.read_text(encoding="ascii")
         except FileNotFoundError:
-            pass
+            last = "not-ready"
         except PermissionError:
-            # The atomic publisher or Windows scanning can transiently deny an
-            # open of this exact fixture marker. Keep the original deadline.
-            if path.name != "owned.json":
-                raise
+            last = "open-denied"
+        except (OSError, UnicodeError):
+            raise RuntimeError(f"native fixture {phase}: read-error") from None
         else:
             if _ms() < deadline:
                 return contents
+            last = "late-read"
             break
         time.sleep(0.01)
-    raise RuntimeError("native fixture witness deadline")
-
+    raise RuntimeError(f"native fixture {phase}: deadline ({last})")
 
 def _publish(path: Path, value: object) -> None:
     scratch = path.with_suffix(".part")
