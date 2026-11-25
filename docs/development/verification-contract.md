@@ -492,3 +492,13 @@ handoff. Those facts do not reconstruct an exact root or successful teardown.
 Do not overwrite that result with subsequent evidence. Diagnostic-only
 follow-up records local IPC preparation, bootstrap and exact witness stages
 without emitting handles, paths, packet fields or exception text.
+
+The separate, owner-approved diagnostic at `fe622896901aef6c7c6fdbf964df69a63a2c45b2`
+ran exactly the primary-environment normal case. It stopped after one failure
+(0.41 s): IPC preparation held, process bootstrap was not attempted, no
+terminal receipt or exact root/Job handles existed, and the outcome was
+`cleanup-unknown`. The read-only fixture census found zero matching Pythonw
+processes; only the fixture setup marker and synthetic store existed. This is
+not exact process or Job cessation proof. The specific operation within IPC
+preparation did not surface, so no code fix or passing native result is claimed.
+No other case, environment, or rerun was attempted.
