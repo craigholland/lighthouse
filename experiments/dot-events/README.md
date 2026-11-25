@@ -1,5 +1,53 @@
 # T02 Phase A: Dot notification-to-local-worker feasibility
 
+## Offline event-eligibility probe preparation
+
+The [renewed offline contract](https://github.com/craigholland/lighthouse/issues/5#issuecomment-7152120809)
+prepares the **worker-free** event source. The existing known-worker proof
+below remains independently approved at its earlier exact head, not this one.
+
+- `t02_events_probe.py --dry-run` exercises a fixed route through the candidate
+  [Streamable HTTP 2025-11-25](https://modelcontextprotocol.io/specification/2025-11-25/basic/transports)
+  initialize/initialized sequence and the documented
+  [MCP Events](https://developers.openai.com/plugins/build/mcp-events) discovery,
+  subscription, callback challenge, deliveries and unsubscribe. Transport
+  dispatch is pure: the fixture passes an already authenticated synthetic
+  principal; it never opens a listener. The event carries only a proof ID
+  and fixed receipt marker. No worker/tool/marker action is imported or exposed.
+- Subscription identity, expiry, restart allowance, terminal stop and attempt
+  counts are private, bound to one canonical disposable SQLite file. The owner
+  commits verification/send intent before each injected effect and serializes
+  the actual effect boundary with stop. A lost/ambiguous intent blocks new
+  delivery. A known 2xx is only transport acknowledgement. Reopening a durable
+  stop cannot reactivate it. There can be one planned restart, one deliberate
+  duplicate of the original event, and at most three application attempts
+  including explicit retries after known transient responses. No event replay,
+  scheduling or automatic retry loop. Confirmed unsubscribe and observed expiry
+  are durable; keep state private, local, and non-replaced.
+- The callback recomputes DNS for every attempt; the complete bounded answer
+  must be public. The adapter contract requires dialing that exact pinned IP
+  with TLS verification against the bound hostname, no redirects, absolute
+  deadlines and a bounded response. HMAC authenticates the transmitted bytes,
+  including stable event ID and fresh signing time. No real callback or DNS
+  was contacted. A successful signed challenge is not a coordinator receipt.
+- The future composition guard independently checks current, provider-derived
+  Craig and Lead evidence, exact head and packet digest before any effect-side
+  factory, and rechecks before source, runtime and observation. It requires the
+  adapter to attest the private binding and pinned runtime, and require
+  confirmed shutdown of both attempted roles inside the original deadline.
+  It has no task creation or continuation role. The later candidate is the
+  [narrow runtime v0.0.21](https://github.com/openai/tunnel-client/releases/tag/v0.0.21)
+  from the Lead packet, not a downloaded or verified executable here.
+- **Hold for live:** a real trusted evidence reader, authenticated loopback
+  HTTP and pinned-IP TLS adapters, verified executable identity and bounded
+  Windows process containment/cleanup still need a separate reviewed contract
+  and Craig's exact operational approval. The checked-in entry hard-rejects
+  `--live`; it does not accept an arbitrary adapter, configuration or approval
+  flag. Synthetic positive authorization only reaches test doubles. Tests
+  observe intent/effect ordering and shutdown dispositions, not a real runtime
+  or actual Dot receipt. The target account, resource and billing are unverified.
+  Full T02 and Gate A remain open.
+
 ## Offline known-worker proof
 
 The [renewed Issue #5 contract](https://github.com/craigholland/lighthouse/issues/5#issuecomment-7148129087)

@@ -215,3 +215,22 @@ contention and restart. A fake acknowledgement, attributable fake turn,
 committed intent and local marker receipt are distinct observations. Only
 bounded Python test helpers may spawn; no real task continuation, service,
 history, runtime, network or credentials belong to these checks.
+
+## Offline event-eligibility preparation
+
+Run the unchanged two-environment offline verification above. From the
+repository root in each, additionally run:
+
+```powershell
+.\experiments\codex-review\.venv\Scripts\python.exe experiments/dot-events/t02_events_probe.py --help
+.\experiments\codex-review\.venv\Scripts\python.exe experiments/dot-events/t02_events_probe.py
+.\experiments\codex-review\.venv\Scripts\python.exe experiments/dot-events/t02_events_probe.py --dry-run
+.\experiments\codex-review\.venv\Scripts\python.exe experiments/dot-events/t02_events_probe.py --live
+```
+
+The final command must reject with exit 2 before constructing anything; it
+is not a live test. The combined pytest and mypy targets already cover the
+probe. Verify request effects, one durable stop, exact-byte signatures and
+shared send budget across synthetic restart. The fake provider/lifecycle
+assertions do not establish actual authority, private eligibility, runtime
+containment or coordinator receipt.
