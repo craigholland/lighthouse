@@ -21,7 +21,8 @@ _SCHEMA = """CREATE TABLE capture (
     provenance BLOB NOT NULL,
     disposition TEXT NOT NULL CHECK(disposition IN ('new','reserved','captured','held')),
     candidate TEXT,
-    captured_ms INTEGER
+    captured_ms INTEGER,
+    run_state TEXT NOT NULL CHECK(run_state IN ('fixture','prepared','claimed','sealed','stopped','cleanup-unknown'))
 ) STRICT"""
 
 
@@ -65,11 +66,14 @@ def _candidate(value: object) -> str:
 class CaptureStore:
     """Durable one-slot store; reservation is committed before capture data."""
 
-    def __init__(self, path: Path, binding: CaptureBinding) -> None:
+    def __init__(self, path: Path, binding: CaptureBinding, *, operation_digest: str | None = None) -> None:
         self.path = path.resolve()
         self.binding = binding
-        self._provenance = encode((astuple(binding), EVENT, {"proof_id": binding.proof_id}))
-        self._fingerprint = hashlib.sha256(encode((str(self.path), astuple(binding), EVENT))).hexdigest()
+        if operation_digest is not None and not re.fullmatch(r"[a-f0-9]{64}", operation_digest):
+            raise Hold("invalid capture operation digest")
+        self._operation_digest = operation_digest
+        self._provenance = encode((astuple(binding), EVENT, {"proof_id": binding.proof_id}, operation_digest))
+        self._fingerprint = hashlib.sha256(encode((str(self.path), astuple(binding), EVENT, operation_digest))).hexdigest()
 
     @contextmanager
     def _edit(self) -> Iterator[sqlite3.Connection]:
@@ -83,18 +87,76 @@ class CaptureStore:
             raise Hold("capture persistence unavailable or uncertain") from None
 
     def setup_fixture(self) -> None:
-        """Explicit disposable setup, never invoked by RPC or a live entry."""
+        """Explicit disposable fixture setup, never invoked by RPC."""
+        if self._operation_digest is not None:
+            raise Hold("capture fixture cannot prepare a run")
+        self._setup("fixture")
+
+    def prepare(self) -> None:
+        """Create only a new, operation-bound store; never reset an existing one."""
+        if self._operation_digest is None:
+            raise Hold("capture operation identity required")
+        self._setup("prepared")
+
+    def _setup(self, state: str) -> None:
         self.path.touch(exist_ok=False)
         with self._edit() as db:
             db.execute(_SCHEMA)
-            db.execute("INSERT INTO capture VALUES (1,?,?,'new',NULL,NULL)", (self._fingerprint, self._provenance))
+            db.execute(
+                "INSERT INTO capture VALUES (1,?,?,'new',NULL,NULL,?)",
+                (self._fingerprint, self._provenance, state),
+            )
 
-    def _read(self, db: sqlite3.Connection) -> tuple[str, str | None, int | None]:
+    def matches_operation(self, head: str, digest: str, start: int, intake: int) -> bool:
+        """Require the admission owner to match the checked packet projection."""
+        return (self._operation_digest == digest and self.binding.source_head == head
+                and self.binding.not_before_ms == start and self.binding.deadline_ms == intake)
+
+    def claim(self, clock: Callable[[], int]) -> None:
+        """Commit once before caller effects; an uncertain commit cannot be retried."""
+        with self._edit() as db:
+            stage, _, _, run = self._read(db)
+            if (self._operation_digest is None or run != "prepared" or stage != "new"
+                or not self.binding.not_before_ms <= clock() < self.binding.deadline_ms):
+                raise Hold("capture run unavailable")
+            db.execute("UPDATE capture SET run_state='claimed' WHERE slot=1")
+
+    def stop(self) -> None:
+        """Seal admitted intake under the same lock used when recording candidates."""
+        with self._edit() as db:
+            _, _, _, run = self._read(db)
+            if run not in {"claimed", "sealed"}:
+                raise Hold("capture run not admitted")
+            db.execute("UPDATE capture SET run_state='sealed' WHERE slot=1")
+
+    def finish_cleanup(self, *, confirmed: bool) -> None:
+        """Record the one cleanup outcome; unconfirmed outcomes never upgrade."""
+        with self._edit() as db:
+            _, _, _, run = self._read(db)
+            if run != "sealed":
+                raise Hold("capture cleanup cannot be finalized")
+            db.execute("UPDATE capture SET run_state=? WHERE slot=1",
+                       ("stopped" if confirmed else "cleanup-unknown",))
+
+    def status(self) -> tuple[str, str]:
+        """Read fresh run and candidate disposition without exposing private data."""
+        try:
+            with closing(sqlite3.connect(self.path.as_uri() + "?mode=ro", uri=True, timeout=0.5)) as db:
+                db.execute("BEGIN")
+                stage, _, _, run = self._read(db)
+                return run, stage
+        except sqlite3.Error:
+            raise Hold("capture status unavailable or uncertain") from None
+
+    def _read(self, db: sqlite3.Connection) -> tuple[str, str | None, int | None, str]:
         schema = db.execute("SELECT sql FROM sqlite_schema").fetchall()
-        rows = db.execute("SELECT binding, provenance, disposition, candidate, captured_ms FROM capture").fetchall()
+        rows = db.execute("SELECT binding, provenance, disposition, candidate, captured_ms, run_state FROM capture").fetchall()
         if schema != [(_SCHEMA,)] or len(rows) != 1 or rows[0][:2] != (self._fingerprint, self._provenance):
             raise Hold("unexpected capture binding or schema")
-        _, _, stage, candidate, captured = rows[0]
+        _, _, stage, candidate, captured, run = rows[0]
+        if ((self._operation_digest is None) != (run == "fixture")
+            or (run == "prepared" and stage != "new")):
+            raise Hold("inconsistent capture run state")
         if ((candidate is None) != (captured is None)
             or (stage in {"new", "reserved"} and candidate is not None)
             or (stage == "captured" and candidate is None)):
@@ -104,21 +166,24 @@ class CaptureStore:
             if type(captured) is not int or not self.binding.not_before_ms <= captured < self.binding.deadline_ms:
                 raise Hold("capture time outside binding")
         assert isinstance(stage, str)
-        return stage, candidate, captured
+        assert isinstance(run, str)
+        return stage, candidate, captured, run
 
     def capture(self, value: str, clock: Callable[[], int]) -> None:
         _candidate(value)
         with self._edit() as db:
-            stage, saved, _ = self._read(db)
+            stage, saved, _, run = self._read(db)
+            if run not in {"fixture", "claimed"}:
+                raise Hold("capture intake is not admitted")
             if stage != "new":
                 if stage == "reserved" or (stage == "captured" and saved != value):
                     db.execute("UPDATE capture SET disposition='held' WHERE slot=1")
                 return
             db.execute("UPDATE capture SET disposition='reserved' WHERE slot=1")
         with self._edit() as db:
-            stage, _, _ = self._read(db)
+            stage, _, _, run = self._read(db)
             now = clock()
-            if stage == "reserved":
+            if stage == "reserved" and run in {"fixture", "claimed"}:
                 if self.binding.not_before_ms <= now < self.binding.deadline_ms:
                     db.execute("UPDATE capture SET disposition='captured',candidate=?,captured_ms=? WHERE slot=1",
                                (value, now))

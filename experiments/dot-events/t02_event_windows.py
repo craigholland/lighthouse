@@ -40,6 +40,56 @@ class _Process(c.Structure):
     ]
 
 
+class _StartupEx(c.Structure):
+    _fields_ = [("startup", _Startup), ("attributes", _POINTER)]
+
+
+def _create_bound_suspended(
+    kernel: c.WinDLL, exe: str, argv: c.Array[c.c_wchar], env: c.Array[c.c_wchar],
+    cwd: str, job: int, proc: _Process, inherited: tuple[int, ...] = (),
+) -> bool:
+    """Create suspended already inside the fixed job; never fall back to late assignment."""
+    initialize = kernel.InitializeProcThreadAttributeList
+    initialize.restype, initialize.argtypes = w.BOOL, (_POINTER, _DWORD, _DWORD, c.POINTER(c.c_size_t))
+    update = kernel.UpdateProcThreadAttribute
+    update.restype, update.argtypes = w.BOOL, (
+        _POINTER, _DWORD, c.c_size_t, _POINTER, c.c_size_t, _POINTER, _POINTER,
+    )
+    delete = kernel.DeleteProcThreadAttributeList
+    delete.restype, delete.argtypes = None, (_POINTER,)
+    size = c.c_size_t()
+    count = 2 if inherited else 1
+    if inherited and (len(inherited) != 3 or len(set(inherited)) != 3 or min(inherited) <= 0):
+        return False
+    initialize(None, count, 0, c.byref(size))
+    if not 0 < size.value <= 64 * 1024:
+        return False
+    raw = c.create_string_buffer(size.value)
+    attributes = c.cast(raw, _POINTER)
+    if not initialize(attributes, count, 0, c.byref(size)):
+        return False
+    handles = (_HANDLE * 1)(job)
+    private_handles = (_HANDLE * len(inherited))(*inherited)
+    startup = _StartupEx()
+    startup.startup.cb = c.sizeof(startup)
+    startup.attributes = attributes
+    try:
+        # PROC_THREAD_ATTRIBUTE_JOB_LIST; the handle array stays live until delete.
+        if not update(attributes, 0, 0x0002000D, c.byref(handles), c.sizeof(handles), None, None):
+            return False
+        if inherited and not update(
+            attributes, 0, 0x00020002, c.byref(private_handles), c.sizeof(private_handles), None, None,
+        ):
+            return False
+        # Cast the STARTUPINFOEX pointer to the API's declared STARTUPINFO pointer.
+        return bool(kernel.CreateProcessW(
+            exe, argv, None, None, bool(inherited), 0x08080404,
+            env, cwd, c.cast(c.byref(startup), c.POINTER(_Startup)), c.byref(proc),
+        ))
+    finally:
+        delete(attributes)
+
+
 class _BasicLimits(c.Structure):
     _fields_ = [
         ("process_time", _QWORD), ("job_time", _QWORD), ("flags", _DWORD),
@@ -109,8 +159,10 @@ class _OwnedWindowsJob:
     def _start_owned(
         self, path: Path, args: list[str], environment: dict[str, str], deadline_ms: int,
         *, before_resume: Callable[[int, int], None] | None = None,
+        bind_at_creation: bool = False,
+        inherited: tuple[int, ...] = (),
     ) -> bool:
-        if self._attempted or self._terminal is not None:
+        if self._attempted or self._terminal is not None or (inherited and not bind_at_creation):
             return False
         self._attempted = True
         k = _kernel()
@@ -136,14 +188,18 @@ class _OwnedWindowsJob:
         if not k.SetInformationJobObject(self._job, 9, c.byref(limits), c.sizeof(limits)):
             return False
         remaining(self._clock, deadline_ms)
-        if not k.CreateProcessW(
-            exe, argv, None, None, False, 0x08000404,
-            env, str(path.parent), c.byref(startup), c.byref(proc),
-        ):
+        if bind_at_creation:
+            created = _create_bound_suspended(k, exe, argv, env, str(path.parent), self._job, proc, inherited)
+        else:
+            created = bool(k.CreateProcessW(
+                exe, argv, None, None, False, 0x08000404,
+                env, str(path.parent), c.byref(startup), c.byref(proc),
+            ))
+        if not created:
             return False
         self._process = proc.process
         try:
-            if not k.AssignProcessToJobObject(self._job, self._process):
+            if not bind_at_creation and not k.AssignProcessToJobObject(self._job, self._process):
                 return False
             self._assigned = True
             if before_resume is not None:
@@ -185,6 +241,15 @@ class _OwnedWindowsJob:
             if self._terminal is None:
                 self._terminal = False
             self._close_owned_handles()
+
+    def _handoff_exact_handles(self) -> tuple[int, int]:
+        """Move an already-owned live Job/root pair; its original object is sealed."""
+        if not self._attempted or not self._assigned or not self._job or not self._process or self._terminal is not None:
+            raise Hold("owned role handoff unavailable")
+        job, process = self._job, self._process
+        self._job = self._process = None
+        self._terminal = False
+        return job, process
 
     def _close_owned_handles(self) -> None:
         job, process = self._job, self._process

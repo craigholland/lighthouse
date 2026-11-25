@@ -285,6 +285,59 @@ subscription, or callback transport belongs to this entry. The capture evidence
 fixture verifies the fixed approval scope, current issue/PR metadata, trusted
 records and expiry, including oversized UTF-8 envelopes under the existing 32 KiB
 cap. It checks an exact digest projection only; it does not parse a real operator
-packet, attest a local host or checkout, prepare or admit a one-use run, or
+packet at the CLI, attest a local host or checkout, execute a real one-use run, or
 prove startup, durable stop and independently bounded shutdown. No operational
 prepare/status/run commands exist yet. Do not infer vendor or hosted readiness.
+
+The dormant capture operator model now includes version 1 strict packet parsing,
+domain-separated SHA-256 over sorted compact ASCII JSON, and a single
+operation-bound SQLite store. The packet binds the fixed repository, issue, PR,
+scope, protocol, loopback address, event and runtime version; the exact head,
+opaque identities, local file references, pinned artifact hashes, and bounded
+activation, intake and cleanup times complete the digest. Syntax checks on
+Windows path text do not attest a checkout, reparse status, executable or key.
+
+The fake composition passes the canonical digest into the capture-specific
+provider verifier, commits a single run claim before starting any roles, and
+seals intake through the existing candidate store. A fresh read confirms sealed
+intake only, never process shutdown. The injected role owner receives one
+original monotonic cutoff; the application signals all attempted roles before
+waiting, and a failed or late independent observation returns cleanup unknown.
+Tests do not establish a real independent watchdog or Windows containment for
+this operator. An actual operator must not be exposed until that owner exists
+and is independently verified. The command above continues to reject execute.
+
+The separate watchdog policy is fake-verified only. Its future host must own
+the listener and runtime independently of the application controller. It must
+observe both exact role exits under the same cutoff even if controller or
+handler work stalls. The current in-process listener and synchronous Windows
+role adapter are not that host. Do not enable execution based on these tests.
+
+The dormant Windows host adapter requests creation-time Job membership
+(STARTUPINFOEX / PROC_THREAD_ATTRIBUTE_JOB_LIST) before resume. It is tested
+with a fake kernel only, with no fallback to late assignment. The supervisor
+state machine and controller reject late or contradictory role receipts in
+synthetic tests. The fixed native host entry still denies direct invocation:
+private native control transport, exact listener/runtime-owned handles and
+independent scheduling are not connected. A fake status receipt is not native
+quiescence evidence.
+
+The Windows channel components provision two private one-way overlapped pipes
+and a separate manual stop event. Only the three intended child handles may
+appear in the process startup inheritance list. The controller and host use
+bounded, correlated, ordered frames with no caller-selected executable or
+target. Timeout stops ordinary I/O; an unconfirmed cancelled operation stays
+quarantined. Job/root pairs can move to one watchdog owner without reopening
+by PID. Exact exit and empty Job are required; a closed handle is not evidence.
+
+All new calls are tested with injected fake I/O or fake kernel capabilities.
+The concrete peer bootstrap, separately owned listener role, pinned runtime
+composition, and integrated native cessation proof are not connected.
+
+The fixed peer bootstrap is exercised only with injected capability events
+and role endpoints. It accepts the provisioned child handle tuple, runs a
+bounded fixed message sequence and stops both roles. The native helper entry
+does not yet consume a real authenticated descriptor or implement simultaneous
+stop-event / overlapped-command waiting. The separate listener and pinned
+runtime are not bound to that entry. No claim of real readiness or native
+quiescence follows from this checkpoint.
