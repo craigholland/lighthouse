@@ -43,20 +43,45 @@ def _duplicate(handle: int, inheritable: bool) -> int:
 class DetachedCoordinator(Protocol):
     """Installed independent owner bootstrap, not caller values or a thread fallback."""
 
-    def arm_bound(self, fixed: FixedWindowsCutoff, transfer: PreparedTransfer) -> None: ...
-    def signal(self) -> None: ...
-    def confirmed(self, deadline: int) -> bool: ...
     def owns_pipe(self, handle: int) -> bool: ...
     def owns_stop(self, handle: int) -> bool: ...
     def owns_jobs(self, handles: tuple[int, int]) -> bool: ...
+    def owns_coordinator_pipe(self, handle: int) -> bool: ...
+    def owns_coordinator_stop(self, handle: int) -> bool: ...
     def owns_listener_pipe(self, handle: int) -> bool: ...
     def owns_listener_stop(self, handle: int) -> bool: ...
+
+
+class _BoundDeadline(Protocol):
+    def arm_bound(self, fixed: FixedWindowsCutoff, transfer: PreparedTransfer) -> None: ...
+    def signal(self) -> None: ...
+    def confirmed(self, deadline: int) -> bool: ...
+
+
+class _LocalCoordinatorDeadline:
+    """Normal stop observation inside the independently started coordinator."""
+
+    def __init__(self, fixed: FixedWindowsCutoff) -> None:
+        self._fixed = fixed
+        self._armed = self._signalled = False
+
+    def arm_bound(self, fixed: FixedWindowsCutoff, transfer: PreparedTransfer) -> None:
+        if self._armed or fixed is not self._fixed or not fixed.roles.confirm_child_copies(transfer.jobs):
+            raise Hold("capture coordinator originals differ")
+        self._armed = True
+
+    def signal(self) -> None:
+        self._signalled = True
+
+    def confirmed(self, deadline: int) -> bool:
+        return (self._armed and self._signalled and self._fixed.host.confirmed_quiescent(deadline)
+                and self._fixed.roles.originals_empty(deadline))
 
 
 class _ExactDeadline:
     """Use the same preallocated supervisor and role objects in both launch and cutoff lanes."""
 
-    def __init__(self, fixed: FixedWindowsCutoff, detached: DetachedCoordinator) -> None:
+    def __init__(self, fixed: FixedWindowsCutoff, detached: _BoundDeadline) -> None:
         self._fixed, self._detached = fixed, detached
         self._ready = False
 
@@ -92,22 +117,32 @@ class WindowsCaptureOwnership:
         self._python, self._wall, self._mono, self._detached = python, wall, mono, detached
         self._duplicate = duplicate
 
-    def connect(self, packet: CapturePacket, store: CaptureStore, window: CaptureWindow,
-                refs: tuple[int, int]) -> CaptureRoles:
+    def coordinator_objects(self, packet: CapturePacket, store: CaptureStore, window: CaptureWindow,
+                            refs: tuple[int, int]) -> tuple[FixedWindowsCutoff, CaptureRoles]:
         if store.status()[0] != "claimed":
             raise Hold("capture needs a committed claim")
         fixed = FixedWindowsCutoff(self._python, self._mono)
         try:
             fixed.allocate_supervisor(window.intake, window.cleanup)
+            fixed.roles.allocate(window.intake)
             pipes = CapturePipeOwner(self._mono)
         except (Hold, OSError):
             fixed.close()
             raise
-        return TransferredCaptureRoles(
+        detached = _LocalCoordinatorDeadline(fixed)
+        roles = TransferredCaptureRoles(
             packet, store, window, refs, self._wall, self._mono, pipes, fixed.roles, fixed.host,
-            _ExactDeadline(fixed, self._detached), lambda handle: self._duplicate(handle, True),
+            _ExactDeadline(fixed, detached), lambda handle: self._duplicate(handle, True),
             secrets.token_hex(32), lambda deadline: _await_candidate(store, self._mono, deadline),
+            preallocated=True,
         )
+        return fixed, roles
+
+    def owns_coordinator_pipe(self, handle: int) -> bool:
+        return self._detached.owns_coordinator_pipe(handle)
+
+    def owns_coordinator_stop(self, handle: int) -> bool:
+        return self._detached.owns_coordinator_stop(handle)
 
     def owns_pipe(self, handle: int) -> bool:
         return self._detached.owns_pipe(handle)

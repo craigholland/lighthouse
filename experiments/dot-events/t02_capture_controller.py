@@ -40,7 +40,7 @@ class TransferredCaptureRoles:
         refs: tuple[int, int], wall: Callable[[], int], mono: Callable[[], int],
         pipes: CapturePipeOwner, jobs: OwnedCaptureJobs, host: CaptureSupervisorHost,
         deadline_owner: IndependentDeadline, duplicate_job: Callable[[int], int], correlation: str,
-        wait_candidate: Callable[[int], None],
+        wait_candidate: Callable[[int], None], *, preallocated: bool = False,
     ) -> None:
         self._packet, self._store, self._window, self._refs = packet, store, window, refs
         self._wall, self._mono = wall, mono
@@ -48,6 +48,7 @@ class TransferredCaptureRoles:
         self._deadline_owner, self._duplicate_job = deadline_owner, duplicate_job
         self._correlation, self._wait_candidate = correlation, wait_candidate
         self._roles: CaptureHostedRoles | None = None
+        self._preallocated = preallocated
         self._attempted = False
         self._owner_armed = False
         self._owner_attempted = False
@@ -59,6 +60,7 @@ class TransferredCaptureRoles:
         transfer = prepare_transfer(
             self._mono, self._wall, self._packet, self._store, self._pipes, self._jobs,
             self._duplicate_job, self._correlation, self._window.intake, self._window.cleanup, approval_refs=self._refs,
+            preallocated=self._preallocated,
         )
         self._owner_attempted = True
         self._deadline_owner.arm_exact(transfer, self._jobs, self._host)

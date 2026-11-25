@@ -40,7 +40,7 @@ def run_transferred_supervisor(
     owns_exact_jobs: Callable[[tuple[int, int]], bool],
     listener_factory: Callable[[AcceptedHandoff, int], HostedRole],
     runtime_factory: Callable[[AcceptedHandoff, int], HostedRole],
-    *, provider: PublicGitHub | None = None,
+    *, provider: PublicGitHub | None = None, require_coordinator: bool = False,
 ) -> HostStatus:
     """Read the authenticated inherited channel; admit both Jobs before role effects.
 
@@ -51,7 +51,8 @@ def run_transferred_supervisor(
     pipe = WindowsCapturePipe(*descriptor.peer.handles, mono)
     wire = read_handoff(pipe, descriptor.peer.intake_ms, mono)
     evidence = CaptureEvidence(GitHubHttps(wall) if provider is None else provider, wall)
-    accepted = receive_handoff(descriptor, wire, mono, wall, owns_exact_jobs, evidence=evidence)
+    accepted = receive_handoff(descriptor, wire, mono, wall, owns_exact_jobs, evidence=evidence,
+                               require_coordinator=require_coordinator)
     if not descriptor.verifies_packet_window(accepted.packet, mono, wall):
         raise Hold("capture owner handoff expired")
     listener = listener_factory(accepted, accepted.jobs[0])

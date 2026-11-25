@@ -71,6 +71,19 @@ class OwnedCaptureJobs:
                 self._native.CloseHandle(value)
             raise Hold("capture Job handoff held") from None
 
+    def has_originals(self) -> bool:
+        return self._handles is not None and not self._signaled
+
+    def originals_empty(self, deadline: int) -> bool:
+        if self._handles is None or self._clock() >= deadline:
+            return False
+        for job in self._handles:
+            account = _Accounting()
+            if (not self._native.QueryInformationJobObject(job, 1, c.byref(account), c.sizeof(account), None)
+                or account.active != 0):
+                return False
+        return self._clock() < deadline
+
     def confirm_child_copies(self, jobs: tuple[int, int]) -> bool:
         return not self._signaled and self._child_copies == jobs
 

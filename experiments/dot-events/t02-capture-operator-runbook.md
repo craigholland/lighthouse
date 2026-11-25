@@ -98,10 +98,21 @@ No other arguments select a provider, command, route, credentials or policy.
    not relaunch. A stopped/captured report is a disposition, not disclosure
    of the endpoint or proof of downstream delivery.
 
-The draft has no installed release binding. Source-reviewed Git and Python
-pins, the host and canonical checkout, and independently witnessed native
-coordinator startup are separate requirements. A guarded controller and
-fixed helper dispatch exist in code, but no standalone production coordinator
-currently authenticates both helpers' inherited capabilities and bridges
-its deadline/receipt lane across a stuck native creation. Do not substitute
-a local claim, caller handles, or the prior closed stand-in fixture for it.
+The draft has no installed release binding. The standalone coordinator
+executable accepts only a bounded private three-handle offer and does not
+accept caller-supplied Job targets. It independently checks the same current
+approvals and local bindings, consumes its one coordination reservation,
+then creates the original supervisor and role Jobs before entering its
+potentially blocking launch lane. The controller accepts only the exact
+correlated receipt and a matching durable store disposition. If native
+startup does not yield an exact root witness, emergency containment holds
+the run as `cleanup-unknown`; empty Jobs alone do not certify root cessation.
+
+The future release must supply approved fixed Git/Python/host/checkout
+pins and authenticate capability origins for the coordinator, supervisor,
+and listener. Windows handle type checks alone, a same-user interpreter
+image, and the handoff MAC do not prove who delegated the capabilities.
+Keep the build held until a separately reviewed trusted launcher or
+equivalent OS confinement provides that attribution and the full native
+graph is verified. The earlier closed stand-in fixture is not that proof.
+Old store layouts are held rather than migrated or reset.

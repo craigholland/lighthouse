@@ -93,7 +93,7 @@ def receive_handoff(
     mono: Callable[[], int],
     wall: Callable[[], int],
     owns_exact_jobs: Callable[[tuple[int, int]], bool],
-    *, evidence: CaptureEvidence, identify: Callable[[Path], StoreIdentity] = store_identity,
+    *, evidence: CaptureEvidence, require_coordinator: bool = False, identify: Callable[[Path], StoreIdentity] = store_identity,
 ) -> AcceptedHandoff:
     """Authenticate packet before opening local state or inspecting either role Job."""
     envelope = decode(wire, _MAX_HANDOFF)
@@ -137,7 +137,7 @@ def receive_handoff(
     store = CaptureStore(path, binding, operation_digest=packet.approval.digest)
     if store.status()[0] != "claimed" or identify(path) != expected or mono() >= descriptor.peer.intake_ms:
         raise Hold("capture DB changed or not admitted")
-    store.reserve_handoff(wall)
+    store.reserve_handoff(wall, require_coordinator=require_coordinator)
     if identify(path) != expected or mono() >= descriptor.peer.intake_ms:
         raise Hold("capture handoff confirmation unknown")
     return AcceptedHandoff(packet, store, role_jobs, (refs[0], refs[1]))

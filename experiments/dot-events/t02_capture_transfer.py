@@ -38,7 +38,7 @@ def prepare_transfer(
     correlation: str,
     intake: int,
     cleanup: int,
-    *, approval_refs: tuple[int, int],
+    *, approval_refs: tuple[int, int], preallocated: bool = False,
 ) -> PreparedTransfer:
     """Pin both Job limits before the supervisor process can even be created."""
     if (not InheritedCapture(PeerBinding((1, 2, 3), correlation, intake, cleanup),
@@ -47,7 +47,11 @@ def prepare_transfer(
         or store.status()[0] != "claimed"):
         raise Hold("capture transfer not admitted")
     try:
-        job_owner.allocate(intake)
+        if preallocated:
+            if not job_owner.has_originals():
+                raise Hold("capture role originals unavailable")
+        else:
+            job_owner.allocate(intake)
         pipes = pipe_owner.prepare(intake)
         descriptor = InheritedCapture(PeerBinding.from_owner(pipes, correlation, intake, cleanup),
                                       packet.approval.head, packet.approval.digest)

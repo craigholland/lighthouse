@@ -125,11 +125,11 @@ def released() -> bool:
 
 def execute_capture(packet: CapturePacket, owner_ref: int, lead_ref: int) -> str:
     """Enter the fixed mapping only when the exact installation is released."""
-    from t02_capture_native_composition import INSTALLED_CAPTURE, select
+    from t02_capture_native_composition import INSTALLED_CAPTURE, launch_coordinator
 
     if INSTALLED_CAPTURE is None:
         return "denied"
-    return run_selected_capture(packet, owner_ref, lead_ref, select(INSTALLED_CAPTURE))
+    return launch_coordinator(INSTALLED_CAPTURE, packet, (owner_ref, lead_ref))
 
 
 def run_native_listener_entry() -> int:

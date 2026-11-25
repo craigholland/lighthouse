@@ -23,7 +23,7 @@ _SCHEMA = """CREATE TABLE capture (
     candidate TEXT,
     captured_ms INTEGER,
     run_state TEXT NOT NULL CHECK(run_state IN ('fixture','prepared','claimed','sealed','stopped','cleanup-unknown')),
-    handed_off INTEGER NOT NULL CHECK(handed_off IN (0,1))
+    handed_off INTEGER NOT NULL CHECK(handed_off IN (0,1,2))
 ) STRICT"""
 
 
@@ -122,14 +122,26 @@ class CaptureStore:
                 raise Hold("capture run unavailable")
             db.execute("UPDATE capture SET run_state='claimed' WHERE slot=1")
 
-    def reserve_handoff(self, clock: Callable[[], int]) -> None:
+    def reserve_coordinator(self, clock: Callable[[], int]) -> None:
+        """Consume one standalone coordination attempt before any Job allocation."""
+        with self._edit() as db:
+            _, _, _, run = self._read(db)
+            if (self._operation_digest is None or run != "claimed"
+                or not self.binding.not_before_ms <= clock() < self.binding.deadline_ms):
+                raise Hold("capture coordinator not admitted")
+            changed = db.execute("UPDATE capture SET handed_off=1 WHERE slot=1 AND handed_off=0")
+            if changed.rowcount != 1:
+                raise Hold("capture coordinator already consumed")
+
+    def reserve_handoff(self, clock: Callable[[], int], *, require_coordinator: bool = False) -> None:
         """Commit the one trusted child ownership transfer before role creation."""
         with self._edit() as db:
             _, _, _, run = self._read(db)
             if (self._operation_digest is None or run != "claimed"
                 or not self.binding.not_before_ms <= clock() < self.binding.deadline_ms):
                 raise Hold("capture handoff not admitted")
-            changed = db.execute("UPDATE capture SET handed_off=1 WHERE slot=1 AND handed_off=0")
+            expected = 1 if require_coordinator else 0
+            changed = db.execute("UPDATE capture SET handed_off=2 WHERE slot=1 AND handed_off=?", (expected,))
             if changed.rowcount != 1:
                 raise Hold("capture handoff already consumed")
 
@@ -140,6 +152,15 @@ class CaptureStore:
             if run not in {"claimed", "sealed"}:
                 raise Hold("capture run not admitted")
             db.execute("UPDATE capture SET run_state='sealed' WHERE slot=1")
+
+    def hold_terminal(self) -> None:
+        """Atomically prevent late success after an unconfirmed emergency cutoff."""
+        with self._edit() as db:
+            self._read(db)
+            db.execute(
+                "UPDATE capture SET run_state='cleanup-unknown' "
+                "WHERE slot=1 AND run_state IN ('claimed','sealed')",
+            )
 
     def finish_cleanup(self, *, confirmed: bool) -> None:
         """Record the one cleanup outcome; unconfirmed outcomes never upgrade."""

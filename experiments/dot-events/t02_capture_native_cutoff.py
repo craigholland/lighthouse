@@ -97,7 +97,10 @@ class FixedWindowsCutoff:
                 raise Hold("capture cutoff not due")
             self._signal_taken = True
             job, root = self._supervisor, self._root
-        signal_host = bool(self._native.TerminateJobObject(job, 1))
+        try:
+            signal_host = bool(self._native.TerminateJobObject(job, 1))
+        except OSError:
+            signal_host = False
         try:
             self.roles.signal_both()
         except (Hold, OSError):
