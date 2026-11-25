@@ -17,6 +17,7 @@ class Provider:
         self.now = ACTIVATION
         self.calls = 0
         self.late = False
+        self.expected_deadline = TARGET.cutoff_ms
         self.records: dict[str, dict[str, object]] = {
             "/issues/5": {"number": 5, "state": "open", "labels": []},
             "/pulls/15": {"number": 15, "state": "open", "draft": True, "merged": False,
@@ -37,7 +38,7 @@ class Provider:
             }
 
     def read(self, path: str, *, deadline_ms: int, limit: int) -> ProviderReply:
-        assert limit == MAX_PROVIDER_BYTES and deadline_ms == TARGET.cutoff_ms
+        assert limit == MAX_PROVIDER_BYTES and deadline_ms == self.expected_deadline
         self.calls += 1
         if self.late and self.calls == 4:
             self.now = deadline_ms

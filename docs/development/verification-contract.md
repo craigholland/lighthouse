@@ -400,3 +400,29 @@ are confirmed; an unconfirmed role persists `cleanup-unknown`. A terminal
 reply without a matching durable store disposition is not success. The
 handoff MAC provides channel binding, not independent authorization of a
 direct child invocation; descriptor values alone cannot unlock either helper.
+
+The fixed transferred host accepts precisely five distinct inherited handles
+(two pipe ends, one stop event, and two Job duplicates). A mocked Windows
+startup ABI checks the exact attribute list, containment-before-resume, and
+rejection of an invalid allowlist without creating a process.
+
+The private handoff includes two bounded Issue #5 comment references. The
+transferred supervisor independently applies the existing capture-only
+approval policy through the fixed credentialless public reader before opening
+claimed state or constructing roles. It refreshes that evidence before each
+role start and bounds reads by the original intake cutoffs. Offline fake
+provider tests cover positive, revoked, absent, edited, stale, wrong-actor,
+late, and changed-head records. Neither the MAC nor a claimed store is
+approval. Public and direct native capture entry points still refuse execution.
+
+To exercise separate-process shutdown with no capture side effects, set
+`LIGHTHOUSE_T02_CAPTURE_DETACHED_PROOF=1` for the test process and run
+`python -m pytest -q -s experiments/dot-events/test_t02_capture_detached_proof.py`
+in the two retained Windows environments. Run the two cases in sequence.
+A fixed Python watchdog owns two fixed harmless sleepers in distinct Jobs
+while the controller waits for an intentionally absent startup acknowledgement.
+The positive case checks exact roots exited and both Jobs empty before the
+original cleanup cutoff; the disabled-signal control checks both remain
+alive and both Jobs remain nonempty at that cutoff, then independently
+confirms explicit cleanup. This is a stand-in proof, not a live role launch,
+production local attestation, or a certification of the full production graph.

@@ -6,12 +6,15 @@ from unittest.mock import Mock
 
 import pytest
 import t02_event_windows as windows
+from t02_capture_bootstrap import InheritedCapture
+from t02_capture_peer import PeerBinding
 from t02_capture_windows_host import CaptureSupervisorHost
 
 
 @pytest.mark.parametrize("allow_attribute", [True, False])
+@pytest.mark.parametrize("transferred", [True, False])
 def test_fixed_host_is_job_bound_before_resume(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, allow_attribute: bool,
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, allow_attribute: bool, transferred: bool,
 ) -> None:
     kernel = Mock()
     trace: list[str] = []
@@ -21,7 +24,7 @@ def test_fixed_host_is_job_bound_before_resume(
     kernel.QueryInformationJobObject.return_value = True
 
     def init(ptr: object, count: int, _flags: int, size_ptr: object) -> bool:
-        assert count == 1
+        assert count == (2 if transferred else 1)
         if ptr is None:
             getattr(size_ptr, "_obj").value = 64
             return False
@@ -31,13 +34,19 @@ def test_fixed_host_is_job_bound_before_resume(
     def update(
         _ptr: object, _flags: int, attribute: int, handles: object, size: int, *_unused: object,
     ) -> bool:
+        if attribute == 0x00020002:
+            assert transferred
+            assert size == 5 * c.sizeof(c.c_void_p)
+            assert list(getattr(handles, "_obj")) == [41, 42, 43, 51, 52]
+            trace.append("five-inherited")
+            return True
         assert attribute == 0x0002000D and size == c.sizeof(c.c_void_p)
         assert getattr(handles, "_obj")[0] == 11
         trace.append("job-bound")
         return allow_attribute
 
     def create(*args: object) -> bool:
-        assert args[4] is False  # No inherited handles.
+        assert args[4] is transferred
         assert args[5] == 0x08080404  # Suspended, extended startup, no window.
         assert "-I" in getattr(args[1], "value")
         assert "t02_capture_supervisor.py" in getattr(args[1], "value")
@@ -60,11 +69,15 @@ def test_fixed_host_is_job_bound_before_resume(
     monkeypatch.setattr(windows, "_kernel", lambda: kernel)
     monkeypatch.setenv("SystemRoot", str(tmp_path))
     role = CaptureSupervisorHost(tmp_path / "python.exe", lambda: 1)
-    assert role.start(100) is allow_attribute
+    if transferred:
+        descriptor = InheritedCapture(PeerBinding((41, 42, 43), "a" * 64, 100, 150), "b" * 40, "c" * 64)
+        assert role.start_transferred(descriptor, (51, 52)) is allow_attribute
+    else:
+        assert role.start(100) is allow_attribute
     assert not role.start(100)
     kernel.AssignProcessToJobObject.assert_not_called()
     if allow_attribute:
-        assert trace == ["init", "job-bound", "create", "delete", "resume"]
+        assert trace == ["init", "job-bound", *(["five-inherited"] if transferred else []), "create", "delete", "resume"]
         role.request_stop(100)
         kernel.TerminateJobObject.assert_called_once_with(11, 1)
     else:
@@ -74,3 +87,16 @@ def test_fixed_host_is_job_bound_before_resume(
     assert role.confirmed_quiescent(100)
     expected = {11, 22, 33} if allow_attribute else {11}
     assert {call.args[0] for call in kernel.CloseHandle.call_args_list} == expected
+
+
+@pytest.mark.parametrize("handles", [
+    (41, 42, 43, 51, 43), (41, 42, 43, 51, 0), (41, 42, 43, 51), (41, 42, 43, 51, 52, 53),
+])
+def test_native_launcher_rejects_wrong_handle_allowlist_before_creation(handles: tuple[int, ...]) -> None:
+    kernel = Mock()
+    assert not windows._create_bound_suspended(
+        kernel, "fixed", c.create_unicode_buffer("fixed"), c.create_unicode_buffer(""), "fixed", 11,
+        windows._Process(), handles,
+    )
+    kernel.InitializeProcThreadAttributeList.assert_not_called()
+    kernel.CreateProcessW.assert_not_called()

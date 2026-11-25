@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from t02_capture_bootstrap import InheritedCapture
+from t02_capture_evidence import CaptureEvidence
 from t02_capture_packet import MAX_PACKET_BYTES, CapturePacket
 from t02_capture_private_channel import OwnedPipe
 from t02_event_capture import CaptureBinding, CaptureStore
@@ -30,6 +31,7 @@ class AcceptedHandoff:
     packet: CapturePacket
     store: CaptureStore
     jobs: tuple[int, int]
+    approval_refs: tuple[int, int]
 
 
 def store_identity(path: Path) -> StoreIdentity:
@@ -51,14 +53,14 @@ def make_handoff(
     jobs: tuple[int, int],
     mono: Callable[[], int],
     wall: Callable[[], int],
-    *, identify: Callable[[Path], StoreIdentity] = store_identity,
+    *, approval_refs: tuple[int, int], identify: Callable[[Path], StoreIdentity] = store_identity,
 ) -> bytes:
     """Send the canonical packet and exact already-admitted DB identity once."""
     if (not descriptor.verifies_packet_window(packet, mono, wall)
         or not store.matches_operation(packet.approval.head, packet.approval.digest,
                                        packet.approval.activation_ms, packet.intake_cutoff_ms)
         or store.binding.proof_id != packet.proof_id or store.binding.principal != packet.principal
-        or not _valid_jobs(descriptor, jobs) or store.status()[0] != "claimed"):
+        or not _valid_refs(approval_refs) or not _valid_jobs(descriptor, jobs) or store.status()[0] != "claimed"):
         raise Hold("capture packet handoff unavailable")
     paths = decode(packet.canonical, MAX_PACKET_BYTES)
     if str(store.path) != paths["state"]:
@@ -68,9 +70,14 @@ def make_handoff(
         raise Hold("capture packet handoff expired")
     message = encode({
         "packet": packet.canonical.hex(), "jobs": jobs, "device": identity.device, "inode": identity.inode,
+        "approvals": approval_refs,
         "intake": descriptor.peer.intake_ms, "cleanup": descriptor.peer.cleanup_ms,
     })
     return encode({"body": message.decode("ascii"), "mac": _mac(descriptor, message)})
+
+
+def _valid_refs(refs: tuple[int, int]) -> bool:
+    return type(refs[0]) is int and type(refs[1]) is int and 0 < refs[0] < refs[1] < 2**63
 
 
 def _valid_jobs(descriptor: InheritedCapture, jobs: tuple[int, int]) -> bool:
@@ -86,7 +93,7 @@ def receive_handoff(
     mono: Callable[[], int],
     wall: Callable[[], int],
     owns_exact_jobs: Callable[[tuple[int, int]], bool],
-    *, identify: Callable[[Path], StoreIdentity] = store_identity,
+    *, evidence: CaptureEvidence, identify: Callable[[Path], StoreIdentity] = store_identity,
 ) -> AcceptedHandoff:
     """Authenticate packet before opening local state or inspecting either role Job."""
     envelope = decode(wire, _MAX_HANDOFF)
@@ -98,8 +105,10 @@ def receive_handoff(
     body = decode(raw.encode("ascii"), _MAX_HANDOFF)
     packet_bytes, jobs = body.get("packet"), body.get("jobs")
     device, inode = body.get("device"), body.get("inode")
-    if (body.keys() != {"packet", "jobs", "device", "inode", "intake", "cleanup"}
+    refs = body.get("approvals")
+    if (body.keys() != {"packet", "jobs", "device", "inode", "intake", "cleanup", "approvals"}
         or not isinstance(packet_bytes, str) or not isinstance(jobs, list) or len(jobs) != 2
+        or not isinstance(refs, list) or len(refs) != 2 or not _valid_refs((refs[0], refs[1]))
         or type(jobs[0]) is not int or type(jobs[1]) is not int or type(device) is not int
         or type(inode) is not int or inode <= 0 or body["intake"] != descriptor.peer.intake_ms
         or body["cleanup"] != descriptor.peer.cleanup_ms):
@@ -112,6 +121,10 @@ def receive_handoff(
     if (not descriptor.verifies_packet_window(packet, mono, wall) or not _valid_jobs(descriptor, role_jobs)
         or not owns_exact_jobs(role_jobs) or mono() >= descriptor.peer.intake_ms):
         raise Hold("capture role handoff held")
+    if (not evidence.allows(packet.approval, refs[0], refs[1],
+                            before_ms=descriptor.approval_deadline(packet, mono, wall))
+        or not descriptor.verifies_packet_window(packet, mono, wall)):
+        raise Hold("capture child authority held")
     fields = decode(packet.canonical, MAX_PACKET_BYTES)
     raw_path = fields["state"]
     assert isinstance(raw_path, str)
@@ -127,7 +140,7 @@ def receive_handoff(
     store.reserve_handoff(wall)
     if identify(path) != expected or mono() >= descriptor.peer.intake_ms:
         raise Hold("capture handoff confirmation unknown")
-    return AcceptedHandoff(packet, store, role_jobs)
+    return AcceptedHandoff(packet, store, role_jobs, (refs[0], refs[1]))
 
 
 def write_handoff(pipe: OwnedPipe, body: bytes, deadline: int) -> None:

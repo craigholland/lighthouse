@@ -75,13 +75,15 @@ class CaptureEvidence:
             raise Hold("invalid capture approval content")
         return datetime.strptime(created, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=UTC), start, end
 
-    def allows(self, target: CaptureApprovalTarget, owner_ref: int, lead_ref: int) -> bool:
+    def allows(
+        self, target: CaptureApprovalTarget, owner_ref: int, lead_ref: int, *, before_ms: int | None = None,
+    ) -> bool:
         """Read the current issue, PR, and distinct chronological owner/Lead comments."""
         now = self._clock()
         if (type(owner_ref) is not int or type(lead_ref) is not int or not 0 < owner_ref < lead_ref
             or not target.activation_ms <= now < target.cutoff_ms):
             return False
-        deadline = min(now + 4_000, target.cutoff_ms)
+        deadline = min(now + 4_000, target.cutoff_ms, before_ms if before_ms is not None else target.cutoff_ms)
         try:
             issue = self._read("/issues/5", deadline)
             pr = self._read("/pulls/15", deadline)

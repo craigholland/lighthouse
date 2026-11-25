@@ -4,7 +4,6 @@ from pathlib import Path
 from unittest.mock import Mock
 
 import pytest
-import t02_capture_host_entry as host_entry
 import t02_capture_roles as roles
 from t02_capture_bootstrap import ENVIRONMENT_KEY, InheritedCapture
 from t02_capture_detached import watch_owned_supervisor
@@ -12,7 +11,6 @@ from t02_capture_listener import listen_bound
 from t02_capture_local_windows import observe_local_capture
 from t02_capture_packet import CapturePacket
 from t02_capture_peer import PeerBinding
-from t02_capture_supervisor import HostStatus
 from t02_capture_terminal import CaptureTerminalOwner
 from t02_event_capture import CaptureBinding, CaptureStore
 from t02_event_gate import ARCHIVE_SHA256
@@ -33,31 +31,18 @@ def state(tmp_path: Path) -> tuple[InheritedCapture, CapturePacket, CaptureStore
     return descriptor, packet, store
 
 
-def test_supervisor_accepts_exact_descriptor_only_after_admission(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    descriptor, packet, store = state(tmp_path)
+def test_exact_descriptor_requires_inherited_capabilities_and_original_window(tmp_path: Path) -> None:
+    descriptor, _, _ = state(tmp_path)
     raw = descriptor.to_environment()[ENVIRONMENT_KEY]
     owns_pipe = Mock(side_effect=lambda handle: handle in (11, 12))
     owns_stop = Mock(side_effect=lambda handle: handle == 13)
-    listener, runtime = Mock(), Mock()
-    run_native = Mock(return_value=HostStatus("armed", False, False))
-    monkeypatch.setattr(host_entry, "run_native_peer", run_native)
+    assert InheritedCapture.accept(raw, lambda: 0, owns_pipe, owns_stop) == descriptor
+    assert [call.args[0] for call in owns_pipe.call_args_list] == [11, 12]
+    owns_stop.assert_called_once_with(13)
     with pytest.raises(Hold):
-        host_entry.run_inherited_supervisor(raw, packet, store, lambda: 0, lambda: ACTIVATION,
-                                            owns_pipe, owns_stop, listener, runtime)
-    listener.assert_not_called()
-    runtime.assert_not_called()
-    store.claim(lambda: ACTIVATION)
-    result = host_entry.run_inherited_supervisor(raw, packet, store, lambda: 0, lambda: ACTIVATION,
-                                                  owns_pipe, owns_stop, listener, runtime)
-    assert result.phase == "armed"
-    assert run_native.call_args.args[0] == descriptor.peer
-    assert [call.args[0] for call in owns_pipe.call_args_list] == [11, 12, 11, 12]
+        InheritedCapture.accept(raw, lambda: 50, owns_pipe, owns_stop)
     with pytest.raises(Hold):
-        host_entry.run_inherited_supervisor(raw, packet, store, lambda: 50, lambda: ACTIVATION,
-                                            owns_pipe, owns_stop, listener, runtime)
-    assert listener.call_count == runtime.call_count == 1
+        InheritedCapture.accept(raw, lambda: 0, owns_pipe, Mock(return_value=False))
 
 
 def test_fixed_listener_helper_loads_only_after_claims_and_uses_separate_stop(

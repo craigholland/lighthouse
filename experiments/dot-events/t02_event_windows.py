@@ -59,7 +59,7 @@ def _create_bound_suspended(
     delete.restype, delete.argtypes = None, (_POINTER,)
     size = c.c_size_t()
     count = 2 if inherited else 1
-    if inherited and (len(inherited) not in (3, 5) or len(set(inherited)) != 3 or min(inherited) <= 0):
+    if inherited and (len(inherited) not in (3, 5) or len(set(inherited)) != len(inherited) or min(inherited) <= 0):
         return False
     initialize(None, count, 0, c.byref(size))
     if not 0 < size.value <= 64 * 1024:

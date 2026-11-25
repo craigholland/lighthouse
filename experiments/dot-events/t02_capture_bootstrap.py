@@ -37,6 +37,11 @@ class InheritedCapture:
             and mono() < self.peer.intake_ms
         )
 
+    def approval_deadline(self, packet: CapturePacket, mono: Callable[[], int], wall: Callable[[], int]) -> int:
+        """Keep provider I/O inside both original intake time domains."""
+        current_wall = wall()
+        return min(packet.intake_cutoff_ms, current_wall + max(0, self.peer.intake_ms - mono()))
+
     def to_environment(self) -> dict[str, str]:
         """Export no file paths, credentials, role selection or executable names."""
         return {ENVIRONMENT_KEY: encode({

@@ -38,6 +38,7 @@ def prepare_transfer(
     correlation: str,
     intake: int,
     cleanup: int,
+    *, approval_refs: tuple[int, int],
 ) -> PreparedTransfer:
     """Pin both Job limits before the supervisor process can even be created."""
     if (not InheritedCapture(PeerBinding((1, 2, 3), correlation, intake, cleanup),
@@ -51,7 +52,7 @@ def prepare_transfer(
         descriptor = InheritedCapture(PeerBinding.from_owner(pipes, correlation, intake, cleanup),
                                       packet.approval.head, packet.approval.digest)
         jobs = job_owner.inherited(duplicate_for_child, intake)
-        wire = make_handoff(descriptor, packet, store, jobs, descriptor_clock, wall)
+        wire = make_handoff(descriptor, packet, store, jobs, descriptor_clock, wall, approval_refs=approval_refs)
     except (Hold, OSError, ValueError):
         try:
             pipe_owner.close()
