@@ -105,3 +105,6 @@ Only the designated harmless fixture processes and disposable state are used.
 
 - [t02_capture_native_peer.py](t02_capture_native_peer.py): dormant fixed native frame/stop wait.
 - [t02_capture_terminal.py](t02_capture_terminal.py), [t02_capture_roles.py](t02_capture_roles.py): sole watchdog terminal owner and fixed role factories; no live entry.
+
+- [t02_capture_bootstrap.py](t02_capture_bootstrap.py), [t02_capture_host_entry.py](t02_capture_host_entry.py), and [t02_capture_listener.py](t02_capture_listener.py): inherited capabilities, claimed-store binding and fixed listener helper; direct entry held.
+- [t02_capture_detached.py](t02_capture_detached.py) and [t02_capture_local_windows.py](t02_capture_local_windows.py): detached cleanup policy and bounded local evidence, tested with fakes.

@@ -37,11 +37,13 @@ def fixed_capture_runtime(
     return RuntimeRole(Path(executable), _RuntimeBinding(tunnel, org, digest), bearer, key, clock, atomic_job=True)
 
 
-def fixed_capture_listener(store: CaptureStore, bearer: str, clock: Callable[[], int]) -> LoopbackRole:
+def fixed_capture_listener(
+    store: CaptureStore, bearer: str, clock: Callable[[], int], *, rpc_clock: Callable[[], int] | None = None,
+) -> LoopbackRole:
     """Select the capture receiver, never an outbound callback sender.
 
     The caller must be the isolated listener helper; this factory does not
     launch a helper or grant listen authority.
     """
-    receiver = capture_receiver(store.binding, store, bearer, clock)
+    receiver = capture_receiver(store.binding, store, bearer, rpc_clock if rpc_clock is not None else clock)
     return LoopbackRole("127.0.0.1", 8765, receiver, clock)

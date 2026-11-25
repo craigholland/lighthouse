@@ -363,3 +363,21 @@ both root exit signals and empty Job accounting before the original deadline,
 and exercise a no-containment negative followed by separately witnessed cleanup.
 Do not substitute vendor execution, socket binding, real private inputs, or
 self-expiry. No such native case was executed for this checkpoint.
+
+The bounded capture witness command is opt-in. From the root, set
+`LIGHTHOUSE_T02_CAPTURE_NATIVE_PROOF=1` for the test process and run
+`python -m pytest -v experiments/dot-events/test_t02_capture_native_proof.py`
+using the two retained Windows verifiers. It starts only two fixed isolated
+Python sleepers per case. The positive witnesses confirm exact root exits
+and empty Jobs in the fixed window while the controller thread is idle; the
+negative disables watchdog signaling, observes both roots alive at the same
+cutoff and exercises independent explicit cleanup. This is a native Job and
+handle witness, not proof of the detached multi-process production graph.
+
+The inherited descriptor is bounded and compared to the claimed operation.
+Separate fixed listener/helper logic, dormant local path/artifact checks and
+detached cleanup policy are present and checked with fakes. Direct entry still
+refuses operation. The native process graph must bridge the trusted child
+descriptor into the admitted packet/store, deliver initial role capabilities
+to a detached watchdog before a blocked start, and prove its termination path
+without substituting the thread-stall fixture for production readiness.
