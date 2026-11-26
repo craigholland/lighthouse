@@ -26,6 +26,7 @@ from lighthouse.application.ledger import (
 from lighthouse.domain.workflow import Outcome, State
 
 _VERSION = 1
+_DISPATCHING = (Outcome.IMPLEMENT, Outcome.REVIEW, Outcome.REVISE)
 _SCHEMA = (
     "CREATE TABLE projects (repo TEXT PRIMARY KEY NOT NULL, state TEXT NOT NULL) STRICT",
     "CREATE TABLE audit (repo TEXT NOT NULL REFERENCES projects(repo), "
@@ -64,6 +65,8 @@ class SQLiteLedger:
                 raise LedgerError(_REJECTED)
             for (repo,) in conn.execute("SELECT repo FROM projects"):
                 self._state(conn, repo)
+            for key, payload in conn.execute("SELECT id, data FROM intents"):
+                self._stored_intent(key, payload)
 
     @classmethod
     def initialize(cls, path: Path) -> SQLiteLedger:
@@ -136,11 +139,15 @@ class SQLiteLedger:
             for key, payload in conn.execute(
                 "SELECT id, data FROM intents WHERE repo=? ORDER BY id", (repository,)
             ):
-                intent = _load(payload, intent_from)
-                if intent.dispatch_id != key:
-                    raise LedgerError(_REJECTED)
-                results.append(intent)
+                results.append(self._stored_intent(key, payload))
             return tuple(results)
+
+    @staticmethod
+    def _stored_intent(key: str, payload: str) -> Intent:
+        intent = _load(payload, intent_from)
+        if intent.dispatch_id != key:
+            raise LedgerError(_REJECTED)
+        return intent
 
     def record(self, change: Change) -> WriteResult:
         """Atomically persist the successor and associated evidence or do nothing."""
@@ -164,6 +171,8 @@ class SQLiteLedger:
             if not self._preserves_claim(prior, change):
                 return WriteResult.CONFLICT
             intent = change.intent
+            if change.decision.outcome in _DISPATCHING and intent is None:
+                return WriteResult.CONFLICT
             if intent is not None:
                 current = conn.execute(
                     "SELECT repo, data FROM intents WHERE id=?", (intent.dispatch_id,)
@@ -195,9 +204,9 @@ class SQLiteLedger:
             and (before.pr is None or before.pr == after.pr)
         )
 
-    @staticmethod
+    @classmethod
     def _matches_intent(
-        prior: State, change: Change, intent: Intent, current: tuple[str, str] | None,
+        cls, prior: State, change: Change, intent: Intent, current: tuple[str, str] | None,
     ) -> bool:
         decision = change.decision
         work = decision.state.work
@@ -205,9 +214,9 @@ class SQLiteLedger:
             return False
         if current:
             repo, payload = current
-            saved = _load(payload, intent_from)
+            saved = cls._stored_intent(intent.dispatch_id, payload)
             return (
-                repo == decision.state.repository
+                decision.outcome not in _DISPATCHING and repo == decision.state.repository
                 and intent == replace(saved, status=intent.status)
                 and (saved.status is intent.status or intent.status is IntentStatus.UNCERTAIN)
             )

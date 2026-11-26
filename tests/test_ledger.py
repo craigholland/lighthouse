@@ -19,7 +19,7 @@ from lighthouse.application.ledger import (
     LedgerError,
     WriteResult,
 )
-from lighthouse.domain.workflow import Execution, Outcome, State, Workflow
+from lighthouse.domain.workflow import Execution, Outcome, State, Verdict, Workflow
 
 
 def claim(repo: str = PROJECT.repository, *, order: str = "order") -> Change:
@@ -196,7 +196,9 @@ def test_initialize_is_deliberate_and_rejected_files_are_not_reset(tmp_path: Pat
         SQLiteLedger(path)
 
 
-@pytest.mark.parametrize("modification", ["PRAGMA user_version=2", "UPDATE projects SET state='{}'"])
+@pytest.mark.parametrize("modification", [
+    "PRAGMA user_version=2", "UPDATE projects SET state='{}'", "UPDATE intents SET data='{}'",
+])
 def test_rejects_unsupported_version_and_malformed_state(tmp_path: Path, modification: str) -> None:
     path = tmp_path / "ledger.db"
     ledger = SQLiteLedger.initialize(path)
@@ -208,3 +210,33 @@ def test_rejects_unsupported_version_and_malformed_state(tmp_path: Path, modific
     with pytest.raises(LedgerError, match="without resetting"):
         SQLiteLedger(path)
     assert path.read_bytes() == before
+
+
+
+@pytest.mark.parametrize("step", [Outcome.IMPLEMENT, Outcome.REVIEW, Outcome.REVISE])
+def test_fresh_dispatch_requires_new_intent_atomically(tmp_path: Path, step: Outcome) -> None:
+    path = tmp_path / "ledger.db"
+    ledger = SQLiteLedger.initialize(path)
+    seed = claim()
+    if step is Outcome.IMPLEMENT:
+        change = seed
+    else:
+        assert ledger.record(seed) is WriteResult.COMMITTED
+        state = ledger.state(PROJECT.repository)
+        facts = replace(FACTS, version=2, pull=PULL)
+        if step is Outcome.REVISE:
+            facts = replace(facts, review=replace(APPROVAL, verdict=Verdict.CHANGES))
+        decision = Workflow(PROJECT).evaluate(state, facts)
+        change = Change(1, step.value, decision, Intent(step.value, "order", step.value, 8, "head-a"))
+    assert change.decision.outcome is step
+    previous = ledger.state(PROJECT.repository)
+    audit = ledger.audit(PROJECT.repository)
+    intents = ledger.intents(PROJECT.repository)
+    assert ledger.record(replace(change, intent=None)) is WriteResult.CONFLICT
+    reopened = SQLiteLedger(path)
+    assert reopened.state(PROJECT.repository) == previous
+    assert reopened.audit(PROJECT.repository) == audit
+    assert reopened.intents(PROJECT.repository) == intents
+    assert reopened.record(change) is WriteResult.COMMITTED
+    assert reopened.record(change) is WriteResult.DUPLICATE
+    assert change.intent in reopened.intents(PROJECT.repository)

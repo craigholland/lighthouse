@@ -21,7 +21,8 @@ unique intent IDs. Explicit write transactions check the expected version and
 preserve binding before committing state, audit and intent together. Exact
 observation replays are inert, conflicting content is rejected, and stale
 versions do not write. A reconciled T04 phase can be saved without recording
-another recommendation or intent.
+another recommendation or intent. Fresh implementation, review and revision
+recommendations require a matching new pending intent in the same write.
 
 State, audit and intent queries are views of the same ledger. Pending intent
 can be marked uncertain through an explicit correlated write; it cannot be
