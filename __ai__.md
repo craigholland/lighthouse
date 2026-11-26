@@ -29,7 +29,8 @@ decisions and specific merge authorizations.
 The approved runtime baseline remains one local Python process, TOML profiles
 and a SQLite workflow ledger, with GitHub authoritative for repository facts.
 The [work intake contract](docs/development/work-intake.md) governs the design of
-readiness, dependencies, captured scope, priority, and PR linkage. It is not
+readiness, dependencies, captured scope, priority, and PR linkage.
+Provider-backed intake is not
 implemented. Keep the foundation free of live integration behavior.
 
 The 2026-11-25 recovery amendment, effective after its documentation PR merges,
@@ -52,7 +53,9 @@ within this repository and do not rely on another checkout. The experiment pins 
 `python -m lighthouse --help` describes the available options.
 `python -m lighthouse --version` reports installed package metadata.
 Unsupported arguments exit nonzero. Import and these commands do not open
-external resources or start work. The offline configuration API is documented in the [configuration contract](docs/development/configuration.md).
+external resources or start work. See the offline
+[configuration contract](docs/development/configuration.md) and
+[pure workflow decisions](docs/development/workflow.md).
 
 ## File Index
 
