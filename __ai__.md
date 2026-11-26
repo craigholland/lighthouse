@@ -55,7 +55,8 @@ within this repository and do not rely on another checkout. The experiment pins 
 Unsupported arguments exit nonzero. Import and these commands do not open
 external resources or start work. See the offline
 [configuration contract](docs/development/configuration.md) and
-[pure workflow decisions](docs/development/workflow.md).
+[pure workflow decisions](docs/development/workflow.md), and the explicit
+[offline SQLite ledger](docs/development/ledger.md).
 
 ## File Index
 
@@ -71,7 +72,7 @@ external resources or start work. See the offline
 
 ## Known Gaps / Future-State Notes
 
-No production orchestration engine, storage, production
+No production orchestration engine, production
 adapters or CI are implemented. The separately gated T01 experiment is not
 a production integration. Compatibility is targeted to CPython 3.14.x on Windows
 AMD64, not asserted for other environments. Integration proofs and production
