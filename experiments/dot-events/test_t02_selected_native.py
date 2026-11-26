@@ -153,6 +153,27 @@ def test_fixture_role_trace_preserves_held_and_unconfirmed_results() -> None:
     roles.signal_all.assert_called_once_with()
 
 
+def test_fixture_role_trace_requires_independent_witnesses() -> None:
+    roles = Mock()
+    roles.confirmed_stopped.return_value = True
+    pre, post = Mock(), Mock()
+    trace = FixtureRoleTrace(roles, before_candidate=pre, after_stop=post)
+    trace.wait_candidate(20)
+    trace.signal_all()
+    assert trace.confirmed_stopped(40)
+    pre.assert_called_once_with(20)
+    post.assert_called_once_with(40)
+    assert trace.stages == [
+        "pre-stop-witness-entered", "pre-stop-witness-returned", "candidate-entered",
+        "candidate-returned", "stop-entered", "stop-returned", "reconcile-entered",
+        "reconcile-returned", "post-stop-witness-entered", "post-stop-witness-returned",
+    ]
+    post.side_effect = Hold("unconfirmed independent witness")
+    with pytest.raises(Hold):
+        trace.confirmed_stopped(40)
+    assert trace.stages[-1] == "post-stop-witness-held"
+
+
 @_native_only
 @pytest.mark.parametrize("mode", ("normal", "stall", "no-signal", "missing-root"))
 def test_fixed_selected_native_topology(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mode: str) -> None:
@@ -267,6 +288,13 @@ def test_fixed_selected_native_topology(tmp_path: Path, monkeypatch: pytest.Monk
             (root / "runtime-ready.json").is_file(),
         )
         assert (root / RPC_CAPTURED).is_file()
+        before = read_marker(root, "before-cutoff.json")
+        after = read_marker(root, "normal-role-stop.json")
+        assert before["roles"] == [[False, 1], [False, 1]]
+        assert after["roles"] == [[True, 0], [True, 0]]
+        live_at, stopped_at = before["at"], after["at"]
+        assert type(live_at) is int and type(stopped_at) is int
+        assert started <= live_at < started + 4200 and live_at <= stopped_at < started + 8000
         assert read_marker(root, "supervisor-result.json")["phase"] == "confirmed"
     else:
         assert result == "cleanup-unknown" and reread.status() == ("cleanup-unknown", "new")

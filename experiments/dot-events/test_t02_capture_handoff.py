@@ -175,3 +175,26 @@ def test_child_deadlines_cannot_extend_packet_window() -> None:
     extended = replace(handoff, peer=replace(handoff.peer, intake_ms=600_000, cleanup_ms=900_000))
     assert not extended.verifies_packet_window(packet, lambda: 0, lambda: ACTIVATION + 49)
     assert not handoff.verifies_packet_window(packet, lambda: 0, lambda: ACTIVATION + 1)
+
+
+@pytest.mark.parametrize(("before", "wall_offset", "after", "extra", "allowed"), [
+    (1000, 1, 1001, 0, True),
+    (1000, 7, 1007, 0, True),
+    (1000, 11, 1011, 0, False),
+    (1002, 1, 1001, 0, False),
+    (1000, 5, 1001, 0, False),
+    (1000, 1, 1001, 1, False),
+    (1049, 49, 1050, 0, False),
+    (1048, 50, 1049, 0, False),
+])
+def test_inherited_window_brackets_wall_sample(
+    before: int, wall_offset: int, after: int, extra: int, allowed: bool,
+) -> None:
+    packet = CapturePacket.parse(encode(record()))
+    target = packet.approval
+    handoff = InheritedCapture(
+        PeerBinding((11, 12, 13), "a" * 64, 1050, 1100 + extra), target.head, target.digest,
+    )
+    ticks = iter((before, after))
+    assert handoff.verifies_packet_window(packet, lambda: next(ticks), lambda: ACTIVATION + wall_offset) is allowed
+    assert handoff.peer.intake_ms == 1050 and handoff.peer.cleanup_ms == 1100 + extra

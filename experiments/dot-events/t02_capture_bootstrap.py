@@ -12,6 +12,7 @@ from t02_event_types import Hold, decode, encode
 
 ENVIRONMENT_KEY = "LIGHTHOUSE_T02_CAPTURE_BOOTSTRAP"
 _MAX_DESCRIPTOR = 512
+_MAX_CLOCK_SAMPLE_MS = 10
 
 
 @dataclass(frozen=True, repr=False)
@@ -25,16 +26,20 @@ class InheritedCapture:
     def verifies_packet_window(
         self, packet: CapturePacket, mono: Callable[[], int], wall: Callable[[], int],
     ) -> bool:
-        """Bound inherited deadlines by the child's conservative wall/monotonic sample."""
-        tick = mono()
+        """Check the original deadlines against a bounded bracket around the wall read."""
+        before = mono()
         time = wall()
+        tick = mono()
         target = packet.approval
+        # The wall observation occurred no later than tick. Using the earlier
+        # bound can falsely reject the unchanged deadline at a tick boundary.
+        # No deadline is reissued; both actual time domains still gate intake.
         return (
-            self.head == target.head and self.packet_digest == target.digest
+            0 <= tick - before <= _MAX_CLOCK_SAMPLE_MS
+            and self.head == target.head and self.packet_digest == target.digest
             and target.activation_ms <= time < packet.intake_cutoff_ms
             and tick < self.peer.intake_ms <= tick + packet.intake_cutoff_ms - time
             and self.peer.intake_ms < self.peer.cleanup_ms <= tick + target.cutoff_ms - time
-            and mono() < self.peer.intake_ms
         )
 
     def approval_deadline(self, packet: CapturePacket, mono: Callable[[], int], wall: Callable[[], int]) -> int:

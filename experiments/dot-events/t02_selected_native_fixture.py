@@ -186,7 +186,7 @@ def supervisor(context: FixtureContext) -> int:
             if not ready(deadline) or not instance.observes_live() or instance._witness is None:
                 return False
             write_marker(context.root, stage + "-root.json", {"root": instance._witness._root})
-            if not listener:
+            if not listener and context.mode != "normal":
                 # Deliberately withhold the real fixed supervisor's runtime-start acknowledgement.
                 while True:
                     time.sleep(60)
@@ -220,6 +220,7 @@ class CutoffObservation:
     def __init__(self, context: FixtureContext, fixed: native_cutoff.FixedWindowsCutoff) -> None:
         self.context, self.fixed = context, fixed
         self.roots: list[int] = []
+        self.jobs: list[int] = []
         self.done = Event()
         self.k = _kernel()
         match = self.k.IsProcessInJob
@@ -251,6 +252,8 @@ class CutoffObservation:
                     raise Hold("fixture role receipt malformed")
                 duplicate = api.DuplicateHandle(source, value, current, 0x00100400, False, 0)
                 self.roots.append(duplicate)
+                if self.context.mode == "normal":
+                    self.jobs.append(api.DuplicateHandle(current, self.originals[index], current, 4, False, 0))
                 matched = w.BOOL()
                 if not self.match(duplicate, self.originals[index], c.byref(matched)) or not matched.value:
                     raise Hold("fixture root is outside the exact original role Job")
@@ -266,7 +269,7 @@ class CutoffObservation:
     def sample(self) -> list[tuple[bool, int]]:
         assert self.originals is not None and len(self.roots) == 2
         result = []
-        for root, job in zip(self.roots, self.originals, strict=True):
+        for root, job in zip(self.roots, self.jobs or self.originals, strict=True):
             data = _Accounting()
             status = self.k.WaitForSingleObject(root, 0)
             if status not in (0, 258) or not self.k.QueryInformationJobObject(
@@ -285,15 +288,19 @@ class CutoffObservation:
         raise Hold("fixture exact role cleanup not observed")
 
     def close(self) -> None:
-        for handle in self.roots:
+        for handle in (*self.roots, *self.jobs):
             self.k.CloseHandle(handle)
 
 
 class FixtureRoleTrace:
     """Collect fixed stage labels without writing files during role execution."""
 
-    def __init__(self, roles: CaptureRoles) -> None:
+    def __init__(
+        self, roles: CaptureRoles, *, before_candidate: Callable[[int], None] = lambda _: None,
+        after_stop: Callable[[int], None] = lambda _: None,
+    ) -> None:
         self._roles = roles
+        self._before_candidate, self._after_stop = before_candidate, after_stop
         self.stages: list[str] = []
 
     def _step[R](self, label: str, operation: Callable[[int], R], deadline: int) -> R:
@@ -316,13 +323,17 @@ class FixtureRoleTrace:
         self._step("runtime", self._roles.start_runtime, intake_deadline_ms)
 
     def wait_candidate(self, intake_deadline_ms: int) -> None:
+        self._step("pre-stop-witness", self._before_candidate, intake_deadline_ms)
         self._step("candidate", self._roles.wait_candidate, intake_deadline_ms)
 
     def signal_all(self) -> None:
         self._step("stop", lambda _: self._roles.signal_all(), 0)
 
     def confirmed_stopped(self, cleanup_deadline_ms: int) -> bool:
-        return self._step("reconcile", self._roles.confirmed_stopped, cleanup_deadline_ms)
+        confirmed = self._step("reconcile", self._roles.confirmed_stopped, cleanup_deadline_ms)
+        if confirmed:
+            self._step("post-stop-witness", self._after_stop, cleanup_deadline_ms)
+        return confirmed
 
 
 def coordinator(context: FixtureContext) -> int:
@@ -338,10 +349,24 @@ def coordinator(context: FixtureContext) -> int:
         fixed, roles = native.coordinator_objects(
             run.packet, run.store, CaptureWindow(cap.intake_ms, cap.cleanup_ms), run.refs,
         )
-        if context.mode == "normal":
-            trace = FixtureRoleTrace(roles)
-            return fixed, trace
         observation = witness = CutoffObservation(context, fixed)
+        if context.mode == "normal":
+            def before_candidate(deadline: int) -> None:
+                witness.follow_spawn(deadline)
+                if witness.failure:
+                    raise Hold("fixture normal pre-stop witnesses unavailable")
+
+            def after_stop(deadline: int) -> None:
+                if witness.failure or not witness.done.is_set() or len(witness.jobs) != 2:
+                    raise Hold("fixture normal witnessed roots unavailable")
+                role_states = witness.await_stopped(deadline)
+                now = mono()
+                if now >= deadline:
+                    raise Hold("fixture normal confirmed too late")
+                write_marker(context.root, "normal-role-stop.json", {"at": now, "roles": role_states})
+
+            trace = FixtureRoleTrace(roles, before_candidate=before_candidate, after_stop=after_stop)
+            return fixed, trace
         original_stop = fixed.stop_due
         original_signal = roles.signal_all
         released = Event()

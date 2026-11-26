@@ -550,3 +550,19 @@ matching fixtures. The normal test does not independently retain separate
 role-root handles outside the production receipt path. No second attempt,
 other case or other environment ran. This result does not explain the
 historical intermittent failure or establish full selected native acceptance.
+
+The exact-head Lead review identified a distinct reproducible false hold:
+an unchanged inherited window was rejected when an aligned wall read
+crossed a monotonic millisecond boundary. The child now bounds the wall
+read with monotonic samples, rejects a reversed or over-10-ms interval,
+and keeps the original approved wall and inherited monotonic deadlines.
+The bracket accounts for sample skew, not a deadline extension. Tests
+cover aligned and delayed readings, clock disagreement, expiry and a
+window extended beyond the bracket. No historical native failure is
+attributed to this defect without contemporaneous evidence.
+
+Normal-case proof now requires both exact role roots alive in their
+original nonempty Jobs before stop and both roots exited with the same
+Jobs empty before cleanup cutoff. The coordinator independently retains
+minimal query/synchronization witnesses and preserves ordinary stop and
+reconciliation; failed witness collection cannot promote a result.
