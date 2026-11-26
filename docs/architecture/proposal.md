@@ -1,7 +1,7 @@
 ---
 title: "Lighthouse System Architecture"
 created_date: 2026-11-23
-update_date: 2026-11-23
+update_date: 2026-11-25
 status: APPROVED
 ---
 
@@ -233,6 +233,11 @@ commands that manufacture approvals, merges, or completion. Windows autostart,
 additional concurrency and an optional dashboard are later decisions.
 
 Craig approved the [initial plan's](../development/initial-plan.md) feasibility-first
-stage in RQ-04. Integration proofs precede production orchestration; their evidence
-and live activation remain behind explicit gates. Overall architecture/plan
-approval is granted; implementation starts after the planning PR merges.
+stage in RQ-04. The 2026-11-25 recovery amendment, effective after its documentation
+PR merges, permits independent offline foundations while production adapters and
+dispatch wait for acceptance of their respective capability evidence. The plan's
+explicit parked PR #15 exception changes development sequencing only; it does not
+add a runtime reservation-release transition or permit uncertain retries. One
+implementation writer, independent review, Craig-only merges and separate live
+activation approvals remain required. Lighthouse's first complete demonstration
+still removes routine Owner relay, including revisions and merge-gated next work.

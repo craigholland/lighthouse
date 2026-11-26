@@ -28,9 +28,10 @@ the [review register](docs/decisions/open-questions.md).
 
 Craig also approved the work-admission policy and delegated exact labels and
 Issue fields to Codex. The [work intake contract](docs/development/work-intake.md)
-records those conventions. He approved a feasibility-first stage for the initial
-plan: foundation, Codex review proof and Dot handoff proof before production
-orchestration. The [T01 capability report](experiments/codex-review/README.md)
+records those conventions. The 2026-11-25 recovery amendment permits offline
+provider-neutral foundation work while integration-specific gates remain closed.
+It takes effect after its documentation PR merges; it starts no assignment.
+The [T01 capability report](experiments/codex-review/README.md)
 records one controlled exact-head Codex review and COMMENT. Production
 orchestration and Dot handoff remain unproved; execution, acceptance and
 concrete live activation still require their applicable approvals.
@@ -68,10 +69,14 @@ reviewed changes change, and block force pushes and deletion. These requirements
 also apply to administrators. Auto-merge is disabled. The basic GitHub review
 gate does not yet enforce the Codex reviewer identity or Craig-only merging.
 
-The orchestration workflow defaults to one active implementation task per project.
-Only authorized, unblocked, dependency-complete Issues are eligible. The next
-implementation task waits for the preceding PR to merge. The orchestration
-engine has not been implemented.
+The orchestration workflow defaults to one active implementation writer per project.
+Only authorized, unblocked, dependency-complete Issues are eligible. Ordinary
+tasks wait for the preceding implementation PR to merge. The recovery amendment
+parks draft PR #15 as an experimental reference outside that sequencing slot;
+it does not complete T02, release uncertain executions or permit concurrent writers.
+See the [amended sequence](docs/development/initial-plan.md) and
+[verification selection policy](docs/development/verification-contract.md).
+The orchestration engine has not been implemented.
 
 ## Contributor entry points
 

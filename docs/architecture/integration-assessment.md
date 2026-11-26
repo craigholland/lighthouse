@@ -1,7 +1,7 @@
 ---
 title: "Lighthouse Integration Assessment"
 created_date: 2026-11-23
-update_date: 2026-11-23
+update_date: 2026-11-25
 status: APPROVED
 ---
 
@@ -103,10 +103,14 @@ application reconciliation path, without changing core rules.
 ## Proof gates
 
 Craig approved the feasibility-first stage in RQ-04 as part of the initial plan.
-Its sequence and overall architecture/plan are approved; the capabilities below
-remain unproven. Implementation waits for the planning PR to merge, and concrete
-live-target/access approvals remain required. Accepting this plan does not accept
-future proof results.
+The 2026-11-25 recovery amendment changes the blanket foundation gate to
+capability-specific gates after its documentation PR merges. Offline configuration,
+workflow and storage need no proven Dot transport. Production adapters/dispatch
+still require Craig's acceptance of their respective capability contracts and
+concrete live-target/access approvals. Accepting a plan does not accept proof results.
+The [T01 report](../../experiments/codex-review/README.md) records one controlled
+Codex review and COMMENT; production orchestration and the complete Dot path remain
+unproved. Fakes and native stand-ins are not hosted integration evidence.
 
 RQ-05 approves controlled Lighthouse work for the proofs and Koios as the first
 real project. Its profile stays inactive until verified and approved for activation.

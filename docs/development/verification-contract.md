@@ -12,6 +12,39 @@ Run the following commands from the repository root in PowerShell. A failed
 command is a failed check. Record the checked commit and working-tree state in
 the PR; describe self-review as self-review.
 
+## Selecting applicable checks
+
+Craig approved proportional verification in the 2026-11-25 recovery amendment.
+This selection policy takes effect after that documentation PR merges. The
+commands below remain the runnable recipes; they are not a requirement to rebuild
+two environments for every edit. Classify the change and record the selected
+scope and rationale before claiming verification.
+
+| Checkpoint/change | Required evidence |
+| --- | --- |
+| Documentation only | Whitespace and Markdown-target checks below; review links, meaning and consistency with approved requirements. No Python rebuild or runtime suite solely for prose. |
+| Iterative implementation/revision | Focused behavioral tests, regressions for changed contracts and adjacent callers, and applicable Ruff/mypy checks. Exercise real composition when wiring changes. |
+| Integration/merge checkpoint | Full applicable behavior suite and configured lint/type checks for the delivered responsibility and affected consumers; installed CLI smoke when entry/packaging behavior is affected. Independent review covers the assembled delivery. |
+| First environment baseline; Python/dependency/lock/build/packaging changes | Two fresh installations using the recipes below, matching package versions, dependency checks and outside-checkout installed CLI checks. |
+| Native/interpreter/environment-sensitive changes | Verify each affected supported target at its acceptance checkpoint; use the second environment when it exercises a relevant difference or an explicit target contract requires it. Identical venvs do not establish another OS or interpreter target. |
+| Live activation/production deployment | Separate target/access approval and applicable integration/operational checks. Never obtain live evidence by expanding an ordinary test run. |
+
+Full applicable verification does not mean rerunning unrelated frozen experiments.
+Conversely, a small diff does not excuse a contract regression. Add negative tests
+for real invariants and demonstrated failures, not every imagined edge case.
+Broader outage/restart/operational matrices may follow feasibility; durable
+duplicate protection, uncertain-outcome holds, secret isolation and bounded cleanup
+for actual launched processes remain mandatory at the relevant boundary.
+
+Existing captured Issue/experiment-specific required checks remain binding until
+explicitly amended; this policy does not retroactively waive them or reclassify
+earlier failures. In particular, it does not accept PR #15's submitted repair.
+For later revisions, inspect the delta, identify which earlier results remain
+applicable and refresh invalidated checks. Record each actual checked commit;
+an earlier pass is never a pass of modified code. Evidence-only changes need
+their own documentation checks and delta assessment. Self-verification is not
+independent review, and no local check is CI or hosted connectivity evidence.
+
 ## Documentation checks
 
 For an uncommitted change, check whitespace with:

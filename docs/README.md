@@ -13,6 +13,13 @@ are resolved. Implementation starts after the planning PR merges into
 merges and releases retain their explicit owner gates. Approval describes design
 and authority, not a completed integration.
 
+Craig approved a recovery amendment on 2026-11-25, effective after its
+documentation PR merges. The updated plan permits offline provider-neutral
+foundations, parks draft PR #15 as an experimental reference outside the
+implementation sequencing slot, and retains capability-specific production/live
+gates. The verification contract selects checks by change and checkpoint.
+This documentation change starts no T03 assignment or live operation.
+
 - [System architecture](architecture/proposal.md): responsibilities, state
   ownership, workflow safeguards, configuration, and a candidate source layout.
 - [Integration assessment](architecture/integration-assessment.md): current
