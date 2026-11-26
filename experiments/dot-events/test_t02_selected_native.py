@@ -39,8 +39,9 @@ from t02_selected_native_fixture import (
     FixtureRoleTrace,
     fixture_provider,
     fixture_role_start,
+    observe_after_terminal,
 )
-from t02_selected_native_roles import RPC_CAPTURED
+from t02_selected_native_roles import RPC_CAPTURED, trace_capture_stage
 from test_t02_capture_lifecycle import local_observation, record
 
 _native_only = pytest.mark.skipif(
@@ -154,25 +155,19 @@ def test_fixture_role_trace_preserves_held_and_unconfirmed_results() -> None:
     roles.signal_all.assert_called_once_with()
 
 
-def test_fixture_role_trace_requires_independent_witnesses() -> None:
-    roles = Mock()
-    roles.confirmed_stopped.return_value = True
-    pre, post = Mock(), Mock()
-    trace = FixtureRoleTrace(roles, before_candidate=pre, after_stop=post)
-    trace.wait_candidate(20)
-    trace.signal_all()
-    assert trace.confirmed_stopped(40)
-    pre.assert_called_once_with(20)
-    post.assert_called_once_with(40)
-    assert trace.stages == [
-        "pre-stop-witness-entered", "pre-stop-witness-returned", "candidate-entered",
-        "candidate-returned", "stop-entered", "stop-returned", "reconcile-entered",
-        "reconcile-returned", "post-stop-witness-entered", "post-stop-witness-returned",
-    ]
-    post.side_effect = Hold("unconfirmed independent witness")
-    with pytest.raises(Hold):
-        trace.confirmed_stopped(40)
-    assert trace.stages[-1] == "post-stop-witness-held"
+@pytest.mark.parametrize("terminal", (False, "cutoff", "raised", "unknown"))
+def test_independent_witness_runs_without_promoting_production(terminal: str | bool) -> None:
+    effects = Mock()
+    effects.production.return_value = terminal
+    if terminal == "raised":
+        effects.production.side_effect = Hold("production held")
+        with pytest.raises(Hold, match="production held"):
+            observe_after_terminal(effects.production, effects.independent)
+    else:
+        if terminal == "unknown":
+            effects.independent.side_effect = Hold("independent unavailable")
+        assert observe_after_terminal(effects.production, effects.independent) == terminal
+    assert [call[0] for call in effects.mock_calls] == ["production", "independent"]
 
 
 @pytest.mark.parametrize("stalled", (False, True))
@@ -188,6 +183,19 @@ def test_fixture_role_start_publishes_before_ack_or_stall(stalled: bool) -> None
     assert not launch(25)
     calls.publish.assert_not_called()
     calls.stall.assert_not_called()
+
+
+def test_one_shot_capture_trace_reports_held_without_retry() -> None:
+    emit = Mock()
+    action = Mock(side_effect=Hold("private trace text"))
+    with pytest.raises(Hold, match="private trace text"):
+        trace_capture_stage("subscribe", emit, action)
+    action.assert_called_once_with()
+    assert [call.args for call in emit.call_args_list] == [("subscribe-entered",), ("subscribe-held",)]
+    emit.side_effect = OSError("trace unavailable")
+    success = Mock(return_value=True)
+    assert trace_capture_stage("store", emit, success)
+    success.assert_called_once_with()
 
 
 @_native_only
@@ -302,12 +310,18 @@ def test_fixed_selected_native_topology(tmp_path: Path, monkeypatch: pytest.Monk
             supervisor.get("phase"), supervisor.get("listener_attempted"), supervisor.get("runtime_attempted"),
             (root / "listener-ready.pending").is_file(), (root / "listener-ready.json").is_file(),
             (root / "runtime-ready.json").is_file(),
+            tuple(
+                f"{stage}-{status}"
+                for stage in ("receiver", "initialize", "initialized", "list", "subscribe", "store", "capture-marker")
+                for status in ("entered", "returned", "held")
+                if (root / f"capture-{stage}-{status}.json").is_file()
+            ),
         )
         assert (root / RPC_CAPTURED).is_file()
         before = read_marker(root, "before-cutoff.json")
         after = read_marker(root, "normal-role-stop.json")
         assert before["roles"] == [[False, 1], [False, 1]]
-        assert after["roles"] == [[True, 0], [True, 0]]
+        assert after["status"] == "confirmed" and after["roles"] == [[True, 0], [True, 0]]
         live_at, stopped_at = before["at"], after["at"]
         assert type(live_at) is int and type(stopped_at) is int
         assert started <= live_at < started + 4200 and live_at <= stopped_at < started + 8000

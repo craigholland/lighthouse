@@ -317,10 +317,9 @@ class FixtureRoleTrace:
 
     def __init__(
         self, roles: CaptureRoles, *, before_candidate: Callable[[int], None] = lambda _: None,
-        after_stop: Callable[[int], None] = lambda _: None,
     ) -> None:
         self._roles = roles
-        self._before_candidate, self._after_stop = before_candidate, after_stop
+        self._before_candidate = before_candidate
         self.stages: list[str] = []
 
     def _step[R](self, label: str, operation: Callable[[int], R], deadline: int) -> R:
@@ -350,10 +349,18 @@ class FixtureRoleTrace:
         self._step("stop", lambda _: self._roles.signal_all(), 0)
 
     def confirmed_stopped(self, cleanup_deadline_ms: int) -> bool:
-        confirmed = self._step("reconcile", self._roles.confirmed_stopped, cleanup_deadline_ms)
-        if confirmed:
-            self._step("post-stop-witness", self._after_stop, cleanup_deadline_ms)
-        return confirmed
+        return self._step("reconcile", self._roles.confirmed_stopped, cleanup_deadline_ms)
+
+
+def observe_after_terminal[R](
+    operation: Callable[[], R], observe: Callable[[], None],
+) -> R:
+    """Keep a fixture stop observation independent of production disposition."""
+    try:
+        return operation()
+    finally:
+        with suppress(Hold, OSError, ValueError):
+            observe()
 
 
 def coordinator(context: FixtureContext) -> int:
@@ -376,16 +383,7 @@ def coordinator(context: FixtureContext) -> int:
                 if witness.failure:
                     raise Hold("fixture normal pre-stop witnesses unavailable")
 
-            def after_stop(deadline: int) -> None:
-                if witness.failure or not witness.done.is_set() or len(witness.jobs) != 2:
-                    raise Hold("fixture normal witnessed roots unavailable")
-                role_states = witness.await_stopped(deadline)
-                now = mono()
-                if now >= deadline:
-                    raise Hold("fixture normal confirmed too late")
-                write_marker(context.root, "normal-role-stop.json", {"at": now, "roles": role_states})
-
-            trace = FixtureRoleTrace(roles, before_candidate=before_candidate, after_stop=after_stop)
+            trace = FixtureRoleTrace(roles, before_candidate=before_candidate)
             return fixed, trace
         original_stop = fixed.stop_due
         original_signal = roles.signal_all
@@ -461,8 +459,28 @@ def coordinator(context: FixtureContext) -> int:
         roles.signal_all = no_early_role_lane_signal  # type: ignore[method-assign]
         return fixed, roles
 
+    def record_normal_stop() -> None:
+        if context.mode != "normal":
+            return
+        deadline = cap.cleanup_ms
+        witness = observation
+        status = "unknown"
+        role_states: list[tuple[bool, int]] = []
+        if (witness is not None and not witness.failure and witness.done.is_set()
+            and len(witness.jobs) == len(witness.roots) == 2):
+            with suppress(Hold, OSError, ValueError):
+                role_states = witness.await_stopped(deadline)
+                if mono() < deadline:
+                    status = "confirmed"
+        write_marker(context.root, "normal-role-stop.json", {
+            "at": mono(), "roles": role_states, "status": status,
+        })
+
     try:
-        disposition = owned_entry(ledger.descriptor, mono, context.wall, context.evidence(), context.exact, lane)
+        disposition = observe_after_terminal(
+            lambda: owned_entry(ledger.descriptor, mono, context.wall, context.evidence(), context.exact, lane),
+            record_normal_stop,
+        )
         status = None
         with suppress(Hold, OSError, ValueError):
             status = open_existing_capture(context.packet).status()

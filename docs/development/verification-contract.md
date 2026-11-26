@@ -623,3 +623,28 @@ case was rerun. Both environments remained under the authorized 120 s
 limit in this sequence. No exact cause for the missing secondary
 candidate or terminal witness is established. Live activation stayed
 disabled and full native acceptance is not established.
+
+Follow-up review at `a6df072` found the earlier clock bracket could admit
+extra time when the wall read came early, and the previous normal fixture
+did not attempt independent observation after a negative receipt. This
+clarifies the historical secondary result: the missing per-role stop
+marker does not show that an independent exit check ran and failed.
+
+The clock gate now takes at most three monotonic/wall/monotonic samples
+and accepts only a same-tick bracket. An ambiguous bracket is resampled,
+not counted as authority; a reversed sample, observed expiry, or lack
+of a same-tick sample denies the window. Original deadlines and provider
+limits are unchanged. Offline fakes cover both sampling orders, delayed
+reads, monotonic/wall rollback, expiry, and the specific +1/+10 ms extended
+windows.
+
+The fixture's exact independent root/Job cleanup observer now runs from
+the witness-owning coordinator after the production terminal path,
+including false, raised and cutoff paths, before releasing its retained
+handles. Its confirmation is separate, does not promote a negative
+operation result and is not proof if handles or time are unavailable.
+The one-shot synthetic capture records only fixed stage labels for
+receiver, handshake, subscribe, store and marker publication; no retry,
+private input, or raw exception is added to evidence. This slice is
+offline only; no further native attempt ran and the missing secondary
+candidate's cause remains unproven.

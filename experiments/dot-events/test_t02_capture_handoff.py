@@ -177,24 +177,26 @@ def test_child_deadlines_cannot_extend_packet_window() -> None:
     assert not handoff.verifies_packet_window(packet, lambda: 0, lambda: ACTIVATION + 1)
 
 
-@pytest.mark.parametrize(("before", "wall_offset", "after", "extra", "allowed"), [
-    (1000, 1, 1001, 0, True),
-    (1000, 7, 1007, 0, True),
-    (1000, 11, 1011, 0, False),
-    (1002, 1, 1001, 0, False),
-    (1000, 5, 1001, 0, False),
-    (1000, 1, 1001, 1, False),
-    (1049, 49, 1050, 0, False),
-    (1048, 50, 1049, 0, False),
+@pytest.mark.parametrize(("ticks", "wall_offsets", "bounds", "allowed"), [
+    ((1000, 1001, 1001, 1001), (1, 1), (1050, 1100), True),
+    ((1000, 1001, 1001, 1001), (0, 1), (1050, 1100), True),
+    ((1000, 1007, 1007, 1007), (0, 7), (1050, 1100), True),
+    ((1000, 1010, 1010, 1010), (0, 10), (1060, 1110), False),
+    ((1000, 1001, 1001, 1001), (0, 1), (1051, 1101), False),
+    ((1000, 1001, 1001, 1001), (1, 1), (1050, 1101), False),
+    ((1000, 1001, 1001, 1002, 1002, 1003), (0, 1, 2), (1050, 1100), False),
+    ((1002, 1001), (1,), (1050, 1100), False),
+    ((1000, 1001, 1001, 1001), (4, 5), (1050, 1100), False),
+    ((1000, 1001, 1001, 1001), (3, 1), (1050, 1100), False),
+    ((1049, 1050), (49,), (1050, 1100), False),
+    ((1048, 1049), (50,), (1050, 1100), False),
 ])
-def test_inherited_window_brackets_wall_sample(
-    before: int, wall_offset: int, after: int, extra: int, allowed: bool,
+def test_inherited_window_resamples_without_granting_ambiguous_time(
+    ticks: tuple[int, ...], wall_offsets: tuple[int, ...], bounds: tuple[int, int], allowed: bool,
 ) -> None:
     packet = CapturePacket.parse(encode(record()))
     target = packet.approval
-    handoff = InheritedCapture(
-        PeerBinding((11, 12, 13), "a" * 64, 1050, 1100 + extra), target.head, target.digest,
-    )
-    ticks = iter((before, after))
-    assert handoff.verifies_packet_window(packet, lambda: next(ticks), lambda: ACTIVATION + wall_offset) is allowed
-    assert handoff.peer.intake_ms == 1050 and handoff.peer.cleanup_ms == 1100 + extra
+    handoff = InheritedCapture(PeerBinding((11, 12, 13), "a" * 64, *bounds), target.head, target.digest)
+    tick, offset = iter(ticks), iter(wall_offsets)
+    assert handoff.verifies_packet_window(packet, lambda: next(tick), lambda: ACTIVATION + next(offset)) is allowed
+    assert (handoff.peer.intake_ms, handoff.peer.cleanup_ms) == bounds

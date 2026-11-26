@@ -12,7 +12,7 @@ from t02_event_types import Hold, decode, encode
 
 ENVIRONMENT_KEY = "LIGHTHOUSE_T02_CAPTURE_BOOTSTRAP"
 _MAX_DESCRIPTOR = 512
-_MAX_CLOCK_SAMPLE_MS = 10
+_CLOCK_SAMPLE_ATTEMPTS = 3
 
 
 @dataclass(frozen=True, repr=False)
@@ -26,21 +26,30 @@ class InheritedCapture:
     def verifies_packet_window(
         self, packet: CapturePacket, mono: Callable[[], int], wall: Callable[[], int],
     ) -> bool:
-        """Check the original deadlines against a bounded bracket around the wall read."""
-        before = mono()
-        time = wall()
-        tick = mono()
+        """Use a same-tick clock sample; an ambiguous interval grants no authority."""
         target = packet.approval
-        # The wall observation occurred no later than tick. Using the earlier
-        # bound can falsely reject the unchanged deadline at a tick boundary.
-        # No deadline is reissued; both actual time domains still gate intake.
-        return (
-            0 <= tick - before <= _MAX_CLOCK_SAMPLE_MS
-            and self.head == target.head and self.packet_digest == target.digest
-            and target.activation_ms <= time < packet.intake_cutoff_ms
-            and tick < self.peer.intake_ms <= tick + packet.intake_cutoff_ms - time
-            and self.peer.intake_ms < self.peer.cleanup_ms <= tick + target.cutoff_ms - time
-        )
+        if self.head != target.head or self.packet_digest != target.digest:
+            return False
+        last_tick: int | None = None
+        last_wall: int | None = None
+        for _ in range(_CLOCK_SAMPLE_ATTEMPTS):
+            before = mono()
+            time = wall()
+            tick = mono()
+            if (
+                before > tick or (last_tick is not None and before < last_tick)
+                or (last_wall is not None and time < last_wall)
+                or not target.activation_ms <= time < packet.intake_cutoff_ms
+                or not tick < self.peer.intake_ms < self.peer.cleanup_ms
+            ):
+                return False
+            if before == tick:
+                return (
+                    self.peer.intake_ms <= tick + packet.intake_cutoff_ms - time
+                    and self.peer.cleanup_ms <= tick + target.cutoff_ms - time
+                )
+            last_tick, last_wall = tick, time
+        return False
 
     def approval_deadline(self, packet: CapturePacket, mono: Callable[[], int], wall: Callable[[], int]) -> int:
         """Keep provider I/O inside both original intake time domains."""
