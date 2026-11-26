@@ -15,6 +15,20 @@ SCOPE = "lighthouse-t02-callback-capture-only"
 PREFIX = "Lighthouse-T02 capture approval: "
 
 
+def _comment_origin(origin: object, actor: int, app: int | None) -> bool:
+    """Recognize GitHub's public view of the independently pinned App bot."""
+    if app is None:
+        return actor == OWNER and origin is None
+    if (actor, app) != (LEAD, LEAD_APP):
+        return False
+    # The public REST view may explicitly redact this field. The primary
+    # identity is the App-specific numeric Bot, checked separately below.
+    # Supplied contrary or malformed metadata is never equivalent to null.
+    return origin is None or (
+        isinstance(origin, dict) and type(origin.get("id")) is int and origin["id"] == LEAD_APP
+    )
+
+
 @dataclass(frozen=True)
 class CaptureApprovalTarget:
     """Exact digest projection; not a checked local operator packet."""
@@ -57,10 +71,10 @@ class CaptureEvidence:
         if (
             type(record.get("id")) is not int or record.get("id") != ref
             or record.get("issue_url") != "https://api.github.com" + API_ROOT + "/issues/5"
-            or not isinstance(user, dict) or user.get("id") != actor
+            or not isinstance(user, dict) or type(user.get("id")) is not int or user["id"] != actor
             or user.get("type") != ("User" if app is None else "Bot")
             or "performed_via_github_app" not in record
-            or (origin is not None if app is None else not isinstance(origin, dict) or origin.get("id") != app)
+            or not _comment_origin(origin, actor, app)
             or not isinstance(created, str) or created != record.get("updated_at")
             or not re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z", created)
             or not isinstance(body, str) or not body.startswith(PREFIX) or "\n" in body or "\r" in body

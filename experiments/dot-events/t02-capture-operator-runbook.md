@@ -59,8 +59,13 @@ fifteen minutes from activation. Use the exact field names and constraints in
 the parser; there are no override fields.
 
 The [approval reader](t02_capture_evidence.py) checks two distinct unedited
-single-line comments on Issue 5. The owner must be the actual GitHub user and
-the Lead must be the actual Lead App actor, in that order. Both must bind the
+single-line comments on Issue 5. The owner must match the pinned numeric
+GitHub User and explicit null App origin. The Lead must match the independently
+verified App-specific numeric GitHub Bot. Anonymous REST may explicitly return
+null App origin for that Bot; if an App object is present its numeric ID must
+match the pinned Lead App. Missing, malformed or contradictory metadata is
+held. Account names and launcher assertions convey no authority. Owner then
+Lead must both bind the
 same full head, digest, scope and approved window, with the approval timestamp
 at or before activation. The issue must stay open and unblocked and the exact
 PR head must remain open, unmerged, draft, and based on development. A

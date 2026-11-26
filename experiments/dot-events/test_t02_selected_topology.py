@@ -137,9 +137,9 @@ class Connection:
         pass
 
 
-@pytest.mark.parametrize("current", [True, False], ids=["exact", "foreign-head"])
+@pytest.mark.parametrize("case", ("public", "foreign-head", "foreign-app", "foreign-bot"))
 def test_selected_graph_durably_captures_and_reopens_without_replay(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, current: bool,
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, case: str,
 ) -> None:
     fields = record() | {
         "state": str(tmp_path / "capture.db"), "runtime_executable": str(tmp_path / "tunnel-client-runtime.exe"),
@@ -157,8 +157,16 @@ def test_selected_graph_durably_captures_and_reopens_without_replay(
 
     fake = ExactProvider()
     source(packet, fake)
-    if not current:
+    lead = fake.records["/issues/comments/2"]
+    expected_app = lead["performed_via_github_app"]
+    assert isinstance(expected_app, dict) and type(expected_app["id"]) is int
+    lead["performed_via_github_app"] = None
+    if case == "foreign-head":
         fake.records["/pulls/15"]["head"] = {"sha": "b" * 40}
+    elif case == "foreign-app":
+        lead["performed_via_github_app"] = {"id": expected_app["id"] + 1}
+    elif case == "foreign-bot":
+        lead["user"] = {"id": 42, "type": "Bot"}
     original = time.monotonic_ns()
     def mono() -> int:
         return (time.monotonic_ns() - original) // 1_000_000
@@ -355,7 +363,7 @@ def test_selected_graph_durably_captures_and_reopens_without_replay(
         assert not thread.is_alive()
     if not errors.empty():
         raise errors.get()
-    if not current:
+    if case != "public":
         assert result == "denied" and store.status() == ("prepared", "new")
         assert not launched and not stops and not members
         observe.assert_not_called()

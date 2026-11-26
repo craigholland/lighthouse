@@ -45,8 +45,10 @@ class Provider:
         return ProviderReply(200, encode(self.records[path.removeprefix(API_ROOT)]))
 
 
-def test_capture_approval_positive_and_invalid_selectors() -> None:
+@pytest.mark.parametrize("lead_origin", (None, {"id": LEAD_APP}), ids=("public", "app-visible"))
+def test_capture_approval_positive_and_invalid_selectors(lead_origin: object) -> None:
     fixture = Provider()
+    fixture.records["/issues/comments/2"]["performed_via_github_app"] = lead_origin
     evidence = CaptureEvidence(fixture, lambda: fixture.now)
     assert not evidence.allows(TARGET, 2, 1) and fixture.calls == 0
     assert evidence.allows(TARGET, 1, 2) and fixture.calls == 4
@@ -58,7 +60,13 @@ def test_capture_approval_positive_and_invalid_selectors() -> None:
     ("/pulls/15", {"head": {"sha": "b" * 40}}),
     ("/pulls/15", {"body": "é" * MAX_PROVIDER_BYTES}),
     ("/issues/comments/1", {"performed_via_github_app": {"id": LEAD_APP}}),
-    ("/issues/comments/2", {"performed_via_github_app": None}),
+    ("/issues/comments/2", {"performed_via_github_app": {"id": LEAD_APP + 1}}),
+    ("/issues/comments/2", {"performed_via_github_app": {"id": float(LEAD_APP)}}),
+    ("/issues/comments/2", {"performed_via_github_app": {}}),
+    ("/issues/comments/2", {"performed_via_github_app": "redacted"}),
+    ("/issues/comments/2", {"performed_via_github_app": None, "user": {"id": LEAD + 1, "type": "Bot"}}),
+    ("/issues/comments/2", {"performed_via_github_app": None, "user": {"id": LEAD, "type": "User"}}),
+    ("/issues/comments/2", {"performed_via_github_app": None, "user": {"id": float(LEAD), "type": "Bot"}}),
     ("/issues/comments/2", {"issue_url": "https://api.github.com" + API_ROOT + "/issues/6"}),
     ("/issues/comments/2", {"updated_at": "2023-11-14T22:13:21Z"}),
     ("/issues/comments/2", {"body": 'Lighthouse-T02 approval: {"scope":"event"}'}),
@@ -75,3 +83,10 @@ def test_evidence_completing_at_cutoff_is_denied() -> None:
     fixture.late = True
     assert not CaptureEvidence(fixture, lambda: fixture.now).allows(TARGET, 1, 2)
     assert fixture.calls == 4
+
+
+@pytest.mark.parametrize("ref", (1, 2))
+def test_missing_origin_field_is_not_public_explicit_null(ref: int) -> None:
+    fixture = Provider()
+    del fixture.records[f"/issues/comments/{ref}"]["performed_via_github_app"]
+    assert not CaptureEvidence(fixture, lambda: fixture.now).allows(TARGET, 1, 2)

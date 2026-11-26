@@ -684,3 +684,15 @@ replay launch. The three non-normal cases held cleanup-unknown/new, with
 causal controls and no replay launch. The earlier failed secondary result
 remains historical and its cause was not established. Actual deployment
 profile, host and artifact pins remain uninstalled/unverified.
+
+The public approval-provenance follow-up at 26d9193 used only sanitized
+synthetic REST shapes, with no credential or native proof flags. The
+credentialless policy accepts the exact independently pinned Lead App Bot
+numeric identity and Bot type when App-origin metadata is explicitly null
+as in the public representation. If the metadata is supplied it must
+identify the expected numeric App; a missing field, wrong actor/type,
+malformed or contradictory metadata still holds. The Owner remains the
+exact pinned numeric User with explicit null App origin. Ordered unedited
+Issue comments, head/digest/scope/windows, independent child checks and
+one-use/cleanup rules are unchanged. The earlier operational window was
+retired before execute; no new installation or execution is in this proof.
