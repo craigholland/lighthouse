@@ -513,3 +513,15 @@ The offline correction posts overlapped connect before opening the client,
 waits only within the original deadline, then checks the result without a
 blocking call. Injected fakes cover order, timeout, non-success and
 ownership cleanup; this is not native acceptance of the correction.
+
+The separately approved primary normal verification at
+`7f19058bf4277857bb91c99c6edfc28b40a25e85` failed once in 1.04 s.
+Unlike the preceding attempt, IPC and the coordinator bootstrap advanced:
+the exact outer coordinator root/Job termination check passed, and its
+terminal receipt corroborated `cleanup-unknown`, not `candidate-held`.
+The supervisor marker recorded `confirmed`, but there was only an empty
+pending listener-ready marker, with no runtime-ready or captured marker.
+The scoped census found zero matching fixture Pythonw processes. This
+does not establish successful both-role startup or capture, nor explain
+the precise failure in the listener-to-runtime transition. No other case,
+environment, native rerun, or functional change was made in this follow-up.
