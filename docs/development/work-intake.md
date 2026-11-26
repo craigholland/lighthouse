@@ -116,5 +116,8 @@ mention, closing keyword or completion receipt alone. Revisions use the same PR
 and work-order ID; each distinct dispatch still has its own stable dispatch ID.
 Ambiguous or conflicting links hold the task for attention.
 
-T03 will introduce templates and validation; T04 and T06 will verify policy and
-provider evidence. These conventions add no merge or release capability.
+T03 supplies the Issue and PR templates and offline profile validation.
+During manually coordinated bootstrap, omit the work-order field if no ledger
+issued one and cite the verified readiness and dependency evidence instead.
+Do not fabricate an ID. T04 and T06 will verify policy and provider evidence.
+These conventions add no merge or release capability.

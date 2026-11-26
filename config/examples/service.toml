@@ -1,0 +1,5 @@
+# Synthetic, offline application settings. No automatic activation.
+version = 1
+max_active_work = 1
+independent_review = true
+human_merge = true

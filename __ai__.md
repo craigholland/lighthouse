@@ -37,7 +37,7 @@ allows bounded offline provider-neutral foundations without T02 completion.
 It parks draft PR #15 outside the implementation sequencing slot, preserves one
 active writer and ordinary merge-before-next-task rules, and never releases an
 uncertain live execution. Follow the plan's capability-specific gates and the
-verification contract's change/checkpoint selection policy. T03 still needs its
+verification contract's change/checkpoint selection policy. Each later task still needs its
 own ready assignment; no runtime parking feature or live action is authorized.
 
 ## Allowed Dependencies
@@ -52,7 +52,7 @@ within this repository and do not rely on another checkout. The experiment pins 
 `python -m lighthouse --help` describes the available options.
 `python -m lighthouse --version` reports installed package metadata.
 Unsupported arguments exit nonzero. Import and these commands do not open
-external resources or start work. No public Python API is defined.
+external resources or start work. The offline configuration API is documented in the [configuration contract](docs/development/configuration.md).
 
 ## File Index
 
@@ -68,7 +68,7 @@ external resources or start work. No public Python API is defined.
 
 ## Known Gaps / Future-State Notes
 
-No production orchestration engine, profile schema, storage, production
+No production orchestration engine, storage, production
 adapters or CI are implemented. The separately gated T01 experiment is not
 a production integration. Compatibility is targeted to CPython 3.14.x on Windows
 AMD64, not asserted for other environments. Integration proofs and production

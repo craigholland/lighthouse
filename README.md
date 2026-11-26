@@ -103,3 +103,10 @@ are rejected. It has no runtime third-party dependencies and does not start
 orchestration or contact providers. See the
 [verification contract](docs/development/verification-contract.md) for
 the test, lint, and type checks and the clean-room install procedure.
+
+## Offline configuration (T03)
+
+The Python configuration boundary validates shared service settings and explicit
+project TOML profiles offline. See the [schema and examples](docs/development/configuration.md).
+No CLI configuration selector, automatic discovery, provider client, or activation
+is implemented.

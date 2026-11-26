@@ -1,0 +1,20 @@
+# Inactive synthetic example; do not use these values as live bindings.
+version = 1
+project = "beta"
+repository = "example-org/beta"
+adapter = "github"
+active = false
+credential_ref = "ref:beta-scm"
+
+[actors]
+owner = 201
+lead = 202
+implementer = 203
+
+[workspaces]
+implementation = "X:/synthetic/beta/implementation"
+review = "X:/synthetic/beta/review"
+
+[verification]
+directory = "."
+commands = ["python -m pytest -q tests"]
