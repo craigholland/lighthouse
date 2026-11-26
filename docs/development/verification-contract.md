@@ -587,3 +587,39 @@ withholds its acknowledgement. Inert regressions exercise publication
 order and no publication on failed witness. This correction has not been
 rerun natively; neither this cause nor the clock defect is attributed to
 older uninstrumented failures. All historical results remain intact.
+
+At the owner-approved exact head `98f45718d8fd62aeffff4b3ba2cc8f78a0a7689b`,
+the selected four-case group ran sequentially using pytest `-x` and the
+test-only opt-in. Primary exited 0: four passed in 14.15 s. With all
+offsets measured from fixture start and the original cutoff at 4,200 ms:
+
+- Normal, 544 ms: exact roots alive and Jobs nonempty at 452 ms; the same
+  roots were exited and Jobs empty at 521 ms. Supervisor confirmed both
+  attempted roles, coordinator receipt at 523 ms, and durable
+  `stopped`/`captured` agreed with `candidate-held`.
+- Stall, 4,239 ms: both exact role roots alive and Jobs nonempty at 435 ms
+  and at cutoff observation; independent signal at 4,206 ms and exact root
+  exits, empty role Jobs and supervisor confirmation by 4,210 ms.
+- Disabled-signal, 4,738 ms: both roots remained alive and Jobs nonempty
+  at 4,704 ms, past the 4,700 ms proof point. Explicit independent cleanup
+  signaled at 4,705 ms; exact roots exited and Jobs empty by 4,709 ms.
+- Missing-root, 4,249 ms: the production supervisor-root witness remained
+  absent and did not upgrade the correlated durable hold. Fixture-owned
+  supervisor-root cleanup was witnessed and both role roots exited and
+  Jobs emptied by 4,220 ms. All three non-normal cases retained
+  `cleanup-unknown`/`new` and rejected a replay launch.
+
+Secondary stopped globally at normal: exit 1, pytest 4.70 s. Both roles
+returned from startup and exact roots were alive in the original Jobs
+at 437 ms. Candidate wait returned without a captured marker. Stop
+returned, but terminal reconciliation was unconfirmed; the coordinator
+receipt at 4,230 ms and durable `cleanup-unknown`/`new` agree. There is no
+secondary supervisor terminal marker or independent role-stop marker.
+The exact outer coordinator exit/empty Job assertion passed; scoped
+read-only census found zero matching processes in every attempted case,
+but that does not replace the missing secondary role-stop witnesses.
+Secondary stall, disabled-signal and missing-root did not run, and no
+case was rerun. Both environments remained under the authorized 120 s
+limit in this sequence. No exact cause for the missing secondary
+candidate or terminal witness is established. Live activation stayed
+disabled and full native acceptance is not established.
