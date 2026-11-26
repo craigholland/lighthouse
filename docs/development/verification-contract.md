@@ -660,3 +660,27 @@ factory with synthetic facts and no actual process/provider effect. The
 selected native fixture uses that assembly and real role ledger/Windows
 object checks with its existing closed stand-ins. See the operator runbook
 for the non-secret fixed install/disable plan, not authority to perform it.
+
+The authorized selected native sequence at implementation head
+`afde2bb852609122a03b3ed737ebcef2b8d0d4b1` ran once per retained Windows
+environment (pytest `-x -q -s experiments/dot-events/test_t02_selected_native.py
+-k test_fixed_selected_native_topology --tb=short` with only its fixture
+flag). Primary: exit 0, four passed in 14.15 s. Secondary: exit 0, four
+passed in 13.86 s. No retries, other native groups, live installation or
+operational effects were involved in this sequence. Relative to each case
+start (original intake 4,200 ms and cleanup 8,000 ms):
+
+| Case | Primary native witness (ms) | Secondary native witness (ms) |
+| --- | --- | --- |
+| Normal | both roles alive/nonempty 502, exact exits/empty 587, receipt 589 | alive/nonempty 438, exact exits/empty 524, receipt 525 |
+| Stalled ack | independent signal 4,207, exact cessation 4,211 | signal 4,200, exact cessation 4,209 |
+| Disabled termination | both live past 4,700 proof point; explicit signal 4,705, exact cessation 4,709 | same signal 4,705 and exact cessation 4,709 |
+| Missing supervisor-root receipt | production remained unknown; externally witnessed fixture cleanup 4,211 | fixture cleanup 4,210 without receipt upgrade |
+
+Exact outer coordinator exit/empty Job assertions passed in every case,
+and a scoped read-only census found no matching survivors. Normal cases
+ended stopped/captured, with candidate-held receipt, synthetic RPC and no
+replay launch. The three non-normal cases held cleanup-unknown/new, with
+causal controls and no replay launch. The earlier failed secondary result
+remains historical and its cause was not established. Actual deployment
+profile, host and artifact pins remain uninstalled/unverified.
