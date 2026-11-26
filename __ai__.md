@@ -57,6 +57,7 @@ external resources or start work. See the offline
 [configuration contract](docs/development/configuration.md) and
 [pure workflow decisions](docs/development/workflow.md), and the explicit
 [offline SQLite ledger](docs/development/ledger.md).
+The [GitHub mapper](docs/development/github-facts.md) only normalizes supplied facts.
 
 ## File Index
 
