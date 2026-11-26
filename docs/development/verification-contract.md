@@ -534,3 +534,19 @@ the listener's readiness write. These facts support no promotion from
 `cleanup-unknown`. In-memory fixed stage labels now distinguish listener,
 runtime, candidate wait, stop and receipt reconciliation on the normal
 fixture, and terminal markers include only state labels and attempt flags.
+
+Under the separate Lead diagnostic clearance, the primary Windows normal
+case passed on the first run at `113aa7e09c6c70a31c7b0beea6e359ec12a6a4be`
+(pytest exit 0, 1 passed in 0.85 s; fixture elapsed 552 ms, coordinator
+receipt at 531 ms; original intake/cleanup offsets 4,200/8,000 ms).
+Listener, runtime, candidate wait, stop and reconciliation all returned.
+Both role-attempt flags were true, the supervisor receipt was confirmed,
+and the authenticated coordinator outcome `candidate-held` agreed with
+the unchanged store identity and durable `stopped`/`captured` row.
+The inert listener, runtime and RPC markers were present; replay admitted
+no new launch. Exact outer coordinator root exit and empty Job passed
+without emergency teardown; the subsequent scoped census found no
+matching fixtures. The normal test does not independently retain separate
+role-root handles outside the production receipt path. No second attempt,
+other case or other environment ran. This result does not explain the
+historical intermittent failure or establish full selected native acceptance.
