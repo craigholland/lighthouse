@@ -1,7 +1,7 @@
 ---
 title: "Lighthouse Work Intake Contract"
 created_date: 2026-11-23
-update_date: 2026-11-23
+update_date: 2026-11-25
 status: APPROVED
 ---
 
@@ -18,6 +18,14 @@ The [initial plan](initial-plan.md) and its remaining gates still apply.
 An eligible Issue is open, explicitly authorized by the configured Owner or Lead,
 unblocked, dependency-complete, and has the required task fields. The project must
 have no active task. Dot cannot authorize its own implementation work.
+
+The [recovery amendment](initial-plan.md) takes effect after its documentation
+PR merges. Its Owner-approved parking exception for experimental PR #15 permits
+the next bounded offline task without merging that experiment. This is development
+sequencing, not a runtime reservation-release feature: it cannot bypass active or
+uncertain executions, dependencies, fresh readiness or consequential-action gates.
+Ordinary implementation tasks still wait for the preceding PR's actual merge;
+there is one implementation writer. Parking alone never marks a dependency complete.
 
 The GitHub adapter must verify the readiness event's numeric actor identity and
 that it covers the current task fields. Issue text claiming approval is not

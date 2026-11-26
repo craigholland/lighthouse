@@ -1,7 +1,7 @@
 ---
 title: "Lighthouse Initial Development Plan"
 created_date: 2026-11-23
-update_date: 2026-11-23
+update_date: 2026-11-25
 status: APPROVED
 ---
 
@@ -20,6 +20,11 @@ in RQ-03, the feasibility-first T00–T02 stage in RQ-04 and the rollout policy
 in RQ-05. The [work intake contract](work-intake.md) records delegated label and field
 conventions. The contracts and sequence below are adopted design requirements;
 their implementation and integration evidence remain to be produced.
+
+Craig approved the recovery amendment on 2026-11-25; it takes effect after this
+documentation PR merges. It replaces the blanket Gate A foundation block with
+capability-specific gates. This records scope and sequencing approval, not a
+T03 assignment, proof acceptance, merge authorization or live-operation approval.
 
 ## Adoption and delegation
 
@@ -44,16 +49,47 @@ approved tasks in its separate checkout, verifies its work, and opens task PRs
 against `development`. Craig resolves consequential choices and personally merges
 approved PRs. A release promotion to `main` and its tag are separate owner actions.
 
-Use one active task per project. Do not begin the next task before the preceding
-PR actually merges. Architecture/plan approval permits bounded Issue publication;
+Use one active implementation writer per project. Ordinary tasks wait for the
+preceding implementation PR to actually merge. Lead assessment and review may
+overlap that writer. Architecture/plan approval permits bounded Issue publication;
 it does not automatically mark any Issue ready or waive its prerequisites. Each
 Issue must include its specific scope, source references, acceptance, verification
 and stop conditions.
 
-The approved feasibility-first stage brings integration proofs ahead of the durable engine.
-This changes the bootstrap's tentative ordering because the cloud-to-local Dot
-path and external launch recovery could change the dispatch contract. The
-orchestration implementation should consume proven contracts.
+The recovery amendment parks [draft PR #15](https://github.com/craigholland/lighthouse/pull/15)
+at `834713f006fb8962c0cd42b64825bd8c767ad509` as an experimental reference. Preserve
+its branch, history and failed evidence; do not merge, split or expand it. The
+submitted repair may receive its bounded independent review. This explicit
+exception removes the unmerged experiment from the development sequencing slot;
+it does not complete T02 or release an uncertain execution. No experiment resumes
+alongside the implementation writer. Resumption needs fresh scope/readiness and
+any consequential-action approvals. Do not implement a generic parking mechanism.
+
+Offline provider-neutral work can proceed without a proven Dot transport. Agent
+adapters consume accepted capability contracts; unavailable integration returns
+to Craig for a design decision rather than indefinite proof infrastructure.
+
+Recommended sequence and actual dependencies:
+
+```mermaid
+flowchart LR
+    T00 --> T03 --> T04 --> T05
+    T04 --> G["T06: GitHub fact mapping"]
+    T05 --> R["T06: persisted reconciliation"]
+    G --> R --> T07
+    T01 --> T07 --> T08 --> T09
+    D["Accepted minimal Dot delivery contract"] --> T08
+```
+
+Deliver T03, T04, T05, complete T06, then T07, T08 and T09. T06 fact mapping
+needs stable domain/configuration contracts; persisted reconciliation also needs
+T05. These are logical dependencies, not permission for concurrent writers or
+intermediate merges. Production dispatch and live activation retain their gates.
+
+Give each PR one explainable outcome, targeting roughly 500 changed code lines
+including tests where practical. Justify larger cohesive changes; do not split
+arbitrarily or add adjacent capabilities to an unfinished PR. Agree acceptance
+before implementation; new obligations require an explicit scope decision.
 
 Every task inherits these bounds: preserve the governing standards and
 existing consuming contracts; change only its listed surface family; exclude
@@ -101,16 +137,32 @@ current PR head, evidence, findings and next actor for independent review.
   reuse the established Dot coordinator and local-worker environment.
 - **Outcome:** establish whether MCP Events and a supported private connectivity
   path can wake Dot, obtain one local claim, and return attributable status.
-- **Acceptance:** matching notification reaches the intended coordinator and local
-  worker; duplicate delivery cannot start a second implementation. Restart, lost
-  acknowledgement, disconnected desktop and rejected delivery are visible. A
-  callback success alone never passes the worker handoff requirement.
-- **Verification:** protocol tests and an approved controlled live task, including
-  repeated delivery and unsubscribe/restart behavior. Report unsupported capabilities.
+- **Acceptance:** one supported notification reaches the existing Dot coordinator
+  and intended known local worker, which durably claims one synthetic dispatch
+  before its fixed harmless action and returns attributable evidence. Duplicate
+  delivery cannot repeat the action. Recheck trusted GitHub authority; event text
+  is not execution authority. A callback alone never passes the worker requirement.
+- **Verification:** focused protocol/claim tests and a separately approved bounded
+  live proof of that complete path and duplicate rejection. Bind destination,
+  repository/checkout, scope and dispatch; preserve secret isolation and bounded
+  owned-process cleanup. Unknown acceptance holds without retry or replacement.
+  Broader restart/disconnection/unsubscribe matrices are later hardening; this
+  does not remove basic durable no-replay, failure visibility or cleanup controls.
 - **Stop:** do not add public ingress, paid infrastructure, credentials or broader
-  permissions as a workaround. Return the concrete result to Craig.
+  permissions as a workaround. Identify the supported destination operation before
+  more implementation. Unsupported or inconclusive capability, wrong attribution,
+  deadline/cleanup failure or uncertain acceptance stops the proof and returns the
+  concrete result to Craig. No silent retry or private-interface workaround.
 
-**Gate A exit:** Craig accepts the capability evidence and any revised contracts.
+Reuse the existing trusted-Windows-account boundary. Provider-level exactly-once
+worker creation, guaranteed automatic lost-identity recovery, a protected broker
+and a separate principal are not prerequisites. Defer generalized installers,
+supervision frameworks and operator tooling; preserve useful experimental work
+without promoting it wholesale. Any simpler path still needs the controls above.
+
+**Gate A exit:** Craig accepts each capability's evidence and revised contract
+before its production adapter/dispatch uses it. Gate A is not a blanket prerequisite
+for the offline foundation below.
 RQ-04 approves this stage's planned scope and sequence, not evidence that either
 integration works. Execution follows the adopted plan after the planning PR merges
 and still requires applicable concrete live-target and connectivity/access approvals. An
@@ -119,12 +171,15 @@ unapproved transport or proceed into production dispatch.
 
 ## Gate B — Deterministic orchestration foundation
 
-Enter this stage after Craig accepts Gate A's evidence and any revised contracts.
-An unsuccessful integration proof returns to design before engine construction.
+After the recovery amendment merges, bounded offline foundation tasks may enter
+this stage after their actual dependencies and explicit readiness are satisfied.
+Use synthetic profiles/provider inputs; do not configure or activate a live
+project. An inconclusive integration blocks its adapter and live dispatch, not
+independent configuration, deterministic rules or storage work.
 
 ### T03 — Configuration and project profile boundaries
 
-- **Depends on:** accepted Gate A evidence and a bounded Issue contract defining
+- **Depends on:** T00, the merged recovery amendment and a bounded Issue contract defining
   the profile schema within this architecture. Admission conventions follow the
   approved work intake contract.
 - **Surface:** `configuration/`, inward-owned project policy/value types, inactive
@@ -172,7 +227,8 @@ An unsuccessful integration proof returns to design before engine construction.
 
 ### T06 — GitHub current-state adapter and reconciliation
 
-- **Depends on:** T03–T05 and the bounded Issue contract. Actor/readiness/linking
+- **Depends on:** T03/T04 for normalized fact mapping; T05 also for persisted
+  reconciliation/cache behavior; and the bounded Issue contract. Actor/readiness/linking
   conventions follow the approved work intake contract.
 - **Surface:** `adapters/github/`, its normalized fact mapping and adapter tests.
 - **Outcome:** retrieve complete current Issue/PR/review/merge evidence using the
@@ -190,7 +246,8 @@ An unsuccessful integration proof returns to design before engine construction.
 
 ### T07 — Coordinator and production Codex adapter
 
-- **Depends on:** T01 and T03–T06; accepted Gate A contracts.
+- **Depends on:** T01 and T03–T06; Craig-accepted Codex capability contract.
+  Dot capability is not a prerequisite for offline composition or the Codex adapter.
 - **Surface:** application coordination/dispatch contracts, explicit composition,
   `adapters/codex/`, operator status and the minimum run entry point.
 - **Outcome:** reconcile, commit intent, dispatch outside the transaction, and
@@ -204,7 +261,8 @@ An unsuccessful integration proof returns to design before engine construction.
 
 ### T08 — Production Dot bridge and revision handoffs
 
-- **Depends on:** T02 and T07; accepted connectivity and claim semantics.
+- **Depends on:** T07 and Craig's acceptance of T02's minimal supported delivery,
+  connectivity and claim contract. Stand-ins or callback capture do not satisfy it.
 - **Surface:** `adapters/dot/`, claim/status boundary, delivery metadata and tests.
 - **Outcome:** deliver authorized implementation/revision work to the established
   cloud coordinator and local worker with stable dispatch identity.
@@ -247,11 +305,12 @@ tests use synthetic payloads and controlled HTTP responses. Ordinary tests must
 not need live credentials or launch agents. Live tests require an explicit
 target, permission boundary and cleanup plan; no production secrets in fixtures.
 
-T00 will configure the exact commands in the
-[verification contract](verification-contract.md). Planned Python checks are
-pytest for behavior, Ruff for lint, and mypy for declared source scope. They are
-not current passing checks. Every PR records working directory, commands,
-results, checked commit, limitations, and the fresh review head.
+The [verification contract](verification-contract.md) owns the configured
+pytest, Ruff and mypy recipes and proportional check selection. Use focused and
+adjacent regression checks during iteration, full applicable checks at integration
+and merge checkpoints, and a second environment when the changed boundary warrants
+it. Every PR records working directory, commands, results, checked commit,
+limitations and the current review head; inspect later deltas for invalidated evidence.
 
 The minimum failure matrix covers unauthorized/blocked work, duplicate and
 reordered observations, wrong identities, stale heads, changed scope, missing

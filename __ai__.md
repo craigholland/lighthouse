@@ -32,6 +32,14 @@ The [work intake contract](docs/development/work-intake.md) governs the design o
 readiness, dependencies, captured scope, priority, and PR linkage. It is not
 implemented. Keep the foundation free of live integration behavior.
 
+The 2026-11-25 recovery amendment, effective after its documentation PR merges,
+allows bounded offline provider-neutral foundations without T02 completion.
+It parks draft PR #15 outside the implementation sequencing slot, preserves one
+active writer and ordinary merge-before-next-task rules, and never releases an
+uncertain live execution. Follow the plan's capability-specific gates and the
+verification contract's change/checkpoint selection policy. T03 still needs its
+own ready assignment; no runtime parking feature or live action is authorized.
+
 ## Allowed Dependencies
 
 The runtime depends only on the standard library. Build and development tools

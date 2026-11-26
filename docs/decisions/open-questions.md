@@ -1,7 +1,7 @@
 ---
 title: "Lighthouse Architecture Review Questions"
 created_date: 2026-11-23
-update_date: 2026-11-23
+update_date: 2026-11-25
 status: APPROVED
 ---
 
@@ -17,8 +17,8 @@ concrete live targets, access/cost and activation retain their explicit owner ga
 | --- | --- | --- | --- |
 | RQ-01 | RESOLVED | Craig accepted dedicated local Codex review sessions on 2026-11-23. Each receives durable Issue, PR and repository context; this desktop chat need not be resumed. SDK/runtime compatibility remains T01 evidence. | Codex adapter target |
 | RQ-02 | RESOLVED | Craig approved one local Python process, TOML project profiles and SQLite for the internal workflow ledger on 2026-11-23, with GitHub authoritative for repository facts. Compatible version/pinning choices are now delegated to Codex within T00/T01; concrete contracts follow the adopted architecture and bounded Issues. | Approved baseline for T00 and T05; task prerequisites still apply |
-| RQ-03 | RESOLVED | Craig approved explicit Owner/Lead readiness, dependency-complete unblocked work, one active task, captured scope and verification, reauthorization after scope changes, deterministic priority/age/Issue-number selection, explicit Issue/work-order-to-PR binding and same-PR revisions on 2026-11-23. He delegated exact label names and Issue fields to Codex, now recorded in the [work intake contract](../development/work-intake.md). | Approved admission policy for T03/T04/T06; task execution remains gated |
-| RQ-04 | RESOLVED — evidence pending | Craig approved the bounded feasibility-first stage on 2026-11-23: T00 foundation, T01 dedicated Codex review proof and T02 Dot cloud-to-local proof. Engine construction and production dispatch wait for his acceptance of the evidence; inconclusive results return for a revised design. Task execution follows overall adoption and its prerequisites; capability, new access/cost and live targets are not established by stage approval. | Approved Gate A sequence; evidence acceptance gates T03–T08 |
+| RQ-03 | RESOLVED — sequencing amended | The 2026-11-23 admission policy preserves explicit readiness, dependencies, captured scope/verification, attributed PRs/reviews, same-PR revisions and Craig-only merges. Craig's 2026-11-25 recovery approval retains one active writer and ordinary merge-before-next-task sequencing, with the explicit parked PR #15 exception below. Exact labels/fields remain delegated. | Bounded offline tasks may follow the amended plan after its PR merges; readiness is still required |
+| RQ-04 | RESOLVED — capability evidence gated | The original 2026-11-23 feasibility-first stage is amended by Craig's 2026-11-25 recovery approval: T02 no longer blocks independent offline foundation work. Production adapters/dispatch require acceptance of their own capability evidence; inconclusive provider results return for a design decision. | Capability-specific gates replace the blanket T03–T08 block; live targets/access remain separate |
 | RQ-05 | RESOLVED — activation pending | Craig approved controlled Lighthouse Issues and Dot-authored PRs for integration proofs, with ordinary review and his merge authority preserved, on 2026-11-23. Koios remains the first real configured project and stays inactive until its profile is verified. Codex verifies branches, separate checkouts, identities, labels and verification commands, keeping machine configuration private. Concrete live targets require Craig's separate approval before execution; disruptive failure cases use fakes. | Approved rollout policy; verified bindings and live-target approval still gate T01/T02/T09 |
 
 ## Package approval and execution gates
@@ -39,8 +39,34 @@ obtain during the approved feasibility stage, not a reason to assume it works.
 The approved bootstrap and merged standards already establish separate Codex and
 Dot identities/checkouts; Craig's merge authority; `development` for active work
 and `main` for releases; mandatory independent review; one active implementation
-task per project by default; no automatic merge; no next task before actual merge;
+writer per project by default; no automatic merge; ordinary next tasks wait for actual merge;
 and durable, visible workflow transitions and failures.
+
+## Recovery amendment — 2026-11-25
+
+Craig explicitly approved the Lead's recovery plan in the project conversation.
+This documentation PR records that approval; the amendment becomes effective
+when merged. It does not authorize its own merge, start T03 or accept T02.
+
+- Permit offline T03–T05 and other genuinely independent work under the
+  [revised dependencies](../development/initial-plan.md). Keep production adapter
+  capability acceptance and all concrete live-action gates.
+- Preserve PR #15 at `834713f006fb8962c0cd42b64825bd8c767ad509` as a frozen draft
+  experimental reference. No merge, split, history rewrite or new implementation;
+  the submitted repair may receive bounded independent review. Its parked state
+  does not occupy the development sequencing slot or resolve unknown execution.
+- Retain one implementation writer, normal actual-merge sequencing and independent
+  review. Lead assessment/review may overlap the writer; no concurrent experiment
+  resumption or generic runtime parking feature is approved.
+- Adopt [proportional verification](../development/verification-contract.md),
+  coherent PRs targeting roughly 500 changed code lines including tests, and
+  supported-interface feasibility decisions before further infrastructure.
+
+Preserve the accepted trusted-Windows-account model, separate identities, exact
+authority/attribution, no duplicate implementation or silent uncertain retry,
+secret isolation, bounded owned-process cleanup, honest evidence and project/core
+separation. No stronger principal/broker model, credential provisioning, tunnel,
+subscription, worker dispatch or other new live operation is approved here.
 
 The current basic GitHub protections do not establish named-reviewer or
 owner-only merge enforcement. The planned application safeguards and their
