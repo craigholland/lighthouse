@@ -38,6 +38,7 @@ from t02_selected_native_fixture import (
     FixtureCoordinatorHost,
     FixtureRoleTrace,
     fixture_provider,
+    fixture_role_start,
 )
 from t02_selected_native_roles import RPC_CAPTURED
 from test_t02_capture_lifecycle import local_observation, record
@@ -172,6 +173,21 @@ def test_fixture_role_trace_requires_independent_witnesses() -> None:
     with pytest.raises(Hold):
         trace.confirmed_stopped(40)
     assert trace.stages[-1] == "post-stop-witness-held"
+
+
+@pytest.mark.parametrize("stalled", (False, True))
+def test_fixture_role_start_publishes_before_ack_or_stall(stalled: bool) -> None:
+    calls = Mock()
+    calls.ready.return_value = True
+    calls.live.return_value = True
+    launch = fixture_role_start(calls.ready, calls.live, calls.publish, calls.stall if stalled else None)
+    assert launch(25)
+    assert [call[0] for call in calls.mock_calls] == ["ready", "live", "publish"] + (["stall"] if stalled else [])
+    calls.reset_mock()
+    calls.live.return_value = False
+    assert not launch(25)
+    calls.publish.assert_not_called()
+    calls.stall.assert_not_called()
 
 
 @_native_only

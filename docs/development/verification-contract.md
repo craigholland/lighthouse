@@ -566,3 +566,24 @@ original nonempty Jobs before stop and both roots exited with the same
 Jobs empty before cleanup cutoff. The coordinator independently retains
 minimal query/synchronization witnesses and preserves ordinary stop and
 reconciliation; failed witness collection cannot promote a result.
+
+On `f102c0f1ddb4dda09be33c7d1680ba9b61ad1805`, the renewed primary
+selected group stopped at normal (pytest exit 1, 4.37 s). The clock
+correction did not cause an observed pre-start hold: both fixed roles
+returned from startup and the synthetic RPC recorded a candidate.
+Independent pre-stop witness collection held; the terminal state was
+`cleanup-unknown`/`captured`, with a coordinator receipt at 4,221 ms
+after the 4,200 ms intake cutoff and within the original 8,000 ms cleanup
+cutoff. Exact outer coordinator exit and empty Job passed. No separate
+individual root/Job witnesses or supervisor terminal marker were obtained;
+a zero-match scoped census corroborates no survivors but is not exact
+individual shutdown proof. No later case or second environment ran.
+
+Source correlation identified a fixture defect: a normal-only early
+return bypassed exact root marker publication at role start. The common
+fixture path now publishes only after readiness and live-root observation
+for both normal and deliberate-stall cases. Only the non-normal runtime
+withholds its acknowledgement. Inert regressions exercise publication
+order and no publication on failed witness. This correction has not been
+rerun natively; neither this cause nor the clock defect is attributed to
+older uninstrumented failures. All historical results remain intact.

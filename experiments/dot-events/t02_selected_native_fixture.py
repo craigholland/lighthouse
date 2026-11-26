@@ -168,6 +168,22 @@ def supervisor_host_class(context: FixtureContext) -> type[CaptureSupervisorHost
     return FixtureSupervisorHost
 
 
+def fixture_role_start(
+    ready: Callable[[int], bool], observe: Callable[[], bool], publish: Callable[[], None],
+    stall: Callable[[], None] | None,
+) -> Callable[[int], bool]:
+    """Every scenario publishes readiness witnesses; only non-normal runtime stalls."""
+    def launch(deadline: int) -> bool:
+        if not ready(deadline) or not observe():
+            return False
+        publish()
+        if stall is not None:
+            stall()
+        return True
+
+    return launch
+
+
 def supervisor(context: FixtureContext) -> int:
     ledger, raw = trusted("supervisor")
     descriptor = ledger.descriptor
@@ -176,21 +192,25 @@ def supervisor(context: FixtureContext) -> int:
         if not context.exact(accepted.packet, descriptor.peer.intake_ms):
             raise Hold("fixture role packet differs")
         instance = (make_listener_role if listener else make_runtime_role)(accepted, job, descriptor, context)
-        if context.mode == "normal":
-            return instance
-
         stage = "listener" if listener else "runtime"
-        ready = instance.request_start
+
+        def publish() -> None:
+            if instance._witness is None:
+                raise Hold("fixture witnessed root unavailable")
+            write_marker(context.root, stage + "-root.json", {"root": instance._witness._root})
+
+        def stall() -> None:
+            # Deliberately withhold the real fixed supervisor's runtime-start acknowledgement.
+            while True:
+                time.sleep(60)
+
+        observed_start = fixture_role_start(
+            instance.request_start, instance.observes_live, publish,
+            stall if not listener and context.mode != "normal" else None,
+        )
 
         def launch(deadline: int) -> bool:
-            if not ready(deadline) or not instance.observes_live() or instance._witness is None:
-                return False
-            write_marker(context.root, stage + "-root.json", {"root": instance._witness._root})
-            if not listener and context.mode != "normal":
-                # Deliberately withhold the real fixed supervisor's runtime-start acknowledgement.
-                while True:
-                    time.sleep(60)
-            return True
+            return observed_start(deadline)
 
         instance.request_start = launch  # type: ignore[method-assign]
         return instance
