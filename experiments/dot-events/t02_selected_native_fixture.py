@@ -20,7 +20,7 @@ if __name__ == "__main__":
 
 import t02_capture_native_cutoff as native_cutoff
 from t02_capture_bootstrap import ENVIRONMENT_KEY, InheritedCapture
-from t02_capture_composition import CaptureWindow
+from t02_capture_composition import CaptureWindow, open_existing_capture
 from t02_capture_coordinator import CoordinatorRun
 from t02_capture_coordinator_windows import CaptureCoordinatorHost, owned_entry
 from t02_capture_handoff import AcceptedHandoff
@@ -201,7 +201,10 @@ def supervisor(context: FixtureContext) -> int:
         lambda accepted, job: build(accepted, job, listener=False),
         provider=fixture_provider(context), require_coordinator=True,
     )
-    write_marker(context.root, "supervisor-result.json", {"phase": terminal.phase})
+    write_marker(context.root, "supervisor-result.json", {
+        "phase": terminal.phase, "listener_attempted": terminal.listener_attempted,
+        "runtime_attempted": terminal.runtime_attempted,
+    })
     return 0 if terminal.phase == "confirmed" else 2
 
 
@@ -286,20 +289,58 @@ class CutoffObservation:
             self.k.CloseHandle(handle)
 
 
+class FixtureRoleTrace:
+    """Collect fixed stage labels without writing files during role execution."""
+
+    def __init__(self, roles: CaptureRoles) -> None:
+        self._roles = roles
+        self.stages: list[str] = []
+
+    def _step[R](self, label: str, operation: Callable[[int], R], deadline: int) -> R:
+        self.stages.append(label + "-entered")
+        try:
+            result = operation(deadline)
+        except (Hold, OSError, ValueError, KeyboardInterrupt):
+            self.stages.append(label + "-held")
+            raise
+        self.stages.append(label + ("-unconfirmed" if result is False else "-returned"))
+        return result
+
+    def arm(self, cleanup_deadline_ms: int) -> None:
+        self._step("arm", self._roles.arm, cleanup_deadline_ms)
+
+    def start_listener(self, intake_deadline_ms: int) -> None:
+        self._step("listener", self._roles.start_listener, intake_deadline_ms)
+
+    def start_runtime(self, intake_deadline_ms: int) -> None:
+        self._step("runtime", self._roles.start_runtime, intake_deadline_ms)
+
+    def wait_candidate(self, intake_deadline_ms: int) -> None:
+        self._step("candidate", self._roles.wait_candidate, intake_deadline_ms)
+
+    def signal_all(self) -> None:
+        self._step("stop", lambda _: self._roles.signal_all(), 0)
+
+    def confirmed_stopped(self, cleanup_deadline_ms: int) -> bool:
+        return self._step("reconcile", self._roles.confirmed_stopped, cleanup_deadline_ms)
+
+
 def coordinator(context: FixtureContext) -> int:
     ledger, _ = trusted("coordinator")
     cap = ledger.descriptor.peer
     setattr(native_cutoff, "CaptureSupervisorHost", supervisor_host_class(context))
     native = WindowsCaptureOwnership(context.python.with_name("python.exe"), context.wall, mono, ledger)
     observation: CutoffObservation | None = None
+    trace: FixtureRoleTrace | None = None
 
     def lane(run: CoordinatorRun) -> tuple[native_cutoff.FixedWindowsCutoff, CaptureRoles]:
-        nonlocal observation
+        nonlocal observation, trace
         fixed, roles = native.coordinator_objects(
             run.packet, run.store, CaptureWindow(cap.intake_ms, cap.cleanup_ms), run.refs,
         )
         if context.mode == "normal":
-            return fixed, roles
+            trace = FixtureRoleTrace(roles)
+            return fixed, trace
         observation = witness = CutoffObservation(context, fixed)
         original_stop = fixed.stop_due
         original_signal = roles.signal_all
@@ -377,7 +418,14 @@ def coordinator(context: FixtureContext) -> int:
 
     try:
         disposition = owned_entry(ledger.descriptor, mono, context.wall, context.evidence(), context.exact, lane)
-        write_marker(context.root, "coordinator-result.json", {"outcome": disposition, "at": mono()})
+        status = None
+        with suppress(Hold, OSError, ValueError):
+            status = open_existing_capture(context.packet).status()
+        write_marker(context.root, "coordinator-result.json", {
+            "outcome": disposition, "at": mono(),
+            "fixed_role_stages": trace.stages if trace is not None else [],
+            "durable_status": status,
+        })
         return 0
     finally:
         if observation is not None:

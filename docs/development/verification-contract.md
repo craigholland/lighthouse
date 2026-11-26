@@ -525,3 +525,12 @@ The scoped census found zero matching fixture Pythonw processes. This
 does not establish successful both-role startup or capture, nor explain
 the precise failure in the listener-to-runtime transition. No other case,
 environment, native rerun, or functional change was made in this follow-up.
+
+Read-only correlation of the retained primary fixture found durable state
+`stopped`, disposition `new`, and handoff flag `2`. The pending listener
+marker was empty. Neither a rename error nor a failure before listener
+resume follows from that evidence: the pending marker is opened only after
+the listener's readiness write. These facts support no promotion from
+`cleanup-unknown`. In-memory fixed stage labels now distinguish listener,
+runtime, candidate wait, stop and receipt reconciliation on the normal
+fixture, and terminal markers include only state labels and attempt flags.

@@ -34,7 +34,11 @@ from t02_selected_native_context import (
     read_marker,
     write_marker,
 )
-from t02_selected_native_fixture import FixtureCoordinatorHost, fixture_provider
+from t02_selected_native_fixture import (
+    FixtureCoordinatorHost,
+    FixtureRoleTrace,
+    fixture_provider,
+)
 from t02_selected_native_roles import RPC_CAPTURED
 from test_t02_capture_lifecycle import local_observation, record
 
@@ -127,6 +131,26 @@ def test_pipe_trace_fault_labels_are_fixed(operation: str, expected: str) -> Non
     with pytest.raises(Hold, match="capture private channel setup held"):
         owner.prepare(1)
     assert trace.stage == expected
+
+
+def test_fixture_role_trace_preserves_held_and_unconfirmed_results() -> None:
+    roles = Mock()
+    roles.start_runtime.side_effect = Hold("private synthetic diagnostics must not escape")
+    roles.confirmed_stopped.return_value = False
+    trace = FixtureRoleTrace(roles)
+    trace.arm(40)
+    trace.start_listener(20)
+    with pytest.raises(Hold):
+        trace.start_runtime(20)
+    trace.signal_all()
+    assert not trace.confirmed_stopped(40)
+    assert trace.stages == [
+        "arm-entered", "arm-returned", "listener-entered", "listener-returned",
+        "runtime-entered", "runtime-held", "stop-entered", "stop-returned",
+        "reconcile-entered", "reconcile-unconfirmed",
+    ]
+    roles.wait_candidate.assert_not_called()
+    roles.signal_all.assert_called_once_with()
 
 
 @_native_only
@@ -235,7 +259,13 @@ def test_fixed_selected_native_topology(tmp_path: Path, monkeypatch: pytest.Monk
     corroboration = read_marker(root, "coordinator-result.json")
     assert corroboration["outcome"] == result
     if mode == "normal":
-        assert result == "candidate-held" and reread.status() == ("stopped", "captured")
+        supervisor = read_marker(root, "supervisor-result.json") if (root / "supervisor-result.json").is_file() else {}
+        assert result == "candidate-held" and reread.status() == ("stopped", "captured"), (
+            corroboration["fixed_role_stages"], corroboration["durable_status"],
+            supervisor.get("phase"), supervisor.get("listener_attempted"), supervisor.get("runtime_attempted"),
+            (root / "listener-ready.pending").is_file(), (root / "listener-ready.json").is_file(),
+            (root / "runtime-ready.json").is_file(),
+        )
         assert (root / RPC_CAPTURED).is_file()
         assert read_marker(root, "supervisor-result.json")["phase"] == "confirmed"
     else:
