@@ -2,6 +2,7 @@
 
 from dataclasses import replace
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -89,7 +90,8 @@ def pull(
 
 def review(**extra: Any) -> dict[str, Any]:
     return {"id": 90, "user": {"id": 12}, "state": "APPROVED", "commit_id": HEAD,
-            "submitted_at": PRE, **extra}
+            "submitted_at": PRE, "pull_request_url": f"https://api.github.com/repos/{REPO}/pulls/8",
+            **extra}
 
 
 def test_realistic_observations_feed_domain_but_do_not_assert_other_authorities() -> None:
@@ -193,3 +195,43 @@ def test_unproven_merge_is_hold(
     mapper = GitHubFacts(replace(CONTEXT, work=Work(4, "order", BINDING)))
     result = mapper.normalize(replace(resources(), pull=pull(merged=True, **fields), reviews=reviews))
     assert result.hold and result.merge is None
+
+@pytest.mark.parametrize("target", [None, "", "https://api.github.com/repos/example/project/pulls/9",
+                                     "https://api.github.com/repos/other/project/pulls/8"])
+def test_review_target_must_match_before_domain_completion(target: str | None) -> None:
+    mapper = GitHubFacts(replace(CONTEXT, work=Work(4, "order", BINDING)))
+    clean = mapper.normalize(replace(resources(), pull=pull(merged=True), reviews=[review()]))
+    assert clean.candidate is not None and clean.merge is not None
+    result = mapper.normalize(replace(
+        resources(), pull=pull(merged=True), reviews=[review(pull_request_url=target)],
+    ))
+    assert result.hold == "unbound-review" and result.review is None
+    work = Work(4, "order", BINDING, 8)
+    facts = Snapshot(REPO, 2, TIME, (clean.candidate,), "order", pull=clean.pull,
+                     merge=clean.merge, review=result.review,
+                     verification=Verification(8, HEAD, "checks", "check", datetime.fromisoformat(PRE)),
+                     implementation=Execution.QUIESCENT, reviewing=Execution.QUIESCENT)
+    decision = Workflow(PROJECT).evaluate(State(REPO, 1, work), facts)
+    assert decision.outcome is Outcome.HOLD and decision.state.work == work
+
+
+def test_comment_only_template_fields_do_not_admit() -> None:
+    path = Path(__file__).resolve().parents[1] / ".github/ISSUE_TEMPLATE/implementation.md"
+    template = path.read_text(encoding="utf-8").split("---", 2)[2].strip()
+    source = resources()
+    assert isinstance(source.issue, dict)
+    binding = replace(BINDING, scope=scope_fingerprint(TITLE, template, ()))
+    context = replace(CONTEXT, readiness=ReadinessBinding(4, 100, binding))
+    result = GitHubFacts(context).normalize(replace(source, issue={**source.issue, "body": template}))
+    assert result.hold == "invalid-task-fields" and result.candidate is None
+
+
+def test_field_comments_preserve_original_fingerprint() -> None:
+    source = resources()
+    assert isinstance(source.issue, dict)
+    body = BODY.replace("Sample objective.", "<!-- Instructions -->\nSample objective.")
+    binding = replace(BINDING, scope=scope_fingerprint(TITLE, body, ()))
+    mapper = GitHubFacts(replace(CONTEXT, readiness=ReadinessBinding(4, 100, binding)))
+    result = mapper.normalize(replace(source, issue={**source.issue, "body": body}))
+    assert result.hold is None and result.candidate is not None and result.candidate.ready
+    assert result.candidate.binding == binding and result.candidate.binding != BINDING

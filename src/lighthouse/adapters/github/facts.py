@@ -146,6 +146,7 @@ def _open(resource: dict[str, Any]) -> bool:
 
 
 def _fields(body: str) -> None:
+    body = re.sub(r"<!--.*?(?:-->|\Z)", "", body, flags=re.DOTALL)
     headings = tuple(re.finditer(r"^##\s+([^\n\r]+)$", body, re.MULTILINE))
     for required in _HEADINGS:
         matches = [i for i, h in enumerate(headings) if h[1].strip() == required]
@@ -296,6 +297,9 @@ class GitHubFacts:
             if state not in ("APPROVED", "CHANGES_REQUESTED", "DISMISSED"):
                 raise _Invalid("invalid-review-state")
             if _sha(obj.get("commit_id")) == pull.head:
+                target = f"https://api.github.com/repos/{pull.repository}/pulls/{pull.number}"
+                if obj.get("pull_request_url") != target:
+                    raise _Invalid("unbound-review")
                 effective.append((_time(obj.get("submitted_at")), _id(obj.get("id")), state))
         if not effective:
             return None
