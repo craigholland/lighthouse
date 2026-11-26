@@ -319,5 +319,6 @@ class Workflow:
     ) -> Decision:
         key = (outcome, pull.head, pull.number, evidence[0])
         if key in state.action_keys:
-            return Decision(state, Outcome.UNCHANGED, "already-recommended", evidence=evidence)
+            return Decision(replace(state, outcome=outcome), Outcome.UNCHANGED,
+                            "already-recommended", evidence=evidence)
         return Workflow._decision(replace(state, action_keys=state.action_keys | {key}), outcome, reason, actor, evidence)

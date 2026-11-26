@@ -181,3 +181,27 @@ def test_missing_execution_facts_and_nonindependent_actors_hold() -> None:
     )
     invalid = Workflow(replace(PROJECT, lead=PROJECT.implementer))
     assert invalid.evaluate(state, FACTS).reason == "invalid-actor-bindings"
+
+
+
+def test_deduped_recommendations_reconcile_phase_from_current_evidence() -> None:
+    facts = replace(FACTS, version=2, pull=PULL)
+    reviewing = ENGINE.evaluate(admit(), facts)
+    approved = replace(facts, version=3, review=APPROVAL, verification=CHECK)
+    waiting = ENGINE.evaluate(reviewing.state, approved)
+    assert waiting.outcome is Outcome.AWAIT_OWNER
+
+    dismissed = ENGINE.evaluate(
+        waiting.state, replace(approved, version=4, review=replace(APPROVAL, effective=False))
+    )
+    missing = ENGINE.evaluate(waiting.state, replace(approved, version=4, verification=None))
+    assert missing.outcome is Outcome.HOLD
+    restored = ENGINE.evaluate(missing.state, replace(
+        approved, version=5, verification=replace(CHECK, evidence="fresh-check"),
+    ))
+    assert dismissed.outcome is restored.outcome is Outcome.UNCHANGED
+    assert dismissed.actor is restored.actor is None
+    assert (dismissed.state.outcome, restored.state.outcome) == (
+        Outcome.REVIEW, Outcome.AWAIT_OWNER,
+    )
+    assert dismissed.state.action_keys == restored.state.action_keys == waiting.state.action_keys
