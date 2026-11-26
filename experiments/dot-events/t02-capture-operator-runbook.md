@@ -2,7 +2,7 @@
 
 This draft is offline evidence, not authorization to execute. The checked-in
 operator prints help by default, and a complete direct execute command is held
-before the packet is opened. There is no environment setting, CLI flag or
+before the packet is opened while the fixed installation is absent. There is no environment setting, CLI flag or
 operator assertion that enables the reviewed release gate. Do not run the
 listener, pinned runtime, or provider proof until an independently reviewed
 release and separate exact owner and Lead approvals exist.
@@ -77,6 +77,38 @@ python experiments/dot-events/t02_capture_operator.py --execute --packet C:\synt
 ~~~
 
 No other arguments select a provider, command, route, credentials or policy.
+
+## Future fixed installation (planned, not performed)
+
+The [installation adapter](t02_capture_installation.py) only selects the
+fixed file named `.lighthouse-t02-capture-v1.json` beside the exact reviewed
+checkout (in its parent). No argument, environment setting, repository file,
+or alternate path selects it. Keep it absent until separate owner approval.
+Use the accepted trusted Windows account; this is not an isolation boundary
+against another process running as that same principal.
+
+The private non-secret JSON fixes version 1, scope, repository, exact local
+host and checkout, release commit, fixed ordered roles (coordinator, supervisor,
+listener), and absolute Git/interpreter/archive/runtime paths and SHA-256 pins.
+The adapter accepts only the pinned fixed Git/interpreter executable names,
+the actual source checkout, current host and running interpreter. The
+approved packet must independently match the release and runtime pins.
+No packet, key, bearer, provider address, launch command, live flag, or
+approval reference belongs in the profile.
+
+For a future separately approved installation, Codex must verify every pin
+and stage canonical bytes using `installation_plan` with synthetic verification
+completed first. The authorized operator atomically publishes those bytes
+at the exact active destination, never overwrites an existing profile, and
+re-verifies the pinned inputs and exact source approvals before execute.
+For disable, stop or confirm cessation of any already owned run first; then
+move only the exact active profile to the unused sibling named by
+`disable_plan` and verify direct entry is held. Disabling admission is not
+proof that a running role exited. No plan function performs filesystem writes.
+The child transport uses three inherited endpoint handles, or five for
+supervisor including its ordered role Jobs, and an exact run-bound ledger.
+The private install input can never replace approval, deadlines, one-use
+store state, or exact owned cleanup.
 
 ## Future staged prerequisites and stop conditions
 

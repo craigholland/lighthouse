@@ -648,3 +648,15 @@ receiver, handshake, subscribe, store and marker publication; no retry,
 private input, or raw exception is added to evidence. This slice is
 offline only; no further native attempt ran and the missing secondary
 candidate's cause remains unproven.
+
+The follow-up deployment preparation implements the fixed sibling profile,
+per-process fixed release factory and common trusted role ledger. The real
+installation remains absent. Inert unchanged executable/ordinary-file reads
+use the real hash reader; Windows ignores only the justified exact
+path-to-descriptor execute-bit projection for an .exe. Type, other mode
+bits, identity, attributes, timestamps, and both same-view checks remain.
+The assembled fake path selects the same parsed profile and exact child
+factory with synthetic facts and no actual process/provider effect. The
+selected native fixture uses that assembly and real role ledger/Windows
+object checks with its existing closed stand-ins. See the operator runbook
+for the non-secret fixed install/disable plan, not authority to perform it.

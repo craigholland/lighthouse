@@ -239,14 +239,14 @@ def test_fixed_selected_native_topology(tmp_path: Path, monkeypatch: pytest.Monk
             ipc_phase = "prepared"
             return handles
 
-    pinned = Mock(python=python)
     from dataclasses import replace
 
     observed = local_observation(packet)
-    pinned.observe.return_value = replace(
+    projection = replace(
         observed, canonical_non_reparse_files=(*observed.canonical_non_reparse_files[:-1], str(state.path)),
     )
-    bind = release.InstalledCapture(pinned, Mock())
+    bind, _ = ctx.installation(None)
+    monkeypatch.setattr(release.ReviewedHost, "observe", lambda *_: projection)
     launches: list[FixtureCoordinatorHost] = []
 
     def host(*_: object) -> FixtureCoordinatorHost:
@@ -254,7 +254,9 @@ def test_fixed_selected_native_topology(tmp_path: Path, monkeypatch: pytest.Monk
         launches.append(controller)
         return controller
 
-    monkeypatch.setattr(release, "INSTALLED_CAPTURE", bind)
+    import t02_capture_installation as installation
+
+    monkeypatch.setattr(installation, "select_installation", lambda role=None: bind if role is None else None)
     monkeypatch.setattr(release, "CaptureCoordinatorHost", host)
     monkeypatch.setattr(release, "CapturePipeOwner", DiagnosticPipeOwner)
     monkeypatch.setattr(release, "GitHubHttps", lambda _: fixture_provider(ctx))

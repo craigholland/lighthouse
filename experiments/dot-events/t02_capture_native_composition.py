@@ -6,9 +6,9 @@ import os
 import platform
 import secrets
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Final
 
 from t02_capture_bootstrap import ENVIRONMENT_KEY, InheritedCapture
 from t02_capture_composition import (
@@ -34,6 +34,7 @@ from t02_capture_packet import CapturePacket
 from t02_capture_pipe_owner import CapturePipeOwner
 from t02_capture_roles import hosted_capture_listener, hosted_capture_runtime
 from t02_capture_supervisor import HostedRole
+from t02_capture_trusted import Role
 from t02_capture_windows_ownership import WindowsCaptureOwnership
 from t02_event_https import GitHubHttps
 from t02_event_types import Hold
@@ -57,9 +58,10 @@ class ReviewedHost:
     git_sha256: str
     python: Path
     python_sha256: str
+    profile_matches: Callable[[CapturePacket], bool] = lambda _: True
 
     def observe(self, packet: CapturePacket, deadline: int) -> LocalCaptureObservation:
-        if (_canonical(self.python, directory=False) != str(self.python)
+        if (not self.profile_matches(packet) or _canonical(self.python, directory=False) != str(self.python)
             or _digest(self.python, mono, deadline) != self.python_sha256 or mono() >= deadline):
             raise Hold("capture interpreter identity held")
         return observe_local_capture(
@@ -77,16 +79,21 @@ class InstalledCapture:
     """Deployment-only binding absent from this offline draft."""
 
     host: ReviewedHost
-    native: WindowsCaptureOwnership
+    native: WindowsCaptureOwnership | None
 
 
-INSTALLED_CAPTURE: Final[InstalledCapture | None] = None
+def released_capture(role: Role | None = None) -> InstalledCapture | None:
+    from t02_capture_installation import select_installation
+
+    return select_installation(role)
 
 
 def start_supervisor(bind: InstalledCapture) -> int:
     """Use fixed listener/runtime factories; effect attempts are independently authorized by the child."""
     raw = os.environ.get(ENVIRONMENT_KEY, "")
     native = bind.native
+    if native is None:
+        return 2
     def checked(accepted: AcceptedHandoff, deadline: int) -> LocalCaptureObservation:
         observed = bind.host.observe(accepted.packet, deadline)
         if mono() >= deadline or not matches_local_capture(accepted.packet, observed):
@@ -140,6 +147,8 @@ def start_coordinator(bind: InstalledCapture) -> int:
     """Only the inherited IPC tuple enters; role Job handles are minted here."""
     raw = os.environ.get(ENVIRONMENT_KEY, "")
     native = bind.native
+    if native is None:
+        return 2
     try:
         descriptor = InheritedCapture.accept(raw, mono, native.owns_coordinator_pipe, native.owns_coordinator_stop)
         owned_entry(

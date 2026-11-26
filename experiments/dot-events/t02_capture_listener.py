@@ -133,6 +133,7 @@ def run_transferred_listener(
     *, released: Callable[[], bool],
     effect: ListenerEffectFactory | None = None,
     fixture_bearer: Callable[[], str] | None = None,
+    local: Callable[[CapturePacket, int], bool] = lambda *_: True,
 ) -> str:
     """Admit independently validated child capabilities and source approvals before I/O."""
     from t02_capture_bootstrap import InheritedCapture
@@ -180,6 +181,8 @@ def run_transferred_listener(
         not descriptor.verifies_packet_window(packet, mono, wall)
         or not evidence.allows(packet.approval, refs[0], refs[1],
                                before_ms=descriptor.approval_deadline(packet, mono, wall))
+        or not descriptor.verifies_packet_window(packet, mono, wall)
+        or not local(packet, deadline)
         or not descriptor.verifies_packet_window(packet, mono, wall)
     ):
         raise Hold("capture listener authority held")

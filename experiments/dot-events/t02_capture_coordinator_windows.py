@@ -21,6 +21,7 @@ from t02_capture_native_cutoff import FixedWindowsCutoff
 from t02_capture_packet import CapturePacket
 from t02_capture_peer import PeerBinding
 from t02_capture_pipe_owner import CapturePipeOwner
+from t02_capture_trusted import bound_child_environment
 from t02_capture_windows_pipe import WindowsCapturePipe
 from t02_event_capture import CaptureStore
 from t02_event_types import Hold
@@ -40,7 +41,7 @@ class CaptureCoordinatorHost(_OwnedWindowsJob):
 
     def start_bootstrap(self, descriptor: InheritedCapture) -> bool:
         return self._start_owned(
-            self._python, ["-I", str(_SCRIPT)], descriptor.to_environment(), descriptor.peer.intake_ms,
+            self._python, ["-I", str(_SCRIPT)], bound_child_environment("coordinator", descriptor), descriptor.peer.intake_ms,
             bind_at_creation=True, inherited=descriptor.peer.handles,
         )
 

@@ -118,29 +118,38 @@ def run_selected_capture(
 
 def released() -> bool:
     """No caller input can install the reviewed native execution binding."""
-    from t02_capture_native_composition import INSTALLED_CAPTURE
+    from t02_capture_native_composition import released_capture
 
-    return INSTALLED_CAPTURE is not None
+    return released_capture() is not None
 
 
 def execute_capture(packet: CapturePacket, owner_ref: int, lead_ref: int) -> str:
     """Enter the fixed mapping only when the exact installation is released."""
-    from t02_capture_native_composition import INSTALLED_CAPTURE, launch_coordinator
+    from t02_capture_native_composition import launch_coordinator, released_capture
 
-    if INSTALLED_CAPTURE is None:
+    binding = released_capture()
+    if binding is None:
         return "denied"
-    return launch_coordinator(INSTALLED_CAPTURE, packet, (owner_ref, lead_ref))
+    return launch_coordinator(binding, packet, (owner_ref, lead_ref))
 
 
 def run_native_listener_entry() -> int:
     """Select only the installed listener dispatcher; no environment enables it."""
-    from t02_capture_native_composition import INSTALLED_CAPTURE
+    from t02_capture_native_composition import released_capture
 
-    return 2 if INSTALLED_CAPTURE is None else INSTALLED_CAPTURE.native.listener_dispatch()
+    binding = released_capture("listener")
+    if binding is None or binding.native is None:
+        return 2
+    from t02_capture_local import matches_local_capture
+
+    return binding.native.listener_dispatch(
+        lambda packet, deadline: matches_local_capture(packet, binding.host.observe(packet, deadline)),
+    )
 
 
 def run_native_supervisor_entry() -> int:
     """Select the fixed supervisor dispatcher only from the installed binding."""
-    from t02_capture_native_composition import INSTALLED_CAPTURE, start_supervisor
+    from t02_capture_native_composition import released_capture, start_supervisor
 
-    return 2 if INSTALLED_CAPTURE is None else start_supervisor(INSTALLED_CAPTURE)
+    binding = released_capture("supervisor")
+    return 2 if binding is None else start_supervisor(binding)

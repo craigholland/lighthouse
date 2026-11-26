@@ -112,10 +112,10 @@ class WindowsCaptureOwnership:
 
     def __init__(
         self, python: Path, wall: Callable[[], int], mono: Callable[[], int], detached: DetachedCoordinator,
-        *, duplicate: Callable[[int, bool], int] = _duplicate,
+        *, duplicate: Callable[[int, bool], int] | None = None,
     ) -> None:
         self._python, self._wall, self._mono, self._detached = python, wall, mono, detached
-        self._duplicate = duplicate
+        self._duplicate = _duplicate if duplicate is None else duplicate
 
     def coordinator_objects(self, packet: CapturePacket, store: CaptureStore, window: CaptureWindow,
                             refs: tuple[int, int]) -> tuple[FixedWindowsCutoff, CaptureRoles]:
@@ -153,8 +153,9 @@ class WindowsCaptureOwnership:
     def owns_jobs(self, handles: tuple[int, int]) -> bool:
         return self._detached.owns_jobs(handles)
 
-    def listener_dispatch(self) -> int:
-        from t02_capture_composition import released
+    def listener_dispatch(
+        self, local: Callable[[CapturePacket, int], bool],
+    ) -> int:
 
         def wait_stop(handle: int, deadline: int) -> bool:
             if not self._detached.owns_listener_stop(handle):
@@ -168,7 +169,7 @@ class WindowsCaptureOwnership:
                 os.environ.get(ENVIRONMENT_KEY, ""), self._mono, self._wall,
                 self._detached.owns_listener_pipe, self._detached.owns_listener_stop,
                 lambda handles: WindowsCapturePipe(*handles, self._mono), wait_stop,
-                CaptureEvidence(GitHubHttps(self._wall), self._wall), released=released,
+                CaptureEvidence(GitHubHttps(self._wall), self._wall), released=lambda: True, local=local,
             )
             return 0 if disposition == "stopped" else 2
         except (Hold, OSError, ValueError, KeyboardInterrupt):

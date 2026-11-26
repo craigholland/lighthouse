@@ -7,9 +7,10 @@ from pathlib import Path
 
 
 def main() -> int:
-    from t02_capture_native_composition import INSTALLED_CAPTURE, start_coordinator
+    from t02_capture_native_composition import released_capture, start_coordinator
 
-    return 2 if INSTALLED_CAPTURE is None else start_coordinator(INSTALLED_CAPTURE)
+    binding = released_capture("coordinator")
+    return 2 if binding is None else start_coordinator(binding)
 
 
 if __name__ == "__main__":

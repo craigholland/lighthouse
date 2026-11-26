@@ -128,3 +128,32 @@ def test_operator_exposes_only_safe_metadata_label(
     monkeypatch.setattr(os, "fstat", fstat)
     assert operator.main(["--status", "--packet", str(private_path)]) == 1
     assert capsys.readouterr().err == "Held: Private capture packet read held at open: st_mtime_ns.\n"
+
+
+@pytest.mark.parametrize("suffix", (".exe", ".bin"))
+def test_digest_reads_unchanged_inert_artifact(tmp_path: Path, suffix: str) -> None:
+    artifact = tmp_path / ("fixture" + suffix)
+    data = b"Not an executable; read-only artifact bytes."
+    artifact.write_bytes(data)
+    assert local._digest(artifact, lambda: 0, 50) == hashlib.sha256(data).hexdigest()
+
+
+@pytest.mark.parametrize("field", ("st_mode", "st_ino", "st_mtime_ns", "st_file_attributes", "st_reparse_tag"))
+def test_windows_executable_cross_view_preserves_stable_fields(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, field: str,
+) -> None:
+    import t02_capture_file_metadata as metadata
+
+    if not hasattr(os.stat_result, field):
+        pytest.skip("platform does not expose this field")
+    artifact = tmp_path / "inert.exe"
+    artifact.write_bytes(b"fixed inert bytes")
+    monkeypatch.setattr(metadata, "platform_name", "nt")
+    path_stat = artifact.stat()
+    before = _changed(path_stat, st_mode=path_stat.st_mode | 0o111)
+    descriptor = _changed(before, st_mode=before.st_mode & ~0o111)
+    assert not changed_stable_fields(before, descriptor, path_to_descriptor=True, executable_suffix=True)
+    assert changed_stable_fields(before, descriptor, path_to_descriptor=True) == ("st_mode",)
+    assert changed_stable_fields(before, descriptor, executable_suffix=True) == ("st_mode",)
+    wrong = _changed(descriptor, **{field: getattr(descriptor, field) ^ 0o200})
+    assert changed_stable_fields(before, wrong, path_to_descriptor=True, executable_suffix=True) == (field,)

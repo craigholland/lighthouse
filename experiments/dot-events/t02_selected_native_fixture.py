@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import ctypes as c
 import importlib
-import json
 import os
 import sys
 import time
@@ -28,12 +27,10 @@ from t02_capture_host_entry import run_transferred_supervisor
 from t02_capture_lifecycle import CaptureRoles
 from t02_capture_trusted import Role, TrustedInheritedCapabilities
 from t02_capture_windows_host import CaptureSupervisorHost
-from t02_capture_windows_ownership import WindowsCaptureOwnership
 from t02_event_evidence import PublicGitHub
 from t02_event_types import Hold
 from t02_event_windows import _Accounting, _kernel
 from t02_selected_native_context import (
-    FIXTURE_LEDGER,
     FixtureContext,
     mono,
     read_marker,
@@ -49,56 +46,11 @@ class _Duplicate(Protocol):
                         inherit: bool, options: int) -> int: ...
 
 
-class _UnicodeString(c.Structure):
-    _fields_ = [("length", w.USHORT), ("maximum", w.USHORT), ("buffer", c.c_void_p)]
-
-
-def handle_checks() -> tuple[Callable[[int], bool], Callable[[int], bool], Callable[[int], bool]]:
-    k = _kernel()
-    filetype = k.GetFileType
-    filetype.restype, filetype.argtypes = w.DWORD, (w.HANDLE,)
-    query = c.WinDLL("ntdll").NtQueryObject
-    query.restype, query.argtypes = w.LONG, (w.HANDLE, w.ULONG, c.c_void_p, w.ULONG, c.c_void_p)
-
-    def is_event(handle: int) -> bool:
-        data = c.create_string_buffer(1024)
-        if query(handle, 2, c.byref(data), c.sizeof(data), None) != 0:
-            return False
-        info = _UnicodeString.from_buffer(data)
-        first = c.addressof(data)
-        pointer = info.buffer
-        return bool(
-            info.length == 10 and 10 <= info.maximum <= c.sizeof(data)
-            and pointer is not None and first <= pointer <= first + c.sizeof(data) - info.maximum
-            and c.wstring_at(pointer, 5) == "Event"
-        )
-
-    def is_job(handle: int) -> bool:
-        data = _Accounting()
-        return bool(k.QueryInformationJobObject(handle, 1, c.byref(data), c.sizeof(data), None))
-
-    return lambda handle: filetype(handle) == 3, is_event, is_job
-
-
-def trusted(role: Role) -> tuple[TrustedInheritedCapabilities, str]:
-    data: object = json.loads(os.environ.get(FIXTURE_LEDGER, ""))
-    if (not isinstance(data, dict) or set(data) != {"role", "descriptor", "jobs"}
-        or data.get("role") != role or not isinstance(data["descriptor"], str)
-        or not isinstance(data["jobs"], list) or any(type(item) is not int for item in data["jobs"])):
-        raise Hold("fixture capability ledger held")
-    pipe, stop, job = handle_checks()
-    expected = InheritedCapture.accept(data["descriptor"], mono, pipe, stop)
-    ledger = TrustedInheritedCapabilities(role, expected, tuple(data["jobs"]), pipe, stop, job)
-    raw = os.environ.get(ENVIRONMENT_KEY, "")
-    owns_pipe, owns_stop = {
-        "coordinator": (ledger.owns_coordinator_pipe, ledger.owns_coordinator_stop),
-        "supervisor": (ledger.owns_pipe, ledger.owns_stop),
-        "listener": (ledger.owns_listener_pipe, ledger.owns_listener_stop),
-    }[role]
-    observed = InheritedCapture.accept(raw, mono, owns_pipe, owns_stop)
-    if not ledger.matches(role, observed):
-        raise Hold("fixture inherited capabilities do not match launch")
-    return ledger, raw
+def trusted(role: Role, context: FixtureContext) -> tuple[TrustedInheritedCapabilities, str]:
+    _, ledger = context.installation(role)
+    if ledger is None:
+        raise Hold("fixture installed child ledger held")
+    return ledger, os.environ.get(ENVIRONMENT_KEY, "")
 
 
 class FixtureCoordinatorHost(CaptureCoordinatorHost):
@@ -185,7 +137,7 @@ def fixture_role_start(
 
 
 def supervisor(context: FixtureContext) -> int:
-    ledger, raw = trusted("supervisor")
+    ledger, raw = trusted("supervisor", context)
     descriptor = ledger.descriptor
 
     def build(accepted: AcceptedHandoff, job: int, *, listener: bool) -> FixtureRole:
@@ -364,10 +316,12 @@ def observe_after_terminal[R](
 
 
 def coordinator(context: FixtureContext) -> int:
-    ledger, _ = trusted("coordinator")
+    binding, ledger = context.installation("coordinator")
+    native = binding.native
+    if ledger is None or native is None:
+        raise Hold("fixture coordinator release held")
     cap = ledger.descriptor.peer
     setattr(native_cutoff, "CaptureSupervisorHost", supervisor_host_class(context))
-    native = WindowsCaptureOwnership(context.python.with_name("python.exe"), context.wall, mono, ledger)
     observation: CutoffObservation | None = None
     trace: FixtureRoleTrace | None = None
 

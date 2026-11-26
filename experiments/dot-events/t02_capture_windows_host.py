@@ -4,6 +4,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from t02_capture_bootstrap import InheritedCapture
+from t02_capture_trusted import bound_child_environment
 from t02_event_types import Hold
 from t02_event_windows import _OwnedWindowsJob
 
@@ -41,7 +42,7 @@ class CaptureSupervisorHost(_OwnedWindowsJob):
         if len(inherited) != 5 or min(inherited) <= 0 or len(set(inherited)) != 5:
             raise Hold("capture supervisor handle allowlist held")
         return self._start_owned(
-            self._python, ["-I", str(_HOST)], descriptor.to_environment(), descriptor.peer.intake_ms,
+            self._python, ["-I", str(_HOST)], bound_child_environment("supervisor", descriptor, jobs), descriptor.peer.intake_ms,
             bind_at_creation=True, inherited=inherited,
         )
 
@@ -55,7 +56,7 @@ class CaptureSupervisorHost(_OwnedWindowsJob):
             or supervisor_job <= 0 or supervisor_job in inherited):
             raise Hold("capture owned supervisor allowlist held")
         return self._start_owned(
-            self._python, ["-I", str(_HOST)], descriptor.to_environment(), descriptor.peer.intake_ms,
+            self._python, ["-I", str(_HOST)], bound_child_environment("supervisor", descriptor, jobs), descriptor.peer.intake_ms,
             bind_at_creation=True, inherited=inherited, preowned_job=supervisor_job,
             before_resume=before_resume,
         )
@@ -75,6 +76,6 @@ class CaptureListenerHost(_OwnedWindowsJob):
             raise Hold("capture listener startup bound differs")
         script = Path(__file__).with_name("t02_capture_listener.py")
         return self._start_owned(
-            self._python, ["-I", str(script)], descriptor.to_environment(), deadline_ms,
+            self._python, ["-I", str(script)], bound_child_environment("listener", descriptor), deadline_ms,
             bind_at_creation=True, inherited=descriptor.peer.handles, preowned_job=preowned_job,
         )

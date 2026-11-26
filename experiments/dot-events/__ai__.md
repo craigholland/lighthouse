@@ -127,3 +127,5 @@ they are not a claim of native selected-process or operational readiness.
 - [t02_capture_detached.py](t02_capture_detached.py) and [t02_capture_local_windows.py](t02_capture_local_windows.py): detached cleanup policy and bounded local evidence, tested with fakes.
 
 - [t02_capture_handoff.py](t02_capture_handoff.py), [t02_capture_transfer.py](t02_capture_transfer.py), and [t02_capture_owned_jobs.py](t02_capture_owned_jobs.py): authenticated one-use pipe transfer and two preowned Jobs; code graph remains held.
+
+The fixed private capture installation remains absent. See the [operator runbook](t02-capture-operator-runbook.md) for the versioned sibling profile and guarded install/disable planning. No selector, test flag or environment override permits an operational profile or release.

@@ -44,7 +44,10 @@ def _digest(path: Path, clock: Callable[[], int], deadline: int) -> str:
     read = 0
     with path.open("rb") as stream:
         opened = os.fstat(stream.fileno())
-        require_stable_metadata(before, opened, "capture artifact inspection held at open", path_to_descriptor=True)
+        require_stable_metadata(
+            before, opened, "capture artifact inspection held at open", path_to_descriptor=True,
+            executable_suffix=path.suffix.casefold() == ".exe",
+        )
         while clock() < deadline:
             data = stream.read(min(1024 * 1024, _MAX_ARTIFACT_BYTES - read + 1))
             if not data:

@@ -7,16 +7,23 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING
 
-from t02_capture_bootstrap import ENVIRONMENT_KEY, InheritedCapture
+from t02_capture_bootstrap import InheritedCapture
 from t02_capture_evidence import PREFIX, SCOPE, CaptureEvidence
+from t02_capture_installation import CaptureInstallation, assemble_installation
 from t02_capture_packet import CapturePacket
+from t02_capture_trusted import Role, bound_child_environment, read_child_binding
 from t02_event_evidence import API_ROOT, MAX_PROVIDER_BYTES, ProviderReply
 from t02_event_gate import LEAD, LEAD_APP, OWNER
-from t02_event_types import Hold, encode
+from t02_event_types import Hold, decode, encode
 from t02_event_windows import _OwnedWindowsJob
 
-FIXTURE_LEDGER = "LIGHTHOUSE_T02_FIXTURE_LEDGER"
+if TYPE_CHECKING:
+    from t02_capture_native_composition import InstalledCapture
+    from t02_capture_trusted import TrustedInheritedCapabilities
+
+
 FIXTURE_SCOPE = "selected-native-synthetic"
 MODES = frozenset({"normal", "stall", "no-signal", "missing-root"})
 REFS = (101, 102)
@@ -86,6 +93,32 @@ class FixtureContext:
             raise Hold("synthetic capture identity held")
         return cls(root, mode, python, started, packet)
 
+    def installation(self, role: Role | None) -> tuple[InstalledCapture, TrustedInheritedCapabilities | None]:
+        """Feed synthetic profile facts to the actual fixed release factory."""
+        fields = decode(self.packet.canonical, 8192)
+        checkout = Path(str(fields["checkout"]))
+        python = self.python.with_name("python.exe")
+        profile = CaptureInstallation.parse(encode({
+            "version": 1, "scope": SCOPE, "repository": str(fields["repository"]),
+            "roles": ["coordinator", "supervisor", "listener"],
+            "checkout": str(checkout), "host": str(fields["host"]), "release": self.packet.approval.head,
+            "git": str(self.root / "git.exe"), "git_sha256": "a" * 64,
+            "python": str(python), "python_sha256": "b" * 64,
+            "archive": fields["runtime_archive"], "archive_sha256": fields["runtime_archive_sha256"],
+            "runtime": fields["runtime_executable"], "runtime_sha256": fields["runtime_executable_sha256"],
+        }), checkout, str(fields["host"]))
+        if not profile.matches(self.packet):
+            raise Hold("fixture installation packet held")
+        ledger: TrustedInheritedCapabilities | None = None
+
+        def child(expected: Role, tick: Callable[[], int]) -> tuple[TrustedInheritedCapabilities, str]:
+            nonlocal ledger
+            ledger, raw = read_child_binding(expected, tick)
+            return ledger, raw
+
+        binding = assemble_installation(profile, python, role, bound_child=child, clocks=(mono, self.wall))
+        return binding, ledger
+
     def exact(self, packet: CapturePacket, deadline: int) -> bool:
         return packet == self.packet and mono() < deadline
 
@@ -128,7 +161,7 @@ class _SyntheticGitHub:
 
 
 def spawn_fixture(
-    host: _OwnedWindowsJob, context: FixtureContext, role: str, descriptor: InheritedCapture,
+    host: _OwnedWindowsJob, context: FixtureContext, role: Role, descriptor: InheritedCapture,
     *, jobs: tuple[int, ...] = (), preowned_job: int | None = None,
     before_resume: Callable[[int, int], None] | None = None,
 ) -> bool:
@@ -136,13 +169,9 @@ def spawn_fixture(
     if role not in {"coordinator", "supervisor"} or len(jobs) != (2 if role == "supervisor" else 0):
         raise Hold("synthetic helper role held")
     script = Path(__file__).with_name("t02_selected_native_fixture.py")
-    raw = descriptor.to_environment()
-    ledger = encode({
-        "role": role, "descriptor": raw[ENVIRONMENT_KEY], "jobs": jobs,
-    }).decode("ascii")
     return host._start_owned(
         context.python, ["-I", "-S", str(script), role, str(context.root), context.mode],
-        raw | {FIXTURE_LEDGER: ledger}, descriptor.peer.intake_ms,
+        bound_child_environment(role, descriptor, jobs), descriptor.peer.intake_ms,
         before_resume=before_resume, bind_at_creation=True, inherited=(*descriptor.peer.handles, *jobs),
         preowned_job=preowned_job,
     )

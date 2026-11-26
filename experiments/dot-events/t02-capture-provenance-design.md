@@ -1,7 +1,7 @@
 # T02 Windows capability provenance: decision note
 
 **Bounded feasibility proof decision.** The release binding and direct entry points stay disabled.
-This note specifies no installation procedure and grants no use of native
+This note grants no use of native
 processes, real capture credentials, provider access, or a live operation.
 
 ## Approved proof boundary
@@ -73,3 +73,5 @@ threat model and live operation would require separate review and approval.
 
 [lead]: https://github.com/craigholland/lighthouse/issues/5#issuecomment-7177426900
 [verify]: ../../docs/development/verification-contract.md
+
+The fixed dormant profile and future install/disable procedure are documented in the [operator runbook](t02-capture-operator-runbook.md). No real installation is selected by this draft.

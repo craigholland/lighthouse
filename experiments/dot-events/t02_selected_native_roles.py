@@ -24,11 +24,12 @@ from t02_capture_listener import run_transferred_listener
 from t02_capture_local import LocalCaptureObservation
 from t02_capture_packet import MAX_PACKET_BYTES
 from t02_capture_roles import _HostedCaptureRole, _HostedListener, _HostedRuntime
+from t02_capture_trusted import CHILD_LEDGER, bound_child_environment
 from t02_capture_windows_host import CaptureListenerHost
 from t02_capture_windows_pipe import WindowsCapturePipe
 from t02_event_types import Hold, decode, encode
 from t02_event_windows import RuntimeRole, _Accounting, _OwnedWindowsJob
-from t02_selected_native_context import FIXTURE_LEDGER, FixtureContext
+from t02_selected_native_context import FixtureContext
 
 ROLE_SCRIPT = Path(__file__).resolve()
 LISTENER_READY = "listener-ready.json"
@@ -84,11 +85,9 @@ class _ListenerHost(CaptureListenerHost):
         context = self._context
         if deadline_ms != descriptor.peer.intake_ms or preowned_job is None:
             raise Hold("fixture listener bound differs")
-        raw = descriptor.to_environment()
-        ledger = encode({"role": "listener", "descriptor": raw[ENVIRONMENT_KEY], "jobs": []}).decode("ascii")
         return self._start_owned(
             context.python, ["-I", "-S", str(ROLE_SCRIPT), "listener", str(context.root), context.mode],
-            raw | {FIXTURE_LEDGER: ledger}, deadline_ms, bind_at_creation=True,
+            bound_child_environment("listener", descriptor), deadline_ms, bind_at_creation=True,
             inherited=descriptor.peer.handles, preowned_job=preowned_job,
         )
 
@@ -199,7 +198,7 @@ def _capture_inert(
     """Exercise the real receiver using only in-memory synthetic request bytes."""
     from t02_event_capture import capture_receiver
     from t02_event_rpc import SOURCE_PATH
-    from t02_event_types import decode, encode
+    from t02_event_types import decode
     from t02_events_probe import CALLBACK, HTTP, SECRET, subscription
 
     receiver = trace_capture_stage(
@@ -274,7 +273,7 @@ class _InertReceiver:
 def _listener_main(context: FixtureContext) -> int:
     from t02_selected_native_fixture import trusted
 
-    ledger, raw = trusted("listener")
+    ledger, raw = trusted("listener", context)
     descriptor = ledger.descriptor
     if not descriptor.verifies_packet_window(context.packet, context.mono, context.wall):
         return 2
@@ -332,7 +331,7 @@ def role_main(role: str, root: Path, mode: str) -> int:
             return 2
         if role == "listener":
             return _listener_main(context)
-        if ENVIRONMENT_KEY in os.environ or FIXTURE_LEDGER in os.environ:
+        if ENVIRONMENT_KEY in os.environ or CHILD_LEDGER in os.environ:
             raise Hold("fixture runtime must not inherit the listener channel")
         if open_existing_capture(packet).status() != ("claimed", "new"):
             return 2

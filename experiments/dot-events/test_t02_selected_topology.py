@@ -263,11 +263,12 @@ def test_selected_graph_durably_captures_and_reopens_without_replay(
             assert b"synthetic.example" not in reply and b"error" in reply
             return True
         name = Path(args[1]).stem
-        assert exe.name == "python.exe" and set(values) == {ENVIRONMENT_KEY} and len(inherited) in (3, 5)
+        assert exe.name == "python.exe" and set(values) == {ENVIRONMENT_KEY, trusted.CHILD_LEDGER}
+        assert len(inherited) in (3, 5)
         dispatch = {
-            "t02_capture_coordinator_entry": lambda: selected.start_coordinator(bind),
-            "t02_capture_supervisor": lambda: selected.start_supervisor(bind),
-            "t02_capture_listener": native.listener_dispatch,
+            "t02_capture_coordinator_entry": coordinator_main,
+            "t02_capture_supervisor": run_native_supervisor_entry,
+            "t02_capture_listener": run_native_listener_entry,
         }[name]
         launched.append(name)
         def run() -> None:
@@ -283,17 +284,42 @@ def test_selected_graph_durably_captures_and_reopens_without_replay(
         thread.start()
         return True
 
-    cap = Mock()
-    for method in ("owns_pipe", "owns_stop", "owns_jobs", "owns_coordinator_pipe", "owns_coordinator_stop",
-                   "owns_listener_pipe", "owns_listener_stop"):
-        getattr(cap, method).return_value = True
+    import t02_capture_installation as installation
+    import t02_capture_trusted as trusted
+    from t02_capture_composition import (
+        run_native_listener_entry,
+        run_native_supervisor_entry,
+    )
+    from t02_capture_coordinator_entry import main as coordinator_main
+    from t02_capture_trusted import Role
+
     python = tmp_path / "python.exe"
-    native = ownership.WindowsCaptureOwnership(python, lambda: ACTIVATION, mono, cap, duplicate=duplicate)
-    host = Mock(python=python)
-    host.observe.return_value = replace(local_observation(packet), canonical_non_reparse_files=tuple(
+    python.write_bytes(b"inert executable data")
+    checkout = Path(str(fields["checkout"]))
+    profile = installation.CaptureInstallation.parse(encode({
+        "version": 1, "scope": "lighthouse-t02-callback-capture-only",
+        "repository": str(fields["repository"]), "roles": ["coordinator", "supervisor", "listener"],
+        "checkout": str(checkout), "host": str(fields["host"]), "release": packet.approval.head,
+        "git": str(tmp_path / "git.exe"), "git_sha256": "a" * 64,
+        "python": str(python), "python_sha256": "b" * 64,
+        "archive": str(fields["runtime_archive"]), "archive_sha256": fields["runtime_archive_sha256"],
+        "runtime": str(fields["runtime_executable"]), "runtime_sha256": fields["runtime_executable_sha256"],
+    }), checkout, str(fields["host"]))
+    assert profile.matches(packet)
+    observe = Mock(return_value=replace(local_observation(packet), canonical_non_reparse_files=tuple(
         str(fields[key]) for key in ("runtime_archive", "runtime_executable", "platform_key", "loopback_bearer", "state")
-    ))
-    bind = selected.InstalledCapture(host, native)
+    )))
+
+    def factory(role: Role | None = None) -> selected.InstalledCapture:
+        return installation.assemble_installation(
+            profile, python, role, bound_child=lambda selected_role, clock: trusted.read_child_binding(
+                selected_role, clock, checks=lambda: (lambda _: True, lambda _: True, lambda _: True),
+            ),
+        )
+
+    monkeypatch.setattr(selected.ReviewedHost, "observe", observe)
+    monkeypatch.setattr(installation, "select_installation", factory)
+    monkeypatch.setattr(trusted, "os", env)
     for mod in (selected, ownership, roles):
         monkeypatch.setattr(mod, "CapturePipeOwner", new_pipe)
     for mod in (coordinator, supervisor, ownership, peer, roles):
@@ -310,7 +336,6 @@ def test_selected_graph_durably_captures_and_reopens_without_replay(
         monkeypatch.setattr(mod, "os", env)
     monkeypatch.setattr(selected, "mono", mono)
     monkeypatch.setattr(selected, "wall", lambda: ACTIVATION)
-    monkeypatch.setattr(selected, "INSTALLED_CAPTURE", bind)
     monkeypatch.setattr(ownership, "_duplicate", duplicate)
     monkeypatch.setattr(ownership, "importlib", SimpleNamespace(import_module=lambda _: kernel))
     monkeypatch.setattr(windows._OwnedWindowsJob, "_start_owned", spawn)
@@ -333,7 +358,7 @@ def test_selected_graph_durably_captures_and_reopens_without_replay(
     if not current:
         assert result == "denied" and store.status() == ("prepared", "new")
         assert not launched and not stops and not members
-        host.observe.assert_not_called()
+        observe.assert_not_called()
         return
     assert result == "candidate-held", (children, launched, store.status())
     assert children == {name: 0 for name in launched if name != "runtime"}
