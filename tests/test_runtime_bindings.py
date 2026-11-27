@@ -5,12 +5,13 @@ import sqlite3
 import subprocess
 import sys
 from dataclasses import replace
+from datetime import datetime
 from hashlib import sha256
 from pathlib import Path
 
 import pytest
 from test_coordinator import CYCLE, accept, assemble, with_pull
-from test_github import HEAD, PROJECT, REPO
+from test_github import BINDING, HEAD, PRE, PROJECT, REPO
 from test_github_collection import Fake
 from test_review_http import HTTPS
 from test_t07_dispatch import commit_review
@@ -19,8 +20,16 @@ from test_t07_stdio import ACK, DONE, ENTER, EXIT, FakeSession
 from lighthouse.adapters.codex import windows_session
 from lighthouse.adapters.codex.stdio import ReviewRequest
 from lighthouse.adapters.sqlite.ledger import SQLiteLedger
+from lighthouse.application.coordinator import Bundle, Coordinator
 from lighthouse.application.review_dispatch import Stage
-from lighthouse.domain.workflow import Execution, Outcome
+from lighthouse.domain.workflow import (
+    Candidate,
+    Execution,
+    Outcome,
+    Ready,
+    Verification,
+    Workflow,
+)
 from lighthouse.operator_status import render_status
 from lighthouse.runtime_bindings import PrivateRuntimeBinding, bind_review
 
@@ -111,7 +120,7 @@ def test_selected_bindings_run_through_actual_reconciliation_and_receipts(
     assert visible["head"] == HEAD and visible["work"] == request.target.order
     if case == "workflow-hold":
         assert saved.stage is Stage.CLAIMED and not launches and not http.requests
-        assert visible["phase"] == "hold" and visible["next_actor"] == "owner"
+        assert visible["phase"] == "hold" and visible["next_actor"] == PROJECT.owner
     elif case == "incomplete-cleanup":
         assert saved.lifecycle.remote.value == "completion-unconfirmed"
         assert saved.lifecycle.cleanup.value == "owned-cleanup-unconfirmed"
@@ -143,7 +152,7 @@ def test_installed_readonly_status_and_incompatible_ledger(tmp_path: Path) -> No
     assert (result["phase"], result["issue"], result["pr"], result["head"], result["status"]) == (
         "review", 4, 8, HEAD, "pending",
     )
-    assert result["dispatch"] == request.target.dispatch and result["next_actor"] == "lead"
+    assert result["dispatch"] == request.target.dispatch and result["next_actor"] == PROJECT.lead
     known = inspect(path, "--dispatch", request.target.dispatch)
     assert json.loads(known.stdout) == result
     assert path.read_bytes() == before and str(tmp_path) not in known.stdout and str(parent) not in known.stdout
@@ -153,3 +162,58 @@ def test_installed_readonly_status_and_incompatible_ledger(tmp_path: Path) -> No
         conn.execute("PRAGMA user_version=1")
     bad = inspect(path)
     assert bad.returncode == 2 and not bad.stdout and str(path) not in bad.stderr
+
+def _installed_status(tmp_path: Path, path: Path, dispatch: str | None = None):
+    command = [sys.executable, "-I", "-m", "lighthouse", "status", "--ledger", str(path), "--project", REPO]
+    if dispatch is not None:
+        command += ["--dispatch", dispatch]
+    response = subprocess.run(command, cwd=tmp_path, capture_output=True, text=True, timeout=10, check=True)
+    assert not response.stderr and str(path) not in response.stdout
+    return json.loads(response.stdout)
+
+
+def test_installed_status_reports_latest_owner_hold_with_pending_review(tmp_path: Path) -> None:
+    path = tmp_path / "ledger"
+    ledger = SQLiteLedger.initialize(path)
+    accept(tmp_path, ledger)
+    request = commit_review(tmp_path, ledger)
+    fake = Fake()
+    with_pull(fake)
+    cycle = replace(CYCLE, version=3, revision="unknown-after-review", reviewing=Execution.UNKNOWN)
+    assert assemble(tmp_path, fake, ledger).reconcile(cycle).phase is Outcome.HOLD
+    before = path.read_bytes()
+    for dispatch in (None, request.target.dispatch):
+        data = _installed_status(tmp_path, path, dispatch)
+        assert (data["phase"], data["status"], data["decision_reason"]) == ("hold", "pending", "unknown-acceptance")
+        assert data["decision_actor"] == data["next_actor"] == PROJECT.owner
+        assert data["issue"] == 4 and data["dispatch"] == request.target.dispatch
+    assert path.read_bytes() == before
+
+
+def test_installed_historical_dispatch_uses_its_originating_issue(tmp_path: Path) -> None:
+    path = tmp_path / "ledger"
+    ledger = SQLiteLedger.initialize(path)
+    original = accept(tmp_path, ledger)
+    commit_review(tmp_path, ledger)
+    fake = Fake()
+    with_pull(fake, merged=True, approval="APPROVED")
+    check = Verification(8, HEAD, "checks", "fixture-verification", datetime.fromisoformat(PRE))
+    done = replace(CYCLE, version=3, revision="first-work-merged", verification=check)
+    assert assemble(tmp_path, fake, ledger).reconcile(done).phase is Outcome.COMPLETE
+
+    class Source:
+        def observe(self, _state, cycle):
+            ready = Ready(PROJECT.lead, "fixture-ready", BINDING, ())
+            return Bundle((Candidate(REPO, 5, cycle.now, BINDING, True, False, True, ready=ready),))
+
+    another = replace(CYCLE, version=4, revision="next-work", new_order="order-2")
+    current = Coordinator(Workflow(PROJECT), ledger, Source()).reconcile(another)
+    assert current.phase is Outcome.IMPLEMENT and current.order == "order-2"
+    before = path.read_bytes()
+    old = _installed_status(tmp_path, path, original)
+    fresh = _installed_status(tmp_path, path)
+    assert (old["issue"], old["work"], old["dispatch"]) == (4, "order", original)
+    assert (fresh["issue"], fresh["work"]) == (5, "order-2")
+    assert old["phase"] == fresh["phase"] == "implement"
+    assert old["decision_actor"] == fresh["decision_actor"] == PROJECT.implementer
+    assert path.read_bytes() == before

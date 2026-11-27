@@ -20,14 +20,15 @@ def render_status(path: Path, repository: str, dispatch: str | None) -> str:
             or (dispatch is not None and _reference(dispatch, r"[0-9a-f]{64}") is None)):
         raise ValueError("invalid status selector")
     ledger = SQLiteLedger(path, read_only=True)
-    state, intent, attempt = ledger.operator_snapshot(repository, dispatch)
-    work = state.work
+    view = ledger.operator_snapshot(repository, dispatch)
+    state, intent, attempt = view.state, view.intent, view.attempt
+    work = state.work if dispatch is None else None
     stage = attempt.stage if attempt else None
     if stage in {Stage.CLAIMED, Stage.STARTING}:
         stage = Stage.EXECUTION_UNKNOWN
     result: dict[str, object] = {
         "project": repository, "phase": state.outcome.value,
-        "issue": attempt.target.issue if attempt else work.issue if work else None,
+        "issue": view.issue,
         "work": _reference(intent.order if intent else work.order if work else None, r"[A-Za-z0-9_-]{1,100}"),
         "pr": intent.pr if intent else work.pr if work else None,
         "head": _reference(intent.head if intent else None, r"[0-9a-f]{40}"),
@@ -42,14 +43,18 @@ def render_status(path: Path, repository: str, dispatch: str | None) -> str:
             status=stage, remote=attempt.lifecycle.remote, local_cleanup=attempt.lifecycle.cleanup,
             approval_required=attempt.lifecycle.approval, causes=attempt.lifecycle.causes,
             thread=attempt.thread or None, turn=attempt.turn or None,
-            review=attempt.review_id or None, next_actor="owner" if owner else "lead",
+            review=attempt.review_id or None, dispatch_next_actor="owner" if owner else "lead",
         )
     elif intent is not None:
-        result.update(status=intent.status.value,
-                      next_actor="owner" if intent.status.value == "uncertain" else
-                      "lead" if intent.operation == "review" else "implementer")
+        result.update(status=intent.status.value)
     elif dispatch is not None:
         result.update(status="not-found")
     elif state.outcome.value == "hold":
-        result.update(status="held", next_actor="owner")
+        result.update(status="held")
+    if view.decision is not None:
+        result.update(
+            decision_reason=_reference(view.decision.reason, r"[a-z0-9-]{1,100}"),
+            decision_actor=view.decision.actor,
+            next_actor=view.decision.actor,
+        )
     return json.dumps(result, sort_keys=True)

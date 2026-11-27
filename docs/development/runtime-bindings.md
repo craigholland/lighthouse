@@ -48,7 +48,10 @@ Supply the path locally, not in a shared transcript:
 
 This opens the existing schema-v2 SQLite ledger read-only, selects the latest
 accepted reservation/dispatch or the explicit dispatch, and reports bounded
-identity and independent lifecycle facts. It cannot create, reset, migrate,
+identity and independent lifecycle facts. The selected dispatch retains the
+Issue bound at admission, even after a new reservation. Current T04 decision
+reason and numeric actor are separate; a current HOLD uses its recorded actor
+for operator guidance rather than the pending action's usual role. It cannot create, reset, migrate,
 queue, dispatch or publish. Help, version and ordinary imports are inert.
 
 ## Verification and activation boundary

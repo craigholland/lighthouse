@@ -4,7 +4,7 @@ import json
 import sqlite3
 from collections.abc import Callable, Iterator
 from contextlib import closing, contextmanager
-from dataclasses import asdict, replace
+from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 from typing import Any, TypeVar
 
@@ -31,7 +31,7 @@ from lighthouse.application.review_dispatch import (
     Stage,
     Target,
 )
-from lighthouse.domain.workflow import Binding, Outcome, State
+from lighthouse.domain.workflow import Binding, Decision, Outcome, State
 
 _VERSION = 2
 _DISPATCHING = (Outcome.IMPLEMENT, Outcome.REVIEW, Outcome.REVISE)
@@ -84,6 +84,17 @@ def _review_from(data: dict[str, Any]) -> Attempt:
     if not result.valid() or _dump(data) != _dump(asdict(result)):
         raise ValueError
     return result
+
+
+@dataclass(frozen=True)
+class OperatorSnapshot:
+    """Current durable decision and independently attributed selected dispatch."""
+
+    state: State
+    decision: Decision | None
+    intent: Intent | None
+    attempt: Attempt | None
+    issue: int | None
 
 
 class SQLiteLedger:
@@ -276,25 +287,39 @@ class SQLiteLedger:
             raise LedgerError(_REJECTED)
         return result
 
-    def operator_snapshot(self, repository: str, dispatch: str | None) -> tuple[State, Intent | None, Attempt | None]:
-        """Read an exact reference, or the current accepted reservation, consistently."""
+    def operator_snapshot(self, repository: str, dispatch: str | None) -> OperatorSnapshot:
+        """Select current guidance and original dispatch admission atomically."""
         with self._connection() as conn:
             state = self._state(conn, repository)
+            latest = conn.execute("SELECT change FROM audit WHERE repo=? AND version=?",
+                                  (repository, state.version)).fetchone()
+            decision = _load(latest[0], change_from).decision if latest else None
+            if (state.version >= 0 and decision is None) or (decision and decision.state != state):
+                raise LedgerError(_REJECTED)
+            original = None
+            for (payload,) in conn.execute("SELECT change FROM audit WHERE repo=? ORDER BY version DESC",
+                                           (repository,)):
+                event = _load(payload, change_from)
+                recorded, work = event.intent, event.decision.state.work
+                if recorded is None or work is None or recorded.order != work.order:
+                    continue
+                if dispatch is None and state.work and (work.issue, work.order) == (
+                    state.work.issue, state.work.order,
+                ):
+                    dispatch = recorded.dispatch_id
+                if (recorded.dispatch_id == dispatch and recorded.status is IntentStatus.PENDING
+                        and recorded.operation == event.decision.outcome.value):
+                    original = work.issue
+                    break
             if dispatch is None:
-                if state.work is None:
-                    return state, None, None
-                for (payload,) in conn.execute("SELECT change FROM audit WHERE repo=? ORDER BY version DESC",
-                                               (repository,)):
-                    recorded = _load(payload, change_from).intent
-                    if recorded is not None and recorded.order == state.work.order:
-                        dispatch = recorded.dispatch_id
-                        break
-                if dispatch is None:
-                    return state, None, None
+                return OperatorSnapshot(state, decision, None, None, state.work.issue if state.work else None)
             row = conn.execute("SELECT data FROM intents WHERE repo=? AND id=?",
                                (repository, dispatch)).fetchone()
-            return (state, None if row is None else self._stored_intent(dispatch, row[0]),
-                    self._attempt(conn, repository, dispatch))
+            intent = self._stored_intent(dispatch, row[0]) if row else None
+            attempt = self._attempt(conn, repository, dispatch)
+            if (intent is not None and original is None) or (attempt is not None and attempt.target.issue != original):
+                raise LedgerError(_REJECTED)
+            return OperatorSnapshot(state, decision, intent, attempt, original)
 
     def review_attempt(self, repository: str, dispatch: str) -> Attempt | None:
         """Read durable dispatch status without advancing it."""
