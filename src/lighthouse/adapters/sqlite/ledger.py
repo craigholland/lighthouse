@@ -4,7 +4,7 @@ import json
 import sqlite3
 from collections.abc import Callable, Iterator
 from contextlib import closing, contextmanager
-from dataclasses import replace
+from dataclasses import asdict, replace
 from pathlib import Path
 from typing import Any, TypeVar
 
@@ -23,9 +23,17 @@ from lighthouse.application.ledger import (
     LedgerError,
     WriteResult,
 )
-from lighthouse.domain.workflow import Outcome, State
+from lighthouse.application.review_dispatch import (
+    Attempt,
+    Cleanup,
+    Lifecycle,
+    Remote,
+    Stage,
+    Target,
+)
+from lighthouse.domain.workflow import Binding, Outcome, State
 
-_VERSION = 1
+_VERSION = 2
 _DISPATCHING = (Outcome.IMPLEMENT, Outcome.REVIEW, Outcome.REVISE)
 _SCHEMA = (
     "CREATE TABLE projects (repo TEXT PRIMARY KEY NOT NULL, state TEXT NOT NULL) STRICT",
@@ -33,6 +41,8 @@ _SCHEMA = (
     "observation TEXT NOT NULL, version INTEGER NOT NULL, change TEXT NOT NULL, "
     "PRIMARY KEY (repo, observation), UNIQUE (repo, version)) STRICT",
     "CREATE TABLE intents (id TEXT PRIMARY KEY NOT NULL, "
+    "repo TEXT NOT NULL REFERENCES projects(repo), data TEXT NOT NULL) STRICT",
+    "CREATE TABLE review_attempts (dispatch TEXT PRIMARY KEY NOT NULL REFERENCES intents(id), "
     "repo TEXT NOT NULL REFERENCES projects(repo), data TEXT NOT NULL) STRICT",
 )
 _REJECTED = "Ledger unavailable or invalid; stop and inspect the selected file without resetting it."
@@ -54,6 +64,28 @@ def _load(data: str, parse: Callable[[dict[str, Any]], _T]) -> _T:
         raise LedgerError(_REJECTED) from None
 
 
+
+_HOLDS = {
+    Stage.EXECUTION_UNKNOWN, Stage.APPROVAL_REQUIRED, Stage.CLEANUP_UNCONFIRMED,
+    Stage.UNKNOWN_AND_CLEANUP, Stage.UNAVAILABLE,
+}
+
+
+def _review_from(data: dict[str, Any]) -> Attempt:
+    raw = data["target"]
+    result = Attempt(
+        Target(raw["repository"], raw["order"], raw["dispatch"], raw["issue"], raw["pr"],
+               raw["head"], Binding(**raw["binding"])),
+        data["fingerprint"], Stage(data["stage"]), data["thread"], data["turn"], data["output"],
+        data["marker"], data["review_id"],
+        Lifecycle(Remote(data["lifecycle"]["remote"]), Cleanup(data["lifecycle"]["cleanup"]),
+                  data["lifecycle"]["approval"]),
+    )
+    if not result.valid() or _dump(data) != _dump(asdict(result)):
+        raise ValueError
+    return result
+
+
 class SQLiteLedger:
     """Explicit file adapter; each operation uses its own bounded connection."""
 
@@ -67,6 +99,8 @@ class SQLiteLedger:
                 self._state(conn, repo)
             for key, payload in conn.execute("SELECT id, data FROM intents"):
                 self._stored_intent(key, payload)
+            for dispatch, repo in conn.execute("SELECT dispatch, repo FROM review_attempts"):
+                self._attempt(conn, repo, dispatch)
 
     @classmethod
     def initialize(cls, path: Path) -> SQLiteLedger:
@@ -229,3 +263,85 @@ class SQLiteLedger:
                      for op, head, pr, _ in decision.state.action_keys - prior.action_keys
                  )))
         )
+
+    @staticmethod
+    def _attempt(conn: sqlite3.Connection, repository: str, dispatch: str) -> Attempt | None:
+        row = conn.execute(
+            "SELECT data FROM review_attempts WHERE repo=? AND dispatch=?", (repository, dispatch),
+        ).fetchone()
+        if row is None:
+            return None
+        result = _load(row[0], _review_from)
+        if (result.target.repository, result.target.dispatch) != (repository, dispatch):
+            raise LedgerError(_REJECTED)
+        return result
+
+    def review_attempt(self, repository: str, dispatch: str) -> Attempt | None:
+        """Read durable dispatch status without advancing it."""
+        with self._connection() as conn:
+            return self._attempt(conn, repository, dispatch)
+
+    def _review_current(self, conn: sqlite3.Connection, t: Target) -> bool:
+        """Read the existing T04 disposition and exact intent inside the writer boundary."""
+        state = self._state(conn, t.repository)
+        work = state.work
+        if state.outcome is not Outcome.REVIEW or work is None or (
+            work.issue, work.order, work.pr, work.binding,
+        ) != (t.issue, t.order, t.pr, t.binding):
+            return False
+        row = conn.execute("SELECT change FROM audit WHERE repo=? AND version=?",
+                           (t.repository, state.version)).fetchone()
+        if row is None:
+            raise LedgerError(_REJECTED)
+        latest = _load(row[0], change_from).decision
+        if (latest.state != state or latest.outcome not in {Outcome.REVIEW, Outcome.UNCHANGED}
+                or latest.evidence[:1] != (t.head,)):
+            return False
+        intent = conn.execute("SELECT data FROM intents WHERE repo=? AND id=?",
+                              (t.repository, t.dispatch)).fetchone()
+        return intent is not None and self._stored_intent(t.dispatch, intent[0]) == Intent(
+            t.dispatch, t.order, Outcome.REVIEW.value, t.pr, t.head,
+        )
+
+    def claim_review(self, attempt: Attempt) -> bool:
+        """Reserve only a committed review intent; any unresolved review blocks another."""
+        if attempt.stage is not Stage.CLAIMED or not attempt.valid():
+            return False
+        t = attempt.target
+        with self._connection(write=True) as conn:
+            if not self._review_current(conn, t):
+                return False
+            for (saved_id,) in conn.execute("SELECT dispatch FROM review_attempts WHERE repo=?", (t.repository,)):
+                old = self._attempt(conn, t.repository, saved_id)
+                if old is None or old.target.dispatch == t.dispatch or old.stage not in {Stage.COMMENTED, Stage.STALE}:
+                    return False
+            conn.execute("INSERT INTO review_attempts VALUES (?, ?, ?)",
+                         (t.dispatch, t.repository, _dump(asdict(attempt))))
+            return True
+
+    def advance_review(self, expected: Attempt, updated: Attempt) -> bool:
+        """Compare-and-set a single stage; never mutate the accepted identity."""
+        t = expected.target
+        allowed = {
+            Stage.CLAIMED: {Stage.STARTING, *_HOLDS},
+            Stage.STARTING: {Stage.ACCEPTED, *_HOLDS},
+            Stage.ACCEPTED: {Stage.COMPLETED, *_HOLDS},
+            Stage.CLEANUP_UNCONFIRMED: {Stage.COMPLETED},
+            Stage.COMPLETED: {Stage.PUBLISHING, Stage.STALE},
+            Stage.PUBLISHING: {Stage.COMMENTED},
+        }
+        if (not updated.valid() or updated.target != t or updated.fingerprint != expected.fingerprint
+                or updated.stage not in allowed.get(expected.stage, set())
+                or (updated.stage is not Stage.ACCEPTED
+                    and (updated.thread, updated.turn) != (expected.thread, expected.turn))
+                or (expected.output and updated.output != expected.output)
+                or (expected.marker and updated.marker != expected.marker)):
+            return False
+        with self._connection(write=True) as conn:
+            if self._attempt(conn, t.repository, t.dispatch) != expected:
+                return False
+            if updated.stage is Stage.STARTING and not self._review_current(conn, t):
+                return False
+            conn.execute("UPDATE review_attempts SET data=? WHERE repo=? AND dispatch=?",
+                         (_dump(asdict(updated)), t.repository, t.dispatch))
+            return True

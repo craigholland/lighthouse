@@ -29,7 +29,7 @@ report a new action. Incomplete observations preserve the last confirmed
 durable phase and reservation and return a fixed hold reason. Intent status
 is inspectable, never permission to execute it.
 
-No CLI, scheduling, provider execution, dispatch, publication or merge
-path is supplied. The assembled tests use fake HTTP and real temporary SQLite
-cache and ledger files. They do not demonstrate live compatibility,
-execution or post-commit receipt handling.
+The reconciler itself does not dispatch, publish or merge. The separately
+composed [dormant review-dispatch slice](review-dispatch.md) consumes committed
+REVIEW intents, with fake I/O in integrated tests. No tested provider path is
+live and no scheduling or CLI activation is supplied.

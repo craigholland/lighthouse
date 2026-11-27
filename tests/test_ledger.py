@@ -197,7 +197,7 @@ def test_initialize_is_deliberate_and_rejected_files_are_not_reset(tmp_path: Pat
 
 
 @pytest.mark.parametrize("modification", [
-    "PRAGMA user_version=2", "UPDATE projects SET state='{}'", "UPDATE intents SET data='{}'",
+    "PRAGMA user_version=1", "UPDATE projects SET state='{}'", "UPDATE intents SET data='{}'",
 ])
 def test_rejects_unsupported_version_and_malformed_state(tmp_path: Path, modification: str) -> None:
     path = tmp_path / "ledger.db"

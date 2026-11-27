@@ -28,5 +28,7 @@ This documentation change starts no T03 assignment or live operation.
   tasks, dependencies, acceptance, verification, and approval gates.
 - [Work intake contract](development/work-intake.md): approved admission policy
   and label/Issue-field conventions selected under Craig's delegation.
+- [Dormant Codex review dispatch](development/review-dispatch.md): offline
+  exact-head intent, execution/publishing boundaries and recovery limits.
 - [Decision register](decisions/open-questions.md): adopted choices, approval
   history and future execution/evidence gates.
