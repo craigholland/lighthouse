@@ -51,7 +51,10 @@ accepted reservation/dispatch or the explicit dispatch, and reports bounded
 identity and independent lifecycle facts. The selected dispatch retains the
 Issue bound at admission, even after a new reservation. Current T04 decision
 reason and numeric actor are separate; a current HOLD uses its recorded actor
-for operator guidance rather than the pending action's usual role. It cannot create, reset, migrate,
+for operator guidance rather than the pending action's usual role. The original
+assignee of a pending dispatch remains visible across duplicate recommendations.
+When that same action remains current, its assignee is the next actor even
+though the latest observation issued no new recommendation. It cannot create, reset, migrate,
 queue, dispatch or publish. Help, version and ordinary imports are inert.
 
 ## Verification and activation boundary

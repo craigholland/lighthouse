@@ -95,6 +95,7 @@ class OperatorSnapshot:
     intent: Intent | None
     attempt: Attempt | None
     issue: int | None
+    assignee: int | None = None
 
 
 class SQLiteLedger:
@@ -296,7 +297,7 @@ class SQLiteLedger:
             decision = _load(latest[0], change_from).decision if latest else None
             if (state.version >= 0 and decision is None) or (decision and decision.state != state):
                 raise LedgerError(_REJECTED)
-            original = None
+            original = assignee = None
             for (payload,) in conn.execute("SELECT change FROM audit WHERE repo=? ORDER BY version DESC",
                                            (repository,)):
                 event = _load(payload, change_from)
@@ -309,7 +310,7 @@ class SQLiteLedger:
                     dispatch = recorded.dispatch_id
                 if (recorded.dispatch_id == dispatch and recorded.status is IntentStatus.PENDING
                         and recorded.operation == event.decision.outcome.value):
-                    original = work.issue
+                    original, assignee = work.issue, event.decision.actor
                     break
             if dispatch is None:
                 return OperatorSnapshot(state, decision, None, None, state.work.issue if state.work else None)
@@ -319,7 +320,7 @@ class SQLiteLedger:
             attempt = self._attempt(conn, repository, dispatch)
             if (intent is not None and original is None) or (attempt is not None and attempt.target.issue != original):
                 raise LedgerError(_REJECTED)
-            return OperatorSnapshot(state, decision, intent, attempt, original)
+            return OperatorSnapshot(state, decision, intent, attempt, original, assignee)
 
     def review_attempt(self, repository: str, dispatch: str) -> Attempt | None:
         """Read durable dispatch status without advancing it."""

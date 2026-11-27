@@ -217,3 +217,32 @@ def test_installed_historical_dispatch_uses_its_originating_issue(tmp_path: Path
     assert old["phase"] == fresh["phase"] == "implement"
     assert old["decision_actor"] == fresh["decision_actor"] == PROJECT.implementer
     assert path.read_bytes() == before
+
+def test_installed_status_retains_original_review_assignee_on_unchanged_and_recovery(tmp_path: Path) -> None:
+    path = tmp_path / "ledger"
+    ledger = SQLiteLedger.initialize(path)
+    accept(tmp_path, ledger)
+    request = commit_review(tmp_path, ledger)
+    original = ledger.intents(REPO)
+    for version, execution, expected_actor, decision_actor in (
+        (3, Execution.QUIESCENT, PROJECT.lead, None),
+        (4, Execution.UNKNOWN, PROJECT.owner, PROJECT.owner),
+        (5, Execution.QUIESCENT, PROJECT.lead, None),
+    ):
+        fake = Fake()
+        with_pull(fake)
+        cycle = replace(CYCLE, version=version, revision=f"later-observation-{version}", reviewing=execution)
+        status = assemble(tmp_path, fake, ledger).reconcile(cycle)
+        assert status.phase is (Outcome.HOLD if execution is Execution.UNKNOWN else Outcome.REVIEW)
+        before = path.read_bytes()
+        for selector in (None, request.target.dispatch):
+            view = _installed_status(tmp_path, path, selector)
+            assert view["status"] == "pending" and view["dispatch"] == request.target.dispatch
+            assert view["issue"] == request.target.issue and view["work"] == request.target.order
+            assert view["dispatch_next_actor"] == PROJECT.lead and view["next_actor"] == expected_actor
+            assert view["decision_actor"] == decision_actor
+            assert view["decision_reason"] == (
+                "unknown-acceptance" if execution is Execution.UNKNOWN else "already-recommended"
+            )
+        assert path.read_bytes() == before
+        assert SQLiteLedger(path).intents(REPO) == original

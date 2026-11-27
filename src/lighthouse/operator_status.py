@@ -5,7 +5,9 @@ import re
 from pathlib import Path
 
 from lighthouse.adapters.sqlite.ledger import SQLiteLedger
+from lighthouse.application.ledger import IntentStatus
 from lighthouse.application.review_dispatch import Stage
+from lighthouse.domain.workflow import Outcome
 
 _REPOSITORY = re.compile(r"[A-Za-z0-9_.-]{1,100}/[A-Za-z0-9_.-]{1,100}")
 
@@ -47,14 +49,29 @@ def render_status(path: Path, repository: str, dispatch: str | None) -> str:
         )
     elif intent is not None:
         result.update(status=intent.status.value)
+        if intent.status is IntentStatus.PENDING:
+            result["dispatch_next_actor"] = view.assignee
     elif dispatch is not None:
         result.update(status="not-found")
     elif state.outcome.value == "hold":
         result.update(status="held")
     if view.decision is not None:
+        decision = view.decision
+        next_actor = decision.actor
+        # An unchanged observation can preserve approval of the same outstanding action,
+        # but cannot borrow guidance from a different work order, PR, or head.
+        if (
+            next_actor is None and state.outcome is not Outcome.HOLD
+            and decision.outcome is Outcome.UNCHANGED and decision.reason == "already-recommended"
+            and intent is not None and intent.status is IntentStatus.PENDING and attempt is None
+            and state.work is not None and (state.work.issue, state.work.order) == (view.issue, intent.order)
+            and state.outcome.value == intent.operation and state.work.pr == intent.pr
+            and (intent.head is None or decision.evidence[:1] == (intent.head,))
+        ):
+            next_actor = view.assignee
         result.update(
             decision_reason=_reference(view.decision.reason, r"[a-z0-9-]{1,100}"),
             decision_actor=view.decision.actor,
-            next_actor=view.decision.actor,
+            next_actor=next_actor,
         )
     return json.dumps(result, sort_keys=True)
