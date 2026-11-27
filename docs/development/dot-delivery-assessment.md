@@ -2,12 +2,12 @@
 
 **Decision: no-go for production T08.** The complete Lighthouse-to-existing-Dot
 delivery path is **not established**. The supported pieces are event
-notification and local work on a connected and permitted device. Neither the
-public contract nor the inspected capability metadata exposes a supported
+notification and local work on a connected and permitted device. The
+reviewed public documentation establishes no supported
 operation for Lighthouse to submit a specific revision to the existing Dot
 and bind it to the intended local worker under a receiver-owned durable
 claim. Optional provider lookup is not the blocker. This is a conclusion about the reviewed
-surface, not a claim that OpenAI cannot provide such an operation elsewhere.
+public documentation, not a claim that OpenAI cannot provide such an operation elsewhere.
 
 Recommend keeping the existing Craig-to-Dot handoff while retaining Lighthouse
 as the source of reconciliation evidence. Do not add a bridge to compensate
@@ -16,9 +16,7 @@ for the missing operation.
 ## What is supported
 
 Public OpenAI product documentation reviewed on 2026-11-27 is rolling
-documentation; no fixed product revision is exposed on these pages. The local
-capability inspection below is a same-date observation, not a supported API
-version or a promise about other accounts.
+documentation; no fixed product revision is exposed on these pages.
 
 | Surface and operation | Where it goes and what it acknowledges | Missing for this path |
 | --- | --- | --- |
@@ -26,41 +24,14 @@ version or a promise about other accounts.
 | [Local computer access for Work Cloud and dots](https://learn.chatgpt.com/docs/enterprise/cloud-local-access): grant a Dot access to a connected computer through its desktop settings and use that access for supported local tasks. | The grant makes a specific computer eligible. Offline leaves the grant intact but blocks work requiring the device. Disconnect or revocation does not attest that an in-flight local effect stopped; local work does not automatically migrate to cloud. | This is an access and execution capability, not a public Lighthouse submission or dispatch-key status operation. |
 | [Secure MCP Tunnel](https://developers.openai.com/api/docs/guides/secure-mcp-tunnels): connect supported OpenAI products to a private MCP server over an outbound tunnel. | A Platform tunnel, runtime key, reachable private server, correct associations and tunnel and workspace permissions are separate prerequisites. | Establishes connectivity if configured; does not establish a custom event path in this account, select a worker, or provide a claim or cleanup receipt. |
 
-### Inert capability observations in the authorized context
+### Evidence limits
 
-These are separate operations on the authenticated Dot surface, not a public
-Lighthouse API. The table describes their selectors and returned references
-in capability terms; the internal interface and schema are not a public
-contract. None of these task or event operations was called for this pass.
-
-| Inspected operation | Selection or receipt | Limit |
-| --- | --- | --- |
-| Execution environment inventory | Exact connected-computer reference and connection state, distinct from cloud execution. | Visibility is not admission or binding of a task. |
-| Create a new local child task | Select an exact eligible computer and request an absolute working directory; acknowledgement returns the new task reference. | Requires the authorized Dot context. A requested directory is not proof of the effective checkout or of an existing worker's durable claim. No external submission operation was established. |
-| Read an admitted task's status | Use its exact returned task reference for status or recorded outcome. | Cannot recover a lost reference by Lighthouse dispatch ID; listing is not a receipt. |
-| Discover event sources | Enumerates supported named built-in sources in the inspected context. | No custom MCP selector or subscription inventory was exposed. The public signed callback above is notification, not authenticated task admission. |
-
-- A connected local computer was visible separately from the cloud one.
-  Manual local task creation can select an eligible computer and request a
-  checkout directory for a **new** child. This is distinct from an external
-  caller submitting an idempotent task to a bound implementation worker.
-- The task reference returned by successful admission can be used for exact
-  status or recorded outcome. A list/search result is not that receipt.
-  No caller-supplied idempotency key, reserve-before-effect operation, or
-  authoritative lookup by Lighthouse dispatch ID was exposed by the inspected
-  creation/read surfaces. If the admission response is lost, no safe automatic
-  re-submission follows. Neither disconnection nor a task stop action proves
-  that a particular local effect ceased.
-- Visible event-source metadata covers named built-in connectors. It did not
-  expose a custom MCP source, subscription selector or connection inventory.
-  An execution preference is not proof of a custom event trigger, the active
-  checkout, or the identity of a local worker. Account eligibility and
-  interoperability were not tested.
-
-No notification, subscription, tunnel, local task, cancellation, provider SDK,
-or integration runtime was invoked in this assessment. Existing access was
-observed, not modified. Checkout/GitHub collaboration for this documentation PR
-is not bridge operation evidence.
+Internal capability observations cannot be independently verified from public
+sources, so their selectors, receipts, and omissions are not evidence for this
+recommendation. The no-go is based on the public operations linked above and
+the retained Lighthouse evidence below. The assessment did not test account
+eligibility or interoperability and did not invoke a notification, subscription,
+tunnel, local task, cancellation, SDK, or integration runtime.
 
 ## What Lighthouse has actually shown
 
