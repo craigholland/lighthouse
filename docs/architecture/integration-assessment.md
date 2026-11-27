@@ -82,6 +82,11 @@ resource under the architecture approval alone. Craig must approve the concrete 
 requirements are known. If the candidate fails, record the blocker and return
 to Craig before selecting another transport.
 
+The [T08 delivery assessment](../development/dot-delivery-assessment.md)
+found no established end-to-end operation for the current Dot and intended
+local worker. Keep manual handoffs; no bridge or T02 resumption is approved
+by the assessment.
+
 ## GitHub observation strategy
 
 The repository activity feed can be delayed by up to six hours and is bounded

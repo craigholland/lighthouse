@@ -98,7 +98,8 @@ python -m venv .venv
 .\.venv\Scripts\python.exe -m lighthouse --version
 ```
 
-The CLI only shows help or the installed package version; unsupported arguments
+The CLI shows help, the installed package version, or `status` for an existing ledger;
+unsupported arguments
 are rejected. It has no runtime third-party dependencies and does not start
 orchestration or contact providers. See the
 [verification contract](docs/development/verification-contract.md) for
