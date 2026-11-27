@@ -8,7 +8,7 @@ verification evidence belongs to the PR and identifies its checked commit.
 ## Scope
 
 Tracked documentation, the Python foundation under `src/lighthouse/`, and its
-tests and packaging/tool configuration. The offline Codex review experiment has a narrower local contract. Local virtual environments, IDE
+tests and packaging/tool configuration. The Codex review experiment and Dot Events assessment have narrower local contracts. Local virtual environments, IDE
 settings, credentials, and Git internals are outside this scope.
 
 ## Purpose
@@ -74,6 +74,7 @@ composition, runtime or publishing authority.
 - [tests/test_cli.py](tests/test_cli.py): tests the real installed entry point.
 - [docs/README.md](docs/README.md): index of the adopted architecture and plan.
 - [Codex review experiment](experiments/codex-review/__ai__.md): offline recovery evidence and one exact-head controlled live proof, not production readiness.
+- [Dot Events assessment](experiments/dot-events/__ai__.md): Phase A evidence, an offline known-worker proof and a worker-free event probe; live notification-to-local-worker handoff remains unproven.
 - [Verification contract](docs/development/verification-contract.md): commands and evidence limits.
 
 ## Known Gaps / Future-State Notes
