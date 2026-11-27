@@ -15,7 +15,7 @@ settings, credentials, and Git internals are outside this scope.
 
 Maintain the governing standards and development foundation for a reusable
 development-orchestration project. The installable package currently exposes
-only CLI help and version. Distinguish approved design from implemented
+CLI help, version and read-only existing-ledger status. Distinguish approved design from implemented
 behavior and demonstrated integration capability.
 
 ## Architectural Rules
@@ -78,6 +78,7 @@ composition, runtime or publishing authority.
 
 ## Known Gaps / Future-State Notes
 
+The [dormant concrete bindings](docs/development/runtime-bindings.md) require separately approved private inputs.
 No runnable production orchestration engine, active
 provider bindings or CI are implemented. The separately gated T01 experiment is not
 a production integration. Compatibility is targeted to CPython 3.14.x on Windows
