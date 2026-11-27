@@ -4,9 +4,9 @@
 delivery path is **not established**. The supported pieces are event
 notification and local work on a connected and permitted device. Neither the
 public contract nor the inspected capability metadata exposes a supported
-operation for Lighthouse to submit a specific revision to the existing Dot,
-bind it to the intended local worker and retrieve that worker's durable claim
-using Lighthouse's own dispatch ID. This is a conclusion about the reviewed
+operation for Lighthouse to submit a specific revision to the existing Dot
+and bind it to the intended local worker under a receiver-owned durable
+claim. Optional provider lookup is not the blocker. This is a conclusion about the reviewed
 surface, not a claim that OpenAI cannot provide such an operation elsewhere.
 
 Recommend keeping the existing Craig-to-Dot handoff while retaining Lighthouse
@@ -27,6 +27,18 @@ version or a promise about other accounts.
 | [Secure MCP Tunnel](https://developers.openai.com/api/docs/guides/secure-mcp-tunnels): connect supported OpenAI products to a private MCP server over an outbound tunnel. | A Platform tunnel, runtime key, reachable private server, correct associations and tunnel and workspace permissions are separate prerequisites. | Establishes connectivity if configured; does not establish a custom event path in this account, select a worker, or provide a claim or cleanup receipt. |
 
 ### Inert capability observations in the authorized context
+
+These are separate operations on the authenticated Dot surface, not a public
+Lighthouse API. The table describes their selectors and returned references
+in capability terms; the internal interface and schema are not a public
+contract. None of these task or event operations was called for this pass.
+
+| Inspected operation | Selection or receipt | Limit |
+| --- | --- | --- |
+| Execution environment inventory | Exact connected-computer reference and connection state, distinct from cloud execution. | Visibility is not admission or binding of a task. |
+| Create a new local child task | Select an exact eligible computer and request an absolute working directory; acknowledgement returns the new task reference. | Requires the authorized Dot context. A requested directory is not proof of the effective checkout or of an existing worker's durable claim. No external submission operation was established. |
+| Read an admitted task's status | Use its exact returned task reference for status or recorded outcome. | Cannot recover a lost reference by Lighthouse dispatch ID; listing is not a receipt. |
+| Discover event sources | Enumerates supported named built-in sources in the inspected context. | No custom MCP selector or subscription inventory was exposed. The public signed callback above is notification, not authenticated task admission. |
 
 - A connected local computer was visible separately from the cloud one.
   Manual local task creation can select an eligible computer and request a
@@ -90,8 +102,13 @@ provider API.
 3. **Single durable claim.** Reserve before any effect. Duplicate or reordered
    delivery under the same stable ID may only return the existing reservation
    or outcome. A second writer cannot claim while the first is reserved.
-   The coordinator must be able to reconcile the exact claim by stable ID
-   without relying on successful delivery of the first response.
+   The Lighthouse/receiver-owned claim and duplicate protection are required.
+   A provider idempotency key or lookup by dispatch ID can aid exact
+   reconciliation but is optional: if the first acknowledgement is lost,
+   reconcile from exact evidence where available or persist an unknown
+   attention hold. The [T02 recovery amendment](initial-plan.md) and
+   [system architecture](../architecture/proposal.md) do not require
+   guaranteed automatic recovery of a lost provider identity.
 4. **Receipt and status.** Include the stable dispatch ID and attributable
    receipt, with run/worker reference only when identified. Observe the known
    run by that exact reference, keeping worker completion separate from
@@ -119,8 +136,8 @@ Issue or revision in the existing Dot conversation. Dot can use its selected
 local checkout, report the PR and head, and leave independent review and merging
 where they are. This adds no access or subscription cost and preserves the
 current role model, but does not remove the manual handoff. Retain the automated
-Dot dispatch gate and seek a supported dispatch-key-to-local-claim contract
-before reconsidering it.
+Dot dispatch gate and seek supported existing-Dot/worker targeting paired with
+a durable receiver claim and reconcile-or-hold recovery before reconsidering it.
 
 One alternative worth evaluating **only if Craig chooses to change the role
 model** is the [Workspace Agents trigger API](https://developers.openai.com/workspace-agents/trigger-runs).
@@ -135,7 +152,9 @@ exercise it.
 
 No end-to-end trial is justified on the reviewed route. Reconsider one exact,
 separately owner-approved harmless trial only when a supported operation can
-bind the intended worker and correlate its claim after an acknowledgement gap.
+bind the intended worker with a durable receiver-owned claim. Demonstrate that
+an acknowledgement gap either reconciles to exact evidence or leaves a durable
+attention hold with no replay or replacement; provider lookup is not required.
 Full T07 operational acceptance, T02 production capability acceptance, and
 T08 implementation, setup and execution remain gated; no proof is accepted
 or authority granted by this assessment.
