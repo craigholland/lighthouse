@@ -23,7 +23,14 @@ from lighthouse.application.ledger import (
     LedgerError,
     WriteResult,
 )
-from lighthouse.application.review_dispatch import Attempt, Stage, Target
+from lighthouse.application.review_dispatch import (
+    Attempt,
+    Cleanup,
+    Lifecycle,
+    Remote,
+    Stage,
+    Target,
+)
 from lighthouse.domain.workflow import Binding, Outcome, State
 
 _VERSION = 2
@@ -71,6 +78,8 @@ def _review_from(data: dict[str, Any]) -> Attempt:
                raw["head"], Binding(**raw["binding"])),
         data["fingerprint"], Stage(data["stage"]), data["thread"], data["turn"], data["output"],
         data["marker"], data["review_id"],
+        Lifecycle(Remote(data["lifecycle"]["remote"]), Cleanup(data["lifecycle"]["cleanup"]),
+                  data["lifecycle"]["approval"]),
     )
     if not result.valid() or _dump(data) != _dump(asdict(result)):
         raise ValueError
@@ -272,23 +281,35 @@ class SQLiteLedger:
         with self._connection() as conn:
             return self._attempt(conn, repository, dispatch)
 
+    def _review_current(self, conn: sqlite3.Connection, t: Target) -> bool:
+        """Read the existing T04 disposition and exact intent inside the writer boundary."""
+        state = self._state(conn, t.repository)
+        work = state.work
+        if state.outcome is not Outcome.REVIEW or work is None or (
+            work.issue, work.order, work.pr, work.binding,
+        ) != (t.issue, t.order, t.pr, t.binding):
+            return False
+        row = conn.execute("SELECT change FROM audit WHERE repo=? AND version=?",
+                           (t.repository, state.version)).fetchone()
+        if row is None:
+            raise LedgerError(_REJECTED)
+        latest = _load(row[0], change_from).decision
+        if (latest.state != state or latest.outcome not in {Outcome.REVIEW, Outcome.UNCHANGED}
+                or latest.evidence[:1] != (t.head,)):
+            return False
+        intent = conn.execute("SELECT data FROM intents WHERE repo=? AND id=?",
+                              (t.repository, t.dispatch)).fetchone()
+        return intent is not None and self._stored_intent(t.dispatch, intent[0]) == Intent(
+            t.dispatch, t.order, Outcome.REVIEW.value, t.pr, t.head,
+        )
+
     def claim_review(self, attempt: Attempt) -> bool:
         """Reserve only a committed review intent; any unresolved review blocks another."""
         if attempt.stage is not Stage.CLAIMED or not attempt.valid():
             return False
         t = attempt.target
         with self._connection(write=True) as conn:
-            work = self._state(conn, t.repository).work
-            if work is None or (work.issue, work.order, work.pr, work.binding) != (
-                t.issue, t.order, t.pr, t.binding,
-            ):
-                return False
-            row = conn.execute("SELECT data FROM intents WHERE repo=? AND id=?",
-                               (t.repository, t.dispatch)).fetchone()
-            if row is None:
-                return False
-            intent = self._stored_intent(t.dispatch, row[0])
-            if intent != Intent(t.dispatch, t.order, Outcome.REVIEW.value, t.pr, t.head):
+            if not self._review_current(conn, t):
                 return False
             for (saved_id,) in conn.execute("SELECT dispatch FROM review_attempts WHERE repo=?", (t.repository,)):
                 old = self._attempt(conn, t.repository, saved_id)
@@ -318,6 +339,8 @@ class SQLiteLedger:
             return False
         with self._connection(write=True) as conn:
             if self._attempt(conn, t.repository, t.dispatch) != expected:
+                return False
+            if updated.stage is Stage.STARTING and not self._review_current(conn, t):
                 return False
             conn.execute("UPDATE review_attempts SET data=? WHERE repo=? AND dispatch=?",
                          (_dump(asdict(updated)), t.repository, t.dispatch))

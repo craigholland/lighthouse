@@ -23,14 +23,16 @@ from lighthouse.adapters.sqlite.ledger import SQLiteLedger
 from lighthouse.application.ledger import LedgerError
 from lighthouse.application.review_dispatch import (
     Attempt,
+    Cleanup,
     Completion,
+    Remote,
     ReviewDispatch,
     ReviewInput,
     Stage,
     Status,
     Target,
 )
-from lighthouse.domain.workflow import Outcome
+from lighthouse.domain.workflow import Execution, Outcome
 from lighthouse.review_composition import compose_review_dispatch
 
 
@@ -276,3 +278,75 @@ def test_rolled_back_review_recommendation_cannot_launch(tmp_path: Path, monkeyp
                           "Review only the configured application.", "Synthetic rollback evidence.")
     assert edges.build().start(request).stage is Stage.HELD
     assert not edges.queue and not edges.sessions and not edges.posts
+
+
+@pytest.mark.parametrize("already_queued", [False, True])
+def test_newer_durable_hold_gates_dispatch(tmp_path: Path, already_queued: bool) -> None:
+    path = tmp_path / "ledger"
+    ledger = SQLiteLedger.initialize(path)
+    accept(tmp_path, ledger)
+    request = commit_review(tmp_path, ledger)
+    edges = Edges(path)
+    service = edges.build()
+    if already_queued:
+        assert service.start(request).stage is Stage.EXECUTION_UNKNOWN
+    fake = Fake()
+    with_pull(fake)
+    held = replace(CYCLE, revision="workflow-hold", version=3, reviewing=Execution.UNKNOWN)
+    assert assemble(tmp_path, fake, ledger).reconcile(held).phase is Outcome.HOLD
+    if already_queued:
+        edges.queue[0]()
+        retained = service.status(request.target.dispatch).attempt
+        assert retained is not None and retained.stage is Stage.CLAIMED
+    else:
+        assert service.start(request).stage is Stage.HELD
+        assert not edges.queue
+    assert not edges.sessions and not edges.posts
+    assert ledger.state(REPO).outcome is Outcome.HOLD
+    assert any(intent.dispatch_id == request.target.dispatch for intent in ledger.intents(REPO))
+
+    fresh = Fake()
+    with_pull(fresh)
+    recovered = replace(CYCLE, revision="workflow-recovered", version=4)
+    assert assemble(tmp_path, fresh, ledger).reconcile(recovered).phase is Outcome.REVIEW
+    if not already_queued:
+        assert service.start(request).stage is Stage.EXECUTION_UNKNOWN
+    edges.queue[0]()
+    assert service.status(request.target.dispatch).stage is Stage.COMMENTED
+    assert len(edges.sessions) == len(edges.posts) == 1
+
+
+@pytest.mark.parametrize(("event", "remote", "approval"), [
+    ("completed", Remote.COMPLETED, False),
+    ("incomplete", Remote.UNKNOWN, False),
+    ("approval", Remote.UNKNOWN, True),
+])
+def test_failed_cleanup_preserves_independent_status(
+    tmp_path: Path, event: str, remote: Remote, approval: bool,
+) -> None:
+    path = tmp_path / "ledger"
+    ledger = SQLiteLedger.initialize(path)
+    accept(tmp_path, ledger)
+    request = commit_review(tmp_path, ledger)
+    edges = Edges(path)
+    edges.cleanup = Shutdown(True, False)
+    edges.frames = {
+        "completed": (ACK, ENTER, EXIT, DONE),
+        "incomplete": (ACK, ENTER),
+        "approval": (ACK, b'{"id":55,"method":"item/commandExecution/requestApproval","params":{}}\n'),
+    }[event]
+    assert edges.build().start(request).stage is Stage.EXECUTION_UNKNOWN
+    edges.queue[0]()
+    reopened = edges.build()
+    status = reopened.status(request.target.dispatch)
+    saved = status.attempt
+    assert saved is not None and saved.thread and saved.turn
+    assert saved.lifecycle.remote is remote and saved.lifecycle.cleanup is Cleanup.UNCONFIRMED
+    assert saved.lifecycle.approval is approval
+    assert Cleanup.UNCONFIRMED.value in status.reason
+    assert ("approval-required" in status.reason) is approval
+    assert (Remote.UNKNOWN.value in status.reason) is (remote is Remote.UNKNOWN)
+    assert status.actor == PROJECT.owner
+    assert reopened.start(request) == status and reopened.publish(request.target.dispatch) == status
+    assert len(edges.queue) == len(edges.sessions) == 1 and not edges.posts
+    assert ledger.state(REPO).work is not None

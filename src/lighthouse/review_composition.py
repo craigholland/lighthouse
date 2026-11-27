@@ -8,7 +8,10 @@ from lighthouse.adapters.codex.stdio import ReviewRequest, StdioReviewWorker
 from lighthouse.adapters.github.review_publisher import ReviewPublisher, ReviewTarget
 from lighthouse.adapters.sqlite.ledger import SQLiteLedger
 from lighthouse.application.review_dispatch import (
+    Cleanup,
     Completion,
+    Lifecycle,
+    Remote,
     ReviewDispatch,
     ReviewInput,
     Stage,
@@ -54,15 +57,15 @@ def compose_review_dispatch(
                     raise ValueError("execution-identity-not-retained")
 
             def run() -> None:
-                # The PR can move while the deliberate outer queue is waiting.
-                if not begin():
-                    return
+                # Read the provider outside the writer lock, then atomically check T04 and claim.
                 try:
                     selected = current(target) is True
                 except Exception:
                     selected = False
                 if not selected:
                     service.hold(target.dispatch, fingerprint, Stage.UNAVAILABLE)
+                    return
+                if not begin():
                     return
                 result = worker.run(
                     ReviewRequest(target.repository, target.issue, target.pr, target.head, workspace,
@@ -85,7 +88,14 @@ def compose_review_dispatch(
                     Stage.CLEANUP_UNCONFIRMED if result.session_started and not result.owned_cleanup else
                     Stage.EXECUTION_UNKNOWN if result.acceptance_unknown or old.thread else Stage.UNAVAILABLE
                 )
-                service.hold(target.dispatch, fingerprint, stage, old.thread, old.turn)
+                lifecycle = Lifecycle(
+                    Remote.COMPLETED if result.remote_completed else
+                    Remote.UNKNOWN if result.acceptance_unknown or old.thread else Remote.NOT_STARTED,
+                    Cleanup.CONFIRMED if result.owned_cleanup else
+                    Cleanup.UNCONFIRMED if result.session_started else Cleanup.NOT_NEEDED,
+                    result.hold_reason == "permission-attention",
+                )
+                service.hold(target.dispatch, fingerprint, stage, old.thread, old.turn, lifecycle=lifecycle)
 
             enqueue(run)
 

@@ -77,6 +77,35 @@ class Stage(StrEnum):
     HELD = "held"
 
 
+class Remote(StrEnum):
+    NOT_STARTED = "not-started"
+    UNKNOWN = "completion-unconfirmed"
+    COMPLETED = "completion-observed"
+
+
+class Cleanup(StrEnum):
+    NOT_NEEDED = "not-needed"
+    UNCONFIRMED = "owned-cleanup-unconfirmed"
+    CONFIRMED = "owned-cleanup-confirmed"
+
+
+@dataclass(frozen=True)
+class Lifecycle:
+    """Independent remote, local and approval facts, with no provider text."""
+
+    remote: Remote = Remote.NOT_STARTED
+    cleanup: Cleanup = Cleanup.NOT_NEEDED
+    approval: bool = False
+
+    @property
+    def causes(self) -> tuple[str, ...]:
+        return (
+            *(("approval-required",) if self.approval else ()),
+            *((self.remote.value,) if self.remote is Remote.UNKNOWN else ()),
+            *((self.cleanup.value,) if self.cleanup is Cleanup.UNCONFIRMED else ()),
+        )
+
+
 @dataclass(frozen=True)
 class Attempt:
     """Durable safe status, references and digests, never review text or paths."""
@@ -89,6 +118,7 @@ class Attempt:
     output: str = ""
     marker: str = ""
     review_id: int = 0
+    lifecycle: Lifecycle = Lifecycle()
 
     def valid(self) -> bool:
         identity = bool(_REF.fullmatch(self.thread) and _REF.fullmatch(self.turn))
@@ -107,6 +137,10 @@ class Attempt:
             and self.stage not in {Stage.PENDING, Stage.HELD}
             and (bool(_HEX.fullmatch(self.output)) if has_output else not self.output)
             and (bool(_HEX.fullmatch(self.marker)) if has_marker else not self.marker)
+            and type(self.lifecycle.approval) is bool
+            and (self.lifecycle.remote is not Remote.COMPLETED or identity)
+            and (not has_output or self.lifecycle == Lifecycle(Remote.COMPLETED, Cleanup.CONFIRMED))
+            and (self.stage is not Stage.APPROVAL_REQUIRED or self.lifecycle.approval)
             and type(self.review_id) is int
             and (self.review_id > 0 if self.stage is Stage.COMMENTED else self.review_id == 0)
         )
@@ -170,7 +204,7 @@ class ReviewDispatch:
         actor = self.project.owner if stage in {
             Stage.EXECUTION_UNKNOWN, Stage.APPROVAL_REQUIRED, Stage.CLEANUP_UNCONFIRMED, Stage.UNKNOWN_AND_CLEANUP, Stage.PUBLISHING,
         } else self.project.lead
-        return Status(stage, actor, stage.value, attempt)
+        return Status(stage, actor, ", ".join(attempt.lifecycle.causes) or stage.value, attempt)
 
     def start(self, request: ReviewInput) -> Status:
         target = request.target
@@ -193,7 +227,7 @@ class ReviewDispatch:
                 return self.status(target.dispatch)
             return Status(Stage.HELD, self.project.lead, "admission-not-current-or-blocked", existing)
 
-        starting = replace(candidate, stage=Stage.STARTING)
+        starting = replace(candidate, stage=Stage.STARTING, lifecycle=Lifecycle(Remote.UNKNOWN, Cleanup.UNCONFIRMED))
 
         def begin() -> bool:
             return self._attempts.advance_review(candidate, starting)
@@ -212,14 +246,17 @@ class ReviewDispatch:
             return self.status(target.dispatch)
         return self.status(target.dispatch)
 
-    def hold(self, dispatch: str, fingerprint: str, stage: Stage, thread: str = "", turn: str = "") -> Status:
+    def hold(
+        self, dispatch: str, fingerprint: str, stage: Stage, thread: str = "", turn: str = "", *,
+        lifecycle: Lifecycle | None = None,
+    ) -> Status:
         prior = self._attempts.review_attempt(self.project.repository, dispatch)
         if (prior is not None and prior.fingerprint == fingerprint
                 and (prior.thread, prior.turn) == (thread, turn)
                 and prior.stage in {Stage.CLAIMED, Stage.STARTING, Stage.ACCEPTED}
                 and stage in {Stage.EXECUTION_UNKNOWN, Stage.CLEANUP_UNCONFIRMED,
                               Stage.APPROVAL_REQUIRED, Stage.UNAVAILABLE, Stage.UNKNOWN_AND_CLEANUP}):
-            self._attempts.advance_review(prior, replace(prior, stage=stage))
+            self._attempts.advance_review(prior, replace(prior, stage=stage, lifecycle=lifecycle or prior.lifecycle))
         return self.status(dispatch)
 
     def complete(self, dispatch: str, result: Completion) -> Status:
@@ -229,11 +266,16 @@ class ReviewDispatch:
                 != (result.fingerprint, result.thread, result.turn)):
             return self.status(dispatch)
         if result.owned_cleanup is not True:
-            return self.hold(dispatch, result.fingerprint, Stage.CLEANUP_UNCONFIRMED, result.thread, result.turn)
+            return self.hold(dispatch, result.fingerprint, Stage.CLEANUP_UNCONFIRMED, result.thread, result.turn,
+                             lifecycle=Lifecycle(Remote.COMPLETED, Cleanup.UNCONFIRMED))
         if (not result.comment.strip() or len(result.comment.encode("utf-8", errors="replace")) > 16384
                 or any(ord(char) < 32 and char not in "\r\n\t" for char in result.comment)):
-            return self.hold(dispatch, result.fingerprint, Stage.EXECUTION_UNKNOWN, result.thread, result.turn)
-        self._attempts.advance_review(prior, replace(prior, stage=Stage.COMPLETED, output=digest(result.comment)))
+            return self.hold(dispatch, result.fingerprint, Stage.EXECUTION_UNKNOWN, result.thread, result.turn,
+                             lifecycle=Lifecycle(Remote.COMPLETED, Cleanup.CONFIRMED))
+        self._attempts.advance_review(prior, replace(
+            prior, stage=Stage.COMPLETED, output=digest(result.comment),
+            lifecycle=Lifecycle(Remote.COMPLETED, Cleanup.CONFIRMED),
+        ))
         return self.status(dispatch)
 
     def publish(self, dispatch: str, text: str = "") -> Status:

@@ -63,6 +63,7 @@ class ReviewResult:
     owned_cleanup: bool = False
     acceptance_unknown: bool = False
     session_started: bool = False
+    remote_completed: bool = False
 
 
 @dataclass(frozen=True, repr=False)
@@ -377,6 +378,7 @@ class StdioReviewWorker:
         thread_id = turn_id = comment = None
         reason = None
         cleanup = False
+        remote_completed = False
         dispatched = accepted = launch_started = False
         try:
             parameters, target = _inputs(request)
@@ -405,6 +407,7 @@ class StdioReviewWorker:
             accepted = True
             while (comment := wire.output(thread_id, turn_id)) is None:
                 wire.receive()
+            remote_completed = True
         except _Hold as exc:
             reason = str(exc)
         except (UnicodeError, ValueError, RecursionError):
@@ -424,6 +427,8 @@ class StdioReviewWorker:
                         and self._clock() < shutdown_limit
                     )
                     if cleanup and reason is None and wire is not None and thread_id is not None and turn_id is not None:
+                        # A verified final drain may contradict earlier attributed evidence.
+                        remote_completed = False
                         for frame in receipt.frames:
                             if not self._clock() < shutdown_limit:
                                 raise _Hold("cleanup-deadline-elapsed")
@@ -432,6 +437,7 @@ class StdioReviewWorker:
                             raise _Hold("cleanup-deadline-elapsed")
                         if comment is None or wire.output(thread_id, turn_id) != comment:
                             raise _Hold("output-invalid")
+                        remote_completed = True
                         comment = _safe_comment(comment, request.workspace)
                 except _Hold as exc:
                     reason = reason or str(exc)
@@ -444,5 +450,5 @@ class StdioReviewWorker:
         unknown = (launch_started and session is None) or (dispatched and not accepted)
         return ReviewResult(
             thread_id, turn_id, comment if reason is None else None,
-            reason, cleanup, unknown, session_started=launch_started,
+            reason, cleanup, unknown, session_started=launch_started, remote_completed=remote_completed,
         )

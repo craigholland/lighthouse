@@ -23,15 +23,22 @@ The caller names a committed REVIEW intent and supplies its accepted normalized
 work binding and exact GitHub head. The dispatch service retains the original
 order, intent, target and context digest before submitting through the injected
 non-blocking queue. The worker must win a second compare-and-set on the same
-attempt before any runtime work; a repeated callback does nothing. Unsupported
+attempt before any runtime work. Admission and queue consumption both require
+the latest committed T04 disposition and exact recommendation to be current
+inside the same writer transaction. A newer HOLD leaves the original intent
+and any unconsumed claim intact and authorizes no runtime or publication. Only
+a later valid T04 observation can make that exact review eligible again. A
+callback that already started cannot consume the claim a second time. Unsupported
 intent types, a missing commit, a changed binding, a stale head, or a separate
 unresolved attempt cannot start a review. All external work is outside SQLite
 write transactions. This layer never changes the workflow phase or releases work.
 
 A reserved attempt without durable acknowledgement is an unknown, not a retry.
 Once acknowledged, only its exact thread/turn may supply completion. An
-approval request identifies Craig; unconfirmed local shutdown is separate from
-unknown upstream execution. Status exposes bounded normalized identities and
+approval request identifies Craig. The durable receipt reports approval
+attention, observed or unconfirmed remote completion, and local shutdown
+separately across restart. Observed remote completion with unconfirmed local
+shutdown still cannot publish. Status exposes bounded normalized identities and
 fixed reasons; it never includes prompts, output, provider payloads or machine
 paths. No attempt expires or is automatically replaced.
 

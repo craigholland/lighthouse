@@ -5,7 +5,7 @@ The [project development profile](../README.md), [root local contract](../__ai__
 [current verification contract](development/verification-contract.md) govern the
 current documentation work.
 
-Craig approved the following architecture and T00â€“T09 initial plan on 2026-11-23,
+Craig approved the following architecture and T00–T09 initial plan on 2026-11-23,
 including bounded delegation for Codex to define/publish task Issues and select
 compatible project-local versions and dependency pins. All five policy questions
 are resolved. Implementation starts after the planning PR merges into
