@@ -195,3 +195,28 @@ def test_intervening_commit_before_expected_version_write_is_stale(
     assert (s.write, s.reason, s.order) == (WriteResult.STALE, "write-stale", "rival-order")
     assert [row.observation for row in ledger.audit(REPO)] == ["rival"]
     assert len(ledger.intents(REPO)) == 1
+
+
+@pytest.mark.parametrize("conflict", [False, True])
+def test_replay_uses_reservation_committed_before_audit(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, conflict: bool,
+) -> None:
+    path = tmp_path / "ledger"
+    ledger = SQLiteLedger.initialize(path)
+    fake, rival = Fake(), Fake()
+    ready(fake)
+    ready(rival)
+    other = assemble(tmp_path, rival, SQLiteLedger(path))
+    audit = ledger.audit
+
+    def intervening_audit(repository: str) -> tuple[Change, ...]:
+        assert other.reconcile(CYCLE).write is WriteResult.COMMITTED
+        return audit(repository)
+
+    monkeypatch.setattr(ledger, "audit", intervening_audit)
+    cycle = replace(CYCLE, new_order="other-order") if conflict else CYCLE
+    status = assemble(tmp_path, fake, ledger).reconcile(cycle)
+    assert status.write is (WriteResult.CONFLICT if conflict else WriteResult.DUPLICATE)
+    assert (status.version, status.phase, status.order) == (1, Outcome.IMPLEMENT, "order")
+    assert status.intents == ledger.intents(REPO)
+    assert len(status.intents) == len(audit(REPO)) == 1

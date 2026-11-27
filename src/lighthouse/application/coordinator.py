@@ -108,6 +108,8 @@ class Coordinator:
         marker = "source-sha256:" + _fingerprint((asdict(cycle), asdict(observed)))
         if existing is not None:
             matched = existing.decision.evidence[-1:] == (marker,)
+            # The audit can see a commit made after the initial state read.
+            state = self._ledger.state(project.repository)
             return self._status(cycle, state, "duplicate-observation" if matched
                                 else "conflicting-observation", None if matched else project.owner,
                                 write=WriteResult.DUPLICATE if matched else WriteResult.CONFLICT)
