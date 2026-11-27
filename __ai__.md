@@ -58,6 +58,7 @@ external resources or start work. See the offline
 [pure workflow decisions](docs/development/workflow.md), and the explicit
 [offline SQLite ledger](docs/development/ledger.md).
 The [GitHub mapper](docs/development/github-facts.md) only normalizes supplied facts.
+The [bounded collector and cache](docs/development/github-collection.md) are not wired to the CLI.
 
 ## File Index
 

@@ -244,6 +244,20 @@ class GitHubFacts:
             return None, "readiness-unresolved"
         return Ready(actor, f"github:issue-event:{latest[1]}", binding, priorities), None
 
+
+    def matches_work(self, body: str) -> bool:
+        """Match the same two exact work markers used by PR normalization."""
+        work = self.context.work
+        if work is None:
+            return False
+        body = body.replace("\r\n", "\n")
+        try:
+            self._link(body, "Lighthouse-Issue", f"{self.context.project.repository}#{work.issue}")
+            self._link(body, "Lighthouse-Work-Order", work.order)
+        except _Invalid:
+            return False
+        return True
+
     def _pull(
         self, source: Resources, issue: Candidate,
     ) -> tuple[Pull | None, Review | None, Merge | None]:
