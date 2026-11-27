@@ -1,6 +1,7 @@
 
 """Actual composed reconcile-to-COMMENT path with fake I/O and temporary SQLite."""
 
+import json
 import sqlite3
 import subprocess
 import sys
@@ -15,7 +16,7 @@ import pytest
 from test_coordinator import CYCLE, accept, assemble, with_pull
 from test_github import HEAD, PROJECT, REPO
 from test_github_collection import Fake
-from test_t07_stdio import ACK, DONE, ENTER, EXIT, FakeSession, Shutdown
+from test_t07_stdio import ACK, DONE, ENTER, EXIT, FakeSession, Shutdown, notify
 
 from lighthouse.adapters.codex.stdio import ReviewRequest, StdioReviewWorker
 from lighthouse.adapters.github.review_publisher import ReviewPublisher
@@ -103,8 +104,8 @@ class Edges:
 
     def create_review(self, repository: str, number: int, *, head: str, event: str, body: str) -> object:
         self.outside_transaction()
-        assert event == "COMMENT"
-        row = {"id": 247, "commit_id": head, "user": {"id": PROJECT.lead}, "state": "COMMENTED", "body": body,
+        state = {"COMMENT": "COMMENTED", "APPROVE": "APPROVED", "REQUEST_CHANGES": "CHANGES_REQUESTED"}[event]
+        row = {"id": 247, "commit_id": head, "user": {"id": PROJECT.lead}, "state": state, "body": body,
                "pull_request_url": f"https://api.github.com/repos/{repository}/pulls/{number}"}
         self.posts.append(row)
         if self.lose_ack:
@@ -116,11 +117,11 @@ class Edges:
         assert (repository, number, limit) == (REPO, 8, 100)
         return [] if self.drop_outcome else self.posts
 
-    def build(self) -> ReviewDispatch:
+    def build(self, *, structured: bool = False) -> ReviewDispatch:
         return compose_review_dispatch(
             PROJECT, SQLiteLedger(self.path), StdioReviewWorker(self.open_session, lambda *_: True, lambda: 0),
             ReviewPublisher(self, repository=REPO), current=self.current, enqueue=self.enqueue,
-            deadlines=lambda: (20, 22), workspace=self.path.parent, model="fixture-model.1",
+            deadlines=lambda: (20, 22), workspace=self.path.parent, model="fixture-model.1", structured=structured,
         )
 
 
@@ -350,3 +351,46 @@ def test_failed_cleanup_preserves_independent_status(
     assert reopened.start(request) == status and reopened.publish(request.target.dispatch) == status
     assert len(edges.queue) == len(edges.sessions) == 1 and not edges.posts
     assert ledger.state(REPO).work is not None
+
+
+@pytest.mark.parametrize(("event", "expected"), [
+    ("APPROVE", "APPROVED"), ("REQUEST_CHANGES", "CHANGES_REQUESTED"), ("COMMENT", "COMMENTED"),
+])
+def test_explicit_outcome_reopens_without_reposting(tmp_path: Path, event: str, expected: str) -> None:
+    path = tmp_path / "ledger"
+    ledger = SQLiteLedger.initialize(path)
+    accept(tmp_path, ledger)
+    request = commit_review(tmp_path, ledger)
+    edges = Edges(path)
+    edges.lose_ack = True
+    item = {"type": "exitedReviewMode", "review": json.dumps({"event": event, "body": "Synthetic review."})}
+    edges.frames = (ENTER, notify("item/completed", {"item": item}), DONE, ACK)
+    runner = edges.build(structured=True)
+    runner.start(request)
+    edges.queue.pop()()
+    assert runner.status(request.target.dispatch).stage is Stage.PUBLISHING
+    assert [row["state"] for row in edges.posts] == [expected]
+    reopened = edges.build(structured=True)
+    assert reopened.start(request).stage is Stage.PUBLISHING
+    edges.posts[0]["state"] = "PENDING"
+    assert reopened.publish(request.target.dispatch).stage is Stage.PUBLISHING
+    edges.posts[0]["state"] = expected
+    receipt = reopened.publish(request.target.dispatch)
+    assert receipt.attempt is not None and receipt.attempt.event == event and receipt.attempt.review_id == 247
+    assert len(edges.posts) == len(edges.sessions) == 1
+
+
+def test_structured_worker_does_not_promote_free_prose(tmp_path: Path) -> None:
+    path = tmp_path / "ledger"
+    ledger = SQLiteLedger.initialize(path)
+    accept(tmp_path, ledger)
+    request = commit_review(tmp_path, ledger)
+    edges = Edges(path)
+    runner = edges.build(structured=True)
+    runner.start(request)
+    edges.queue.pop()()
+    status = runner.status(request.target.dispatch)
+    assert status.stage is Stage.EXECUTION_UNKNOWN
+    assert status.attempt is not None and status.attempt.lifecycle.remote is Remote.COMPLETED
+    assert status.attempt.lifecycle.cleanup is Cleanup.CONFIRMED
+    assert not edges.posts

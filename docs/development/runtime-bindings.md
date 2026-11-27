@@ -11,8 +11,9 @@ status: DRAFT
 concrete Windows STDIO and scoped GitHub bindings through the private
 [runtime factory](../../src/lighthouse/runtime_bindings.py). Importing the
 package or calling the factory does not start a process, use credentials or
-make an HTTP request. There is no enabled run command, live profile, service,
-secret discovery or general-purpose launcher.
+make an HTTP request. The [foreground review command](review-runner.md) selects
+one existing committed dispatch explicitly. No live profile, service, secret
+discovery or general-purpose launcher is enabled.
 
 The [Windows owner](../../src/lighthouse/adapters/codex/windows_session.py)
 requires an explicitly approved executable and SHA-256, pinned public App
@@ -33,7 +34,7 @@ The [HTTP client](../../src/lighthouse/adapters/github/review_http.py) only
 accepts its explicitly configured repository and PR. It uses the standard
 library's certificate-verified GitHub API TLS connection, the pinned API
 representation, injected repository-scoped bearer, fixed read endpoints and
-one COMMENT request. It follows no redirects and never retries POST. A request
+one explicitly selected review request. Historical COMMENT receipts remain COMMENT. It follows no redirects and never retries POST. A request
 that outlasts its wait holds rather than replaying; a still-running transport
 blocks another request on that instance. Historical lookup requires a
 complete bounded page and exact receipt attribution. Credential values stay
@@ -74,6 +75,6 @@ independently sourced bearer, pinned executable/hash and scoped workspace,
 approved managed Codex home/account/model/retention, environment and owners.
 Then attest those bindings, do one exact-head review, verify effective policy,
 retained remote correlation and owned local shutdown, separately authorize
-the exact COMMENT, and record or reconcile only its original receipt. Stop on
+the exact review event, and record or reconcile only its original receipt. Stop on
 unknown acceptance or shutdown without a retry. No prior T01 allowance is
 renewed; no hosted or real account behavior is proven by offline tests.

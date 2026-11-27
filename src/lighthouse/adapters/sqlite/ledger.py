@@ -80,8 +80,9 @@ def _review_from(data: dict[str, Any]) -> Attempt:
         data["marker"], data["review_id"],
         Lifecycle(Remote(data["lifecycle"]["remote"]), Cleanup(data["lifecycle"]["cleanup"]),
                   data["lifecycle"]["approval"]),
+        data.get("event", "COMMENT"),
     )
-    if not result.valid() or _dump(data) != _dump(asdict(result)):
+    if not result.valid() or _dump({"event": "COMMENT", **data}) != _dump(asdict(result)):
         raise ValueError
     return result
 
@@ -380,13 +381,13 @@ class SQLiteLedger:
                 or updated.stage not in allowed.get(expected.stage, set())
                 or (updated.stage is not Stage.ACCEPTED
                     and (updated.thread, updated.turn) != (expected.thread, expected.turn))
-                or (expected.output and updated.output != expected.output)
+                or (expected.output and (updated.output, updated.event) != (expected.output, expected.event))
                 or (expected.marker and updated.marker != expected.marker)):
             return False
         with self._connection(write=True) as conn:
             if self._attempt(conn, t.repository, t.dispatch) != expected:
                 return False
-            if updated.stage is Stage.STARTING and not self._review_current(conn, t):
+            if updated.stage in {Stage.STARTING, Stage.PUBLISHING} and not self._review_current(conn, t):
                 return False
             conn.execute("UPDATE review_attempts SET data=? WHERE repo=? AND dispatch=?",
                          (_dump(asdict(updated)), t.repository, t.dispatch))

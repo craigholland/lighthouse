@@ -37,3 +37,7 @@ credential references, contacts a provider, or runs verification commands.
 Use the [Issue template](../../.github/ISSUE_TEMPLATE/implementation.md) and
 [PR template](../../.github/PULL_REQUEST_TEMPLATE.md) for work intake. Neither
 grants readiness; see the intake contract for the bootstrap work-order exception.
+
+The [T07 review runner](review-runner.md) explicitly composes one private
+per-run packet with these validated inactive definitions. None of the public
+profile examples is an operational packet or authorizes provider access.

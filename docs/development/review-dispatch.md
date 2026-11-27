@@ -76,3 +76,11 @@ hosted COMMENT. The [dormant concrete bindings](runtime-bindings.md) supply an e
 There is no operational launch command, usable live profile or credential discovery. Any actual activation
 requires separate owner-approved target, runtime, auth/retention and operational
 evidence. This work does not reopen the T01 trial, T02, or PR #15.
+
+## Foreground formal outcomes
+
+The [one-shot operator runner](review-runner.md) reuses this durable attempt
+boundary. An explicitly authorized structured APPROVE or REQUEST_CHANGES is
+bound alongside its body digest before publication; the exact receipt state
+must agree. Prior records with no event remain COMMENT. A confirmed receipt
+alone never supplies missing implementation verification or merge authority.

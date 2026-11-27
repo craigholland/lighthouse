@@ -98,10 +98,10 @@ python -m venv .venv
 .\.venv\Scripts\python.exe -m lighthouse --version
 ```
 
-The CLI shows help, the installed package version, or `status` for an existing ledger;
-unsupported arguments
-are rejected. It has no runtime third-party dependencies and does not start
-orchestration or contact providers. See the
+The CLI provides help, the installed version, and read-only `status` for an
+existing ledger. Those paths do not start orchestration or contact providers.
+The separately gated foreground review entry requires an exact private
+selection. Unsupported arguments are rejected. See the
 [verification contract](docs/development/verification-contract.md) for
 the test, lint, and type checks and the clean-room install procedure.
 
@@ -109,5 +109,5 @@ the test, lint, and type checks and the clean-room install procedure.
 
 The Python configuration boundary validates shared service settings and explicit
 project TOML profiles offline. See the [schema and examples](docs/development/configuration.md).
-No CLI configuration selector, automatic discovery, provider client, or activation
+The [T07 foreground review entry](docs/development/review-runner.md) selects one existing committed review with explicit private settings. Automatic discovery or activation
 is implemented.
