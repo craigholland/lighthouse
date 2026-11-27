@@ -72,7 +72,7 @@ select a separately authorized allowlisted target and immutable Lead identity
 and supply bounded GitHub I/O. Tests inject these boundaries. They do not
 prove native containment, provider compatibility, a real account or model,
 credential isolation on a live machine, externally effective policy, or a
-hosted COMMENT. There is no operational launch command, session owner, usable
-live profile or credential binding in this increment. Any actual activation
+hosted COMMENT. The [dormant concrete bindings](runtime-bindings.md) supply an explicit session owner and review client.
+There is no operational launch command, usable live profile or credential discovery. Any actual activation
 requires separate owner-approved target, runtime, auth/retention and operational
 evidence. This work does not reopen the T01 trial, T02, or PR #15.

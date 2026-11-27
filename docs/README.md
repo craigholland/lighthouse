@@ -30,5 +30,6 @@ This documentation change starts no T03 assignment or live operation.
   and label/Issue-field conventions selected under Craig's delegation.
 - [Dormant Codex review dispatch](development/review-dispatch.md): offline
   exact-head intent, execution/publishing boundaries and recovery limits.
+- [Dormant T07 runtime bindings](development/runtime-bindings.md): concrete private adapters, read-only status and activation limits.
 - [Decision register](decisions/open-questions.md): adopted choices, approval
   history and future execution/evidence gates.

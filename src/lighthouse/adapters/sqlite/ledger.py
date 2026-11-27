@@ -89,8 +89,8 @@ def _review_from(data: dict[str, Any]) -> Attempt:
 class SQLiteLedger:
     """Explicit file adapter; each operation uses its own bounded connection."""
 
-    def __init__(self, path: Path) -> None:
-        self._uri = path.resolve().as_uri() + "?mode=rw"
+    def __init__(self, path: Path, *, read_only: bool = False) -> None:
+        self._uri = path.resolve().as_uri() + ("?mode=ro" if read_only else "?mode=rw")
         with self._connection() as conn:
             if (conn.execute("PRAGMA quick_check").fetchall() != [("ok",)]
                     or conn.execute("PRAGMA foreign_key_check").fetchone() is not None):
@@ -275,6 +275,26 @@ class SQLiteLedger:
         if (result.target.repository, result.target.dispatch) != (repository, dispatch):
             raise LedgerError(_REJECTED)
         return result
+
+    def operator_snapshot(self, repository: str, dispatch: str | None) -> tuple[State, Intent | None, Attempt | None]:
+        """Read an exact reference, or the current accepted reservation, consistently."""
+        with self._connection() as conn:
+            state = self._state(conn, repository)
+            if dispatch is None:
+                if state.work is None:
+                    return state, None, None
+                for (payload,) in conn.execute("SELECT change FROM audit WHERE repo=? ORDER BY version DESC",
+                                               (repository,)):
+                    recorded = _load(payload, change_from).intent
+                    if recorded is not None and recorded.order == state.work.order:
+                        dispatch = recorded.dispatch_id
+                        break
+                if dispatch is None:
+                    return state, None, None
+            row = conn.execute("SELECT data FROM intents WHERE repo=? AND id=?",
+                               (repository, dispatch)).fetchone()
+            return (state, None if row is None else self._stored_intent(dispatch, row[0]),
+                    self._attempt(conn, repository, dispatch))
 
     def review_attempt(self, repository: str, dispatch: str) -> Attempt | None:
         """Read durable dispatch status without advancing it."""

@@ -45,7 +45,7 @@ def test_cli_rejects_unknown_arguments(tmp_path: Path, argument: str) -> None:
     )
     assert result.returncode == 2
     assert not result.stdout
-    assert "unrecognized arguments" in result.stderr
+    assert ("invalid choice" if argument == "start" else "unrecognized arguments") in result.stderr
     assert argument in result.stderr
 
 
