@@ -5,7 +5,7 @@ The [project development profile](../README.md), [root local contract](../__ai__
 [current verification contract](development/verification-contract.md) govern the
 current documentation work.
 
-Craig approved the following architecture and T00–T09 initial plan on 2026-11-23,
+Craig approved the following architecture and T00â€“T09 initial plan on 2026-11-23,
 including bounded delegation for Codex to define/publish task Issues and select
 compatible project-local versions and dependency pins. All five policy questions
 are resolved. Implementation starts after the planning PR merges into
@@ -28,5 +28,7 @@ This documentation change starts no T03 assignment or live operation.
   tasks, dependencies, acceptance, verification, and approval gates.
 - [Work intake contract](development/work-intake.md): approved admission policy
   and label/Issue-field conventions selected under Craig's delegation.
+- [Dormant Codex review dispatch](development/review-dispatch.md): offline
+  exact-head intent, execution/publishing boundaries and recovery limits.
 - [Decision register](decisions/open-questions.md): adopted choices, approval
   history and future execution/evidence gates.

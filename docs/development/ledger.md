@@ -1,7 +1,7 @@
 ---
 title: "Offline SQLite Ledger"
 created_date: 2026-11-26
-update_date: 2026-11-26
+update_date: 2026-11-27
 status: APPROVED
 ---
 
@@ -15,7 +15,7 @@ dispatch intent. Callers supply normalized, secret-free evidence. The
 `SQLiteLedger.initialize(path)` initializes a new file; `SQLiteLedger(path)`
 opens an existing, recognized file. Neither is wired to the CLI.
 
-Schema v1 keeps one current-state/reservation row per project (an absent work
+Schema v2 keeps one current-state/reservation row per project (an absent work
 order is an unreserved slot), uniquely keyed observation audits and globally
 unique intent IDs. Explicit write transactions check the expected version and
 preserve binding before committing state, audit and intent together. Exact
@@ -27,9 +27,13 @@ recommendations require a matching new pending intent in the same write.
 State, audit and intent queries are views of the same ledger. Pending intent
 can be marked uncertain through an explicit correlated write; it cannot be
 reset to pending or assigned a replacement identity by the adapter. Reopen
-and timeout do not change evidence or release a reservation. These are storage
-properties only. There is no dispatcher, external acknowledgment protocol,
-retry behavior or multi-ledger coordination.
+and timeout do not change evidence or release a reservation. The dormant [review dispatch](review-dispatch.md) adds a versioned review-attempt
+table under the same SQLite writer boundary. Its state includes stage, target,
+fingerprint and bounded review references. It records one use per review intent
+and independent publication marker; no stored prompt or output. Multiple SQLite
+connections observe the same compare-and-set result; no lease or force reset
+can replace ambiguous work. Existing schema-v1 files are intentionally rejected;
+retain them unchanged. No automatic migration is provided.
 
 Do not reset a rejected database. Preserve its file and stop for investigation
 of the selected path, schema version or malformed stored evidence. No migration

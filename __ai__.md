@@ -60,6 +60,9 @@ external resources or start work. See the offline
 The [GitHub mapper](docs/development/github-facts.md) only normalizes supplied facts.
 The [bounded collector and cache](docs/development/github-collection.md) are not wired to the CLI.
 The [offline reconciler](docs/development/reconciliation.md) records intents but cannot execute them.
+The [dormant review dispatch](docs/development/review-dispatch.md) composes
+injected execution and publication for committed review intents without any live
+composition, runtime or publishing authority.
 
 ## File Index
 
@@ -75,8 +78,8 @@ The [offline reconciler](docs/development/reconciliation.md) records intents but
 
 ## Known Gaps / Future-State Notes
 
-No production orchestration engine, production
-adapters or CI are implemented. The separately gated T01 experiment is not
+No runnable production orchestration engine, active
+provider bindings or CI are implemented. The separately gated T01 experiment is not
 a production integration. Compatibility is targeted to CPython 3.14.x on Windows
 AMD64, not asserted for other environments. Integration proofs and production
 activation retain their approval gates in the
