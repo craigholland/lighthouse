@@ -4,6 +4,7 @@ import json
 import subprocess
 import sys
 from dataclasses import replace
+from datetime import UTC, datetime, timedelta
 from hashlib import sha256
 from pathlib import Path
 
@@ -45,6 +46,8 @@ def test_installed_review_help_and_missing_settings_are_inert(tmp_path: Path) ->
 
 
 @pytest.mark.parametrize(("event", "phase", "drift"), [
+    ("APPROVE", "hold", "receipt-advance"), ("APPROVE", "review", "receipt-future"),
+    ("APPROVE", "review", "receipt-clock-backward"),
     ("COMMENT", "review", ""), ("REQUEST_CHANGES", "revise", ""), ("APPROVE", "hold", ""),
     ("APPROVE", "", "owner"), ("APPROVE", "", "verification"), ("APPROVE", "", "workspace"),
     ("APPROVE", "", "snapshot-missing"), ("APPROVE", "", "snapshot-changed"),
@@ -267,6 +270,19 @@ def test_explicit_foreground_composition(tmp_path: Path, monkeypatch, capsys, ev
     wire = FakeSession(ReviewRequest(REPO, 4, 8, HEAD, workspace, "fixture-model.1", "ctx", "rules", "checks"),
                        review_frames=frames)
     launched, posts = [], []
+    submitted = datetime.fromisoformat(PRE)
+    clock = submitted + timedelta(seconds=2 if drift == "receipt-clock-backward" else -1)
+
+    if drift.startswith("receipt-"):
+        from lighthouse import review_runner
+
+        class Clock:
+            @staticmethod
+            def now(tz):
+                assert tz is UTC
+                return clock
+
+        monkeypatch.setattr(review_runner, "datetime", Clock)
 
     class Child:
         def start(self, path, args, cwd, env, deadline):
@@ -333,6 +349,7 @@ def test_explicit_foreground_composition(tmp_path: Path, monkeypatch, capsys, ev
             pass
 
         def getresponse(self):
+            nonlocal clock
             route = self.route.split("?", 1)[0]
             prefix = f"/repos/{REPO}"
             if self.method == "POST":
@@ -344,6 +361,12 @@ def test_explicit_foreground_composition(tmp_path: Path, monkeypatch, capsys, ev
                 return FakeResponse(201, posts[0])
             choices = {"/issues/4": issue, "/issues/4/events": available.events,
                        "/pulls/8": pr, "/pulls/8/reviews": posts}
+            if (route == prefix + "/pulls/8/reviews" and posts
+                    and self.headers.get("Authorization") == "Bearer synthetic-read"):
+                if drift == "receipt-advance":
+                    clock = submitted + timedelta(seconds=1)
+                elif drift == "receipt-clock-backward":
+                    clock = submitted + timedelta(seconds=1)
             assert self.method == "GET" and route.startswith(prefix)
             return FakeResponse(200, choices[route.removeprefix(prefix)])
 
@@ -368,6 +391,20 @@ def test_explicit_foreground_composition(tmp_path: Path, monkeypatch, capsys, ev
     reported = json.loads(capsys.readouterr().out)
     assert reported["review_event"] == event and reported["phase"] == phase, (reported, launched, len(posts), wire.sent)
     assert reported["review"] == 90 and len(launched) == len(posts) == 1
+    if drift == "receipt-advance":
+        assert (reported["decision_reason"], reported["next_actor"]) == ("missing-verification", PROJECT.implementer)
+    if drift in {"receipt-future", "receipt-clock-backward"}:
+        assert (reported["reconciliation"], reported["next_actor"]) == ("observation-held", PROJECT.owner)
+        assert ledger.state(REPO).version == 2
+        # A later invocation can observe a current receipt, but cannot replay the effect.
+        if drift == "receipt-future":
+            clock = submitted + timedelta(seconds=1)
+            assert main(["review", "--settings", str(settings), "--dispatch", req.dispatch_id]) == 0
+            recovered = json.loads(capsys.readouterr().out)
+            assert (recovered["phase"], recovered["decision_reason"], recovered["next_actor"]) == (
+                "hold", "missing-verification", PROJECT.implementer,
+            )
+            assert len(launched) == len(posts) == 1
     turn = wire.sent[-1]
     assert turn["method"] == "turn/start"
     assert turn["params"]["outputSchema"]["required"] == ["event", "body"]

@@ -260,32 +260,43 @@ def run_review(settings: Path, dispatch: str, *, resolve: Callable[[str], str] =
         receipt_event, receipt_id = result.event, result.review_id
         # The existing paired lifecycle witnesses and prior REVIEW selection
         # delimit observation. Reconcile only the matched real receipt.
-        class ReceiptObservation:
-            def observe(self, accepted: State, cycle: Cycle) -> Bundle:
-                try:
-                    facts, refreshed = observe()
-                except (OSError, RuntimeError, ValueError):
-                    return Bundle(held=True)
-                review = facts.review
-                matches = ((review is None and receipt_event == "COMMENT") or (
-                    review is not None and review.evidence == f"github:review:{receipt_id}"
-                    and review.verdict.value == {"APPROVE": "approved", "REQUEST_CHANGES": "changes-requested"}
-                    .get(receipt_event)
-                ))
-                return Bundle(
-                    (facts.candidate,) if facts.candidate is not None else (),
-                    facts.pull, review, facts.merge, accepted.work != work or
-                    facts.hold is not None or sha256(refreshed.encode()).hexdigest() != proof or not matches
-                    or (base_revision is not None and (facts.pull is None or facts.pull.base_revision != base_revision)),
-                )
+        def collect_receipt() -> Bundle:
+            try:
+                facts, refreshed = observe()
+            except (OSError, RuntimeError, ValueError):
+                return Bundle(held=True)
+            review = facts.review
+            matches = ((review is None and receipt_event == "COMMENT") or (
+                review is not None and review.evidence == f"github:review:{receipt_id}"
+                and review.verdict.value == {"APPROVE": "approved", "REQUEST_CHANGES": "changes-requested"}
+                .get(receipt_event)
+            ))
+            return Bundle(
+                (facts.candidate,) if facts.candidate is not None else (),
+                facts.pull, review, facts.merge,
+                facts.hold is not None or sha256(refreshed.encode()).hexdigest() != proof or not matches
+                or (base_revision is not None and (facts.pull is None or facts.pull.base_revision != base_revision)),
+            )
         latest = ledger.operator_snapshot(project.repository, dispatch)
         if (latest.state.work == work and latest.state.outcome is Outcome.REVIEW
                 and latest.decision is not None and latest.decision.evidence[:1] == (target.head,)):
-            reconciled = Coordinator(Workflow(project), ledger, ReceiptObservation()).reconcile(Cycle(
-                f"review-receipt:{dispatch}:{receipt_id}", latest.state.version + 1, datetime.now(UTC),
-                implementation=Execution.QUIESCENT, reviewing=Execution.QUIESCENT,
-            ))
-            reconciliation_held = reconciled.reason == "observation-held"
+            started = datetime.now(UTC)
+            observed = collect_receipt()
+            completed = datetime.now(UTC)
+            # Bound the observation by our own clock, never by the provider's
+            # timestamp. A future receipt or clock reversal is not a decision.
+            if completed < started or (observed.review and observed.review.submitted > completed):
+                reconciliation_held = True
+            else:
+                class ReceiptObservation:
+                    def observe(self, accepted: State, cycle: Cycle) -> Bundle:
+                        return observed if accepted == latest.state else Bundle(held=True)
+
+                reconciled = Coordinator(Workflow(project), ledger, ReceiptObservation()).reconcile(Cycle(
+                    f"review-receipt:{dispatch}:{receipt_id}", latest.state.version + 1, completed,
+                    implementation=Execution.QUIESCENT, reviewing=Execution.QUIESCENT,
+                ))
+                reconciliation_held = reconciled.reason == "observation-held"
     status = render_status(ledger_path, project.repository, dispatch)
     if reconciliation_held:
         data = json.loads(status)
