@@ -16,7 +16,17 @@ import pytest
 from test_coordinator import CYCLE, accept, assemble, with_pull
 from test_github import HEAD, PROJECT, REPO
 from test_github_collection import Fake
-from test_t07_stdio import ACK, DONE, ENTER, EXIT, FakeSession, Shutdown, notify
+from test_t07_stdio import (
+    ACK,
+    DONE,
+    ENTER,
+    EXIT,
+    TURN_ACK,
+    FakeSession,
+    Shutdown,
+    final_answer,
+    notify,
+)
 
 from lighthouse.adapters.codex.stdio import ReviewRequest, StdioReviewWorker
 from lighthouse.adapters.github.review_publisher import ReviewPublisher
@@ -388,8 +398,7 @@ def test_explicit_outcome_reopens_without_reposting(tmp_path: Path, event: str, 
     request = commit_review(tmp_path, ledger)
     edges = Edges(path)
     edges.lose_ack = True
-    item = {"type": "exitedReviewMode", "review": json.dumps({"event": event, "body": "Synthetic review."})}
-    edges.frames = (ENTER, notify("item/completed", {"item": item}), DONE, ACK)
+    edges.frames = (final_answer(json.dumps({"event": event, "body": "Synthetic review."})), DONE, TURN_ACK)
     runner = edges.build(structured=True)
     runner.start(request)
     edges.queue.pop()()
@@ -411,6 +420,11 @@ def test_structured_worker_does_not_promote_free_prose(tmp_path: Path) -> None:
     accept(tmp_path, ledger)
     request = commit_review(tmp_path, ledger)
     edges = Edges(path)
+    prose = ("Review could not be completed: read-only commands to inspect the exact authorized commit "
+             "were blocked by execution policy. No defects are established, but the patch cannot be approved "
+             "from the supplied summary alone; the correctness verdict reflects this verification limitation.")
+    edges.frames = (ENTER, notify("item/completed", {"item": {"type": "exitedReviewMode", "review": prose}}),
+                    DONE, TURN_ACK)
     runner = edges.build(structured=True)
     runner.start(request)
     edges.queue.pop()()
@@ -422,6 +436,7 @@ def test_structured_worker_does_not_promote_free_prose(tmp_path: Path) -> None:
 
 
 @pytest.mark.parametrize(("failure", "reason", "progress", "local", "stage"), [
+    ("tool", "unexpected-review-item", "checkout-reverified", "owned-cleanup-confirmed", "execution-unknown"),
     ("runtime", "runtime-unverified", "session-opened", "owned-cleanup-confirmed", "unavailable"),
     ("account", "account-unverified", "runtime-verified", "owned-cleanup-confirmed", "unavailable"),
     ("policy", "policy-unverified", "account-verified", "owned-cleanup-confirmed", "unavailable"),
@@ -440,7 +455,10 @@ def test_startup_diagnostic_persists_without_replay(
     edges.startup_failure = failure
     if failure == "transport":
         edges.cleanup = Shutdown(True, False)
-    service = edges.build()
+    if failure == "tool":
+        tool = notify("item/started", {"item": {"type": "commandExecution", "id": "synthetic"}})
+        edges.frames = (TURN_ACK, tool)
+    service = edges.build(structured=failure == "tool")
     service.start(request)
     edges.queue.pop()()
     command = [sys.executable, "-I", "-m", "lighthouse", "status", "--ledger", str(path),
@@ -449,10 +467,11 @@ def test_startup_diagnostic_persists_without_replay(
     observed = subprocess.run(command, cwd=tmp_path, capture_output=True, text=True, timeout=10, check=True)
     data = json.loads(observed.stdout)
     assert (data["startup_reason"], data["startup_progress"]) == (reason, progress)
-    assert (data["remote"], data["local_cleanup"], data["status"]) == ("not-started", local, stage)
+    remote = Remote.UNKNOWN.value if failure == "tool" else Remote.NOT_STARTED.value
+    assert (data["remote"], data["local_cleanup"], data["status"]) == (remote, local, stage)
     assert data["approval_required"] == (failure == "permission")
     assert "synthetic-private-data" not in observed.stdout and str(tmp_path) not in observed.stdout
-    reopened = edges.build()
+    reopened = edges.build(structured=failure == "tool")
     reopened.start(request)
     reopened.publish(request.target.dispatch)
     assert len(edges.sessions) == 1 and not edges.queue and not edges.posts

@@ -284,7 +284,7 @@ class GitHubFacts:
         self._link(text, "Lighthouse-Work-Order", work.order)
         pull = Pull(ctx.project.repository, ctx.project.base, author, issue.number, work.order,
                     number, _sha(_object(obj.get("head")).get("sha")), _open(obj),
-                    _flag(obj.get("draft")))
+                    _flag(obj.get("draft")), _sha(base["sha"]) if "sha" in base else None)
         review = self._review(source.reviews, pull)
         merge = self._merge(obj, pull)
         if merge is not None and (review is None or review.verdict is not Verdict.APPROVED

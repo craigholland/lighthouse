@@ -2,6 +2,7 @@
 
 import json
 from collections import deque
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -25,6 +26,22 @@ ENTER = notify("item/completed", {"item": {"type": "enteredReviewMode", "review"
 EXIT = notify("item/completed", {"item": {"type": "exitedReviewMode", "review": "Looks good in src/f.py."}})
 DONE = notify("turn/completed", {"turn": {"id": TURN, "status": "completed", "error": None}})
 ACK = encode({"id": 4, "result": {"reviewThreadId": THREAD, "turn": {"id": TURN, "status": "inProgress"}}})
+
+TURN_ACK = encode({"id": 4, "result": {"turn": {"id": TURN, "status": "inProgress", "items": []}}})
+
+
+def final_answer(text: str, *, thread: str = THREAD, phase: str = "final_answer") -> bytes:
+    return notify("item/completed", {"item": {
+        "type": "agentMessage", "id": "assistant-output-id", "phase": phase, "text": text,
+    }}, thread=thread)
+
+
+def turn_done(text: str, *, item: str = "assistant-output-id") -> bytes:
+    return encode({"method": "turn/completed", "params": {"threadId": THREAD, "turn": {
+        "id": TURN, "status": "completed", "error": None, "itemsView": "summary",
+        "items": [{"type": "agentMessage", "id": item, "phase": "final_answer", "text": text}],
+    }}})
+
 
 
 def exact_request(tmp_path: Path) -> ReviewRequest:
@@ -62,7 +79,7 @@ class FakeSession:
                 "cwd": str(self.target.workspace),
                 "thread": {"cwd": str(self.target.workspace), "ephemeral": False, "turns": [], "id": THREAD},
             }
-        elif method == "review/start":
+        elif method in ("review/start", "turn/start"):
             self.queue.extend(self.review_frames)
             return
         else:
@@ -227,3 +244,32 @@ def test_lost_start_is_not_proof_that_nothing_ran(tmp_path: Path) -> None:
     result = StdioReviewWorker(unknown_open, lambda *_: True, lambda: 0.0).run(target, 20.0)
     assert result.hold_reason == "transport-lost" and result.acceptance_unknown and not result.owned_cleanup
     assert result.session_started and "private fixture detail" not in repr(result)
+
+
+@pytest.mark.parametrize("reason", ["duplicate", "foreign", "terminal-items", "terminal-id", "drain", "unphased", "tool-item"])
+def test_structured_turn_holds_conflicting_wire_evidence(tmp_path: Path, reason: str) -> None:
+    target = replace(exact_request(tmp_path), structured=True)
+    result_text = '{"event":"COMMENT","body":"Inert outcome."}'
+    final = final_answer(result_text)
+    terminal = DONE
+    cleanup = Shutdown(True, True)
+    output = (final,)
+    if reason == "duplicate":
+        output = (final, final)
+    if reason == "foreign":
+        output = (final_answer(result_text, thread="foreign-thread"),)
+    if reason == "terminal-items":
+        terminal = notify("turn/completed", {"turn": {"id": TURN, "status": "completed", "items": [{}]}})
+    if reason == "terminal-id":
+        terminal = turn_done(result_text, item="different-output-id")
+    if reason == "drain":
+        cleanup = Shutdown(True, True, (final,))
+    if reason == "tool-item":
+        output = (notify("item/started", {"item": {"type": "commandExecution", "id": "synthetic"}}), final)
+    if reason == "unphased":
+        output = (final_answer(result_text, phase="partial_answer"),)
+    session = FakeSession(target, review_frames=(*output, terminal, TURN_ACK), cleanup=cleanup)
+    result = StdioReviewWorker(lambda *_: session, lambda *_: True, lambda: 0.0).run(target, 20.0)
+    assert result.owned_cleanup
+    assert result.comment == ("" if reason == "unphased" else None)
+    assert [frame["method"] for frame in session.sent][-1] == "turn/start"

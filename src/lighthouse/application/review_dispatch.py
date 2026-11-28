@@ -78,7 +78,7 @@ _STARTUP_REASONS = frozenset({
     "frame-invalid", "identity-mismatch", "output-invalid", "permission-attention", "policy-unverified",
     "provider-interrupted", "request-budget", "request-invalid", "response-mismatch", "runtime-unverified",
     "second-dispatch", "server-error", "terminal-conflict", "terminal-failed", "terminal-invalid",
-    "thread-unverified", "transport-lost",
+    "thread-unverified", "transport-lost", "unexpected-review-item",
 })
 
 
