@@ -44,7 +44,9 @@ The [architecture and initial-plan package](docs/README.md) is approved. Codex m
 define and publish bounded task Issues and select compatible project-local
 versions and dependency pins within that plan. Implementation starts from the
 approved baseline on `development` after the planning PR merges; live execution
-retains its explicit task gates. The orchestration design has not yet been implemented.
+retains its explicit task gates. The delivered foundation includes validated
+configuration, workflow decisions, a durable SQLite ledger, and bounded GitHub
+evidence collection. See the [documentation index](docs/README.md).
 
 ## Development profile
 
@@ -76,7 +78,12 @@ parks draft PR #15 as an experimental reference outside that sequencing slot;
 it does not complete T02, release uncertain executions or permit concurrent writers.
 See the [amended sequence](docs/development/initial-plan.md) and
 [verification selection policy](docs/development/verification-contract.md).
-The orchestration engine has not been implemented.
+The [one-shot Codex review runner](docs/development/review-runner.md) is
+implemented for an explicitly selected, already committed review intent.
+Automatic admission, automatic Dot handoff, and activated project orchestration
+are not implemented. [Dot delivery](docs/development/dot-delivery-assessment.md)
+remains unproved, and T07 operational acceptance still requires separate
+approval and evidence.
 
 ## Contributor entry points
 
