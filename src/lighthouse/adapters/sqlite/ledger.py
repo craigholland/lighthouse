@@ -29,6 +29,8 @@ from lighthouse.application.review_dispatch import (
     Lifecycle,
     Remote,
     Stage,
+    StartupDiagnostic,
+    StartupProgress,
     Target,
 )
 from lighthouse.domain.workflow import Binding, Decision, Outcome, State
@@ -73,6 +75,7 @@ _HOLDS = {
 
 def _review_from(data: dict[str, Any]) -> Attempt:
     raw = data["target"]
+    startup = data.get("startup")
     result = Attempt(
         Target(raw["repository"], raw["order"], raw["dispatch"], raw["issue"], raw["pr"],
                raw["head"], Binding(**raw["binding"])),
@@ -81,8 +84,9 @@ def _review_from(data: dict[str, Any]) -> Attempt:
         Lifecycle(Remote(data["lifecycle"]["remote"]), Cleanup(data["lifecycle"]["cleanup"]),
                   data["lifecycle"]["approval"]),
         data.get("event", "COMMENT"),
+        StartupDiagnostic(startup["reason"], StartupProgress(startup["progress"])) if startup is not None else None,
     )
-    if not result.valid() or _dump({"event": "COMMENT", **data}) != _dump(asdict(result)):
+    if not result.valid() or _dump({"event": "COMMENT", "startup": None, **data}) != _dump(asdict(result)):
         raise ValueError
     return result
 

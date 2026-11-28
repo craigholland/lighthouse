@@ -64,6 +64,7 @@ class Edges:
         self.drop_outcome = False
         self.raise_enqueue = False
         self.move_on_shutdown = False
+        self.startup_failure = ""
 
     def outside_transaction(self) -> None:
         with sqlite3.connect(self.path, timeout=0.05) as probe:
@@ -79,6 +80,30 @@ class Edges:
         edges = self
 
         class Session(FakeSession):
+            def write(self, data: bytes, deadline: float) -> None:
+                super().write(data, deadline)
+                req = json.loads(data)
+                stage = edges.startup_failure
+                mode = req.get("method")
+                response = self.queue[-1] if self.queue else None
+                if response is None or mode not in {"initialize", "account/read", "thread/start"}:
+                    return
+                result = json.loads(response)
+                if mode == "initialize" and stage == "runtime":
+                    result["result"]["userAgent"] = "synthetic unsupported runtime"
+                elif mode == "account/read" and stage == "account":
+                    result["result"]["account"] = None
+                elif mode == "thread/start" and stage == "policy":
+                    result["result"]["sandbox"]["networkAccess"] = True
+                elif mode == "thread/start" and stage == "thread":
+                    result["result"]["thread"]["ephemeral"] = True
+                elif mode == "thread/start" and stage == "permission":
+                    result = {"id": "permission", "method": "item/commandExecution/requestApproval", "params": {}}
+                elif mode == "thread/start" and stage == "transport":
+                    raise OSError("synthetic-private-data-must-not-appear")
+                else:
+                    return
+                self.queue[-1] = json.dumps(result).encode() + b"\n"
             def shutdown(self, deadline: float) -> Shutdown:
                 if edges.move_on_shutdown:
                     edges.head = "c" * 40
@@ -394,3 +419,54 @@ def test_structured_worker_does_not_promote_free_prose(tmp_path: Path) -> None:
     assert status.attempt is not None and status.attempt.lifecycle.remote is Remote.COMPLETED
     assert status.attempt.lifecycle.cleanup is Cleanup.CONFIRMED
     assert not edges.posts
+
+
+@pytest.mark.parametrize(("failure", "reason", "progress", "local", "stage"), [
+    ("runtime", "runtime-unverified", "session-opened", "owned-cleanup-confirmed", "unavailable"),
+    ("account", "account-unverified", "runtime-verified", "owned-cleanup-confirmed", "unavailable"),
+    ("policy", "policy-unverified", "account-verified", "owned-cleanup-confirmed", "unavailable"),
+    ("thread", "thread-unverified", "account-verified", "owned-cleanup-confirmed", "unavailable"),
+    ("permission", "permission-attention", "account-verified", "owned-cleanup-confirmed", "approval-required"),
+    ("transport", "transport-lost", "account-verified", "owned-cleanup-unconfirmed", "cleanup-unconfirmed"),
+])
+def test_startup_diagnostic_persists_without_replay(
+    tmp_path: Path, failure: str, reason: str, progress: str, local: str, stage: str,
+) -> None:
+    path = tmp_path / "ledger"
+    ledger = SQLiteLedger.initialize(path)
+    accept(tmp_path, ledger)
+    request = commit_review(tmp_path, ledger)
+    edges = Edges(path)
+    edges.startup_failure = failure
+    if failure == "transport":
+        edges.cleanup = Shutdown(True, False)
+    service = edges.build()
+    service.start(request)
+    edges.queue.pop()()
+    command = [sys.executable, "-I", "-m", "lighthouse", "status", "--ledger", str(path),
+               "--project", REPO, "--dispatch", request.target.dispatch]
+    before = path.read_bytes()
+    observed = subprocess.run(command, cwd=tmp_path, capture_output=True, text=True, timeout=10, check=True)
+    data = json.loads(observed.stdout)
+    assert (data["startup_reason"], data["startup_progress"]) == (reason, progress)
+    assert (data["remote"], data["local_cleanup"], data["status"]) == ("not-started", local, stage)
+    assert data["approval_required"] == (failure == "permission")
+    assert "synthetic-private-data" not in observed.stdout and str(tmp_path) not in observed.stdout
+    reopened = edges.build()
+    reopened.start(request)
+    reopened.publish(request.target.dispatch)
+    assert len(edges.sessions) == 1 and not edges.queue and not edges.posts
+    assert path.read_bytes() == before
+    if failure == "runtime":
+        # Remove the new optional key from this owned test record to model old schema-v2 files.
+        with sqlite3.connect(path) as conn:
+            row, = conn.execute("SELECT data FROM review_attempts").fetchone()
+            old = json.loads(row)
+            del old["startup"]
+            conn.execute("UPDATE review_attempts SET data=?", (json.dumps(old, sort_keys=True, separators=(",", ":")),))
+        observed = subprocess.run(command, cwd=tmp_path, capture_output=True, text=True, timeout=10, check=True)
+        older = json.loads(observed.stdout)
+        assert (older["startup_reason"], older["startup_progress"]) == ("unknown", "unknown")
+        assert (older["remote"], older["local_cleanup"], older["status"]) == ("not-started", local, stage)
+        assert edges.build().start(request).attempt is not None
+        assert len(edges.sessions) == 1 and not edges.queue and not edges.posts
