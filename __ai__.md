@@ -15,8 +15,9 @@ settings, credentials, and Git internals are outside this scope.
 
 Maintain the governing standards and development foundation for a reusable
 development-orchestration project. The installable package currently exposes
-CLI help, version and read-only existing-ledger status. Distinguish approved design from implemented
-behavior and demonstrated integration capability.
+inert help/version, read-only existing-ledger status, and a one-shot foreground
+review command for an existing committed intent. Its effectful execution is
+separately gated. Distinguish design, implementation and operational evidence.
 
 ## Architectural Rules
 
@@ -30,8 +31,8 @@ The approved runtime baseline remains one local Python process, TOML profiles
 and a SQLite workflow ledger, with GitHub authoritative for repository facts.
 The [work intake contract](docs/development/work-intake.md) governs the design of
 readiness, dependencies, captured scope, priority, and PR linkage.
-Provider-backed intake is not
-implemented. Keep the foundation free of live integration behavior.
+Automatic provider-backed admission and background discovery are not implemented.
+The foreground review runner reads only evidence for its selected accepted work.
 
 The 2026-11-25 recovery amendment, effective after its documentation PR merges,
 allows bounded offline provider-neutral foundations without T02 completion.
@@ -52,17 +53,19 @@ within this repository and do not rely on another checkout. The experiment pins 
 
 `python -m lighthouse --help` describes the available options.
 `python -m lighthouse --version` reports installed package metadata.
-Unsupported arguments exit nonzero. Import and these commands do not open
-external resources or start work. See the offline
+Unsupported arguments exit nonzero. Imports and help/version are inert;
+`status` reads only an existing ledger. See the offline
 [configuration contract](docs/development/configuration.md) and
 [pure workflow decisions](docs/development/workflow.md), and the explicit
 [offline SQLite ledger](docs/development/ledger.md).
 The [GitHub mapper](docs/development/github-facts.md) only normalizes supplied facts.
-The [bounded collector and cache](docs/development/github-collection.md) are not wired to the CLI.
-The [offline reconciler](docs/development/reconciliation.md) records intents but cannot execute them.
-The [dormant review dispatch](docs/development/review-dispatch.md) composes
-injected execution and publication for committed review intents without any live
-composition, runtime or publishing authority.
+The [bounded collector and cache](docs/development/github-collection.md) serve
+the explicit review selection, not automatic admission. The
+[reconciler](docs/development/reconciliation.md) records intents, and the
+[one-shot review runner](docs/development/review-runner.md) can consume one
+existing REVIEW intent only when the private selection and captured authority
+match. The operator selects the exact allowed event, APPROVE, REQUEST_CHANGES
+or COMMENT. Separate exact owner approval is still required for any real run.
 
 ## File Index
 
@@ -70,7 +73,7 @@ composition, runtime or publishing authority.
 - [pyproject.toml](pyproject.toml) and [requirements-dev.lock](requirements-dev.lock):
   package metadata, tool settings, and Windows dependency pins.
 - [src/lighthouse/__main__.py](src/lighthouse/__main__.py): module entry point.
-- [src/lighthouse/cli.py](src/lighthouse/cli.py): parses help and version arguments.
+- [src/lighthouse/cli.py](src/lighthouse/cli.py): defines help, version, status and the explicit foreground review entry.
 - [tests/test_cli.py](tests/test_cli.py): tests the real installed entry point.
 - [docs/README.md](docs/README.md): index of the adopted architecture and plan.
 - [Codex review experiment](experiments/codex-review/__ai__.md): offline recovery evidence and one exact-head controlled live proof, not production readiness.
@@ -78,10 +81,10 @@ composition, runtime or publishing authority.
 
 ## Known Gaps / Future-State Notes
 
-The [dormant concrete bindings](docs/development/runtime-bindings.md) require separately approved private inputs.
-No runnable production orchestration engine, active
-provider bindings or CI are implemented. The separately gated T01 experiment is not
-a production integration. Compatibility is targeted to CPython 3.14.x on Windows
+The [concrete bindings](docs/development/runtime-bindings.md) and explicit runner
+require separately approved private inputs. There is no orchestration service,
+automatic dispatch, activated project profile or CI. The T01 experiment is not
+a production integration, and the T07 runner has only offline evidence. Compatibility is targeted to CPython 3.14.x on Windows
 AMD64, not asserted for other environments. Integration proofs and production
 activation retain their approval gates in the
 [decision register](docs/decisions/open-questions.md). Basic branch protection

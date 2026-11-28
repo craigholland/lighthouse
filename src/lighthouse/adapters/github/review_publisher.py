@@ -1,4 +1,4 @@
-"""Exact single-attempt GitHub COMMENT boundary; no live client is selected here."""
+"""Exact single-attempt GitHub review boundary; no live client is selected here."""
 
 from __future__ import annotations
 
@@ -11,6 +11,7 @@ from typing import Protocol
 _ORIGIN = "https://api.github.com"
 _MAX_TEXT_BYTES = 16_384
 _LIMIT = 100
+_STATES = {"COMMENT": "COMMENTED", "APPROVE": "APPROVED", "REQUEST_CHANGES": "CHANGES_REQUESTED"}
 _PREFIX = "<!-- lighthouse:codex-dispatch-v1:"
 
 
@@ -38,10 +39,11 @@ class ReviewTarget:
     head: str
     lead_id: int
     attempt_id: str
+    event: str = "COMMENT"
 
     def __post_init__(self) -> None:
         if (
-            not isinstance(self.repository, str) or not _repository(self.repository)
+            self.event not in _STATES or not isinstance(self.repository, str) or not _repository(self.repository)
             or not _positive(self.pull_request) or not _positive(self.lead_id)
             or not isinstance(self.head, str) or not re.fullmatch(r"[0-9a-f]{40}", self.head)
             or not isinstance(self.attempt_id, str) or not re.fullmatch(r"[0-9a-f]{64}", self.attempt_id)
@@ -95,7 +97,7 @@ def _receipt(target: ReviewTarget, resource: object, *, body: str | None = None)
         raise PublicationHeld("exact COMMENT receipt unavailable")
     review_id, actor, content = resource.get("id"), resource.get("user"), resource.get("body")
     if (
-        not _positive(review_id) or resource.get("state") != "COMMENTED"
+        not _positive(review_id) or resource.get("state") != _STATES[target.event]
         or resource.get("commit_id") != target.head or resource.get("pull_request_url") != target.pull_url
         or not isinstance(actor, dict) or not _positive(actor.get("id")) or actor["id"] != target.lead_id
         or not isinstance(content, str) or len(content) > _MAX_TEXT_BYTES + 256
@@ -138,7 +140,7 @@ class ReviewPublisher:
             raise PublicationHeld("current pull request does not match")
 
     def publish(self, target: ReviewTarget, text: str) -> CommentReceipt:
-        """One fixed COMMENT POST after the outer durable one-use claim."""
+        """One fixed, explicitly selected review POST after the outer durable one-use claim."""
         self._validate_scope(target)
         body = _body(target, text)
         try:
@@ -151,7 +153,7 @@ class ReviewPublisher:
             raise PublicationHeld("COMMENT not attempted") from None
         try:
             response = self._client.create_review(
-                target.repository, target.pull_request, head=target.head, event="COMMENT", body=body,
+                target.repository, target.pull_request, head=target.head, event=target.event, body=body,
             )
             return _receipt(target, response, body=body)
         except (OSError, RuntimeError, ValueError):

@@ -6,13 +6,17 @@ import math
 import re
 import sqlite3
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 from email.utils import parsedate_to_datetime
 from typing import Any
 from urllib.parse import parse_qs, urlencode, urlsplit
 
 from lighthouse.adapters.github.cache import Cache, Page
+from lighthouse.adapters.github.dependency_evidence import (
+    Resolution,
+    verify_dependencies,
+)
 from lighthouse.adapters.github.facts import (
     API_VERSION,
     Context,
@@ -107,6 +111,43 @@ class GitHubCollector:
         except (ValueError, OSError, OverflowError, sqlite3.Error, http.client.HTTPException):
             return Scan(revision, cycle.count, hold="invalid-or-unavailable-evidence")
 
+    def selected_review(
+        self, context: Context, *, now: datetime, revision: str,
+        dependencies: tuple[Resolution, ...],
+    ) -> tuple[Observation, str]:
+        """Fresh exact-work scan, independent of the ready-queue inventory."""
+        scope, work = self._transport.scope, context.work
+        if (context.dependencies_complete or work is None or work.pr is None
+                or (context.project, context.labels, context.verification) != (
+                    self._default.project, self._default.labels, self._default.verification)
+                or scope.repository != context.project.repository
+                or scope.read_identity != context.project.lead
+                or scope.comments != frozenset(entry.comment for entry in dependencies)):
+            raise Held("selected-review-context")
+        cycle = _Cycle(self._transport, self._cache, now, 20, 3.0)
+        issue_path = f"issues/{work.issue}"
+        issue = cycle.detail(issue_path, fresh=True)
+        body = issue.get("body")
+        if not isinstance(body, str):
+            raise Held("selected-issue-content")
+        verify_dependencies(
+            body, scope.repository, work.issue, {context.project.owner, context.project.lead},
+            dependencies, lambda number: cycle.detail(f"issues/comments/{number}", fresh=True),
+        )
+        events = cycle.pages(f"{issue_path}/events", fresh=True)
+        pull_path = f"pulls/{work.pr}"
+        pull = cycle.detail(pull_path, fresh=True)
+        reviews = cycle.pages(f"{pull_path}/reviews", fresh=True)
+        if cycle.detail(issue_path, fresh=True) != issue or cycle.detail(pull_path, fresh=True) != pull:
+            raise Held("resource-drift")
+        evidence = json.dumps({"issue": body, "title": issue.get("title"), "pull": pull.get("body")},
+                              ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+        if len(evidence.encode()) > 100_000:
+            raise Held("selected-review-content-limit")
+        return GitHubFacts(replace(context, dependencies_complete=True)).normalize(Resources(
+            scope.repository, work.issue, revision, API_VERSION, True, issue, events, pull, reviews,
+        )), evidence
+
     @staticmethod
     def _pull(
         cycle: _Cycle, context: Context, refresh: dict[str, Any],
@@ -153,13 +194,13 @@ class _Cycle:
         data, _ = self._read(f"{self.root}/{path}", collection=False, fresh=fresh)
         return _object(data)
 
-    def pages(self, path: str, **query: str) -> list[dict[str, Any]]:
+    def pages(self, path: str, *, fresh: bool = False, **query: str) -> list[dict[str, Any]]:
         rows: list[dict[str, Any]] = []
         page = 1
         while True:
             params = {**query, "per_page": "100", "page": str(page)}
             url = f"{self.root}/{path}?{urlencode(params)}"
-            data, link = self._read(url, collection=True)
+            data, link = self._read(url, collection=True, fresh=fresh)
             rows.extend(_objects(data))
             candidate = self._next(link)
             if candidate is None:

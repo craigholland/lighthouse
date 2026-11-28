@@ -37,3 +37,12 @@ credential references, contacts a provider, or runs verification commands.
 Use the [Issue template](../../.github/ISSUE_TEMPLATE/implementation.md) and
 [PR template](../../.github/PULL_REQUEST_TEMPLATE.md) for work intake. Neither
 grants readiness; see the intake contract for the bootstrap work-order exception.
+
+The [T07 review runner](review-runner.md) explicitly composes one private
+per-run packet with these validated inactive definitions. None of the public
+profile examples is an operational packet or authorizes provider access.
+
+At an admission boundary capture `profile_fingerprint(service, profile)` in
+the accepted binding. The versioned canonical representation hashes normalized
+policy data, not the syntactic TOML, private credential values or its filename.
+A profile slug names a definition; it does not attest its contents.

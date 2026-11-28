@@ -37,6 +37,9 @@ def bind_review(
     current_lead: Callable[[str, int, str], int | None],
     enqueue: Callable[[Callable[[], None]], None],
     native_boundary: Callable[[], Child] | None = None,
+    structured: bool = False,
+    worker_context: tuple[str, str] | None = None,
+    expected_event: str | None = None,
 ) -> ReviewDispatch:
     """Select concrete adapters without starting work, opening a child or contacting GitHub."""
     target = binding.target
@@ -65,5 +68,6 @@ def bind_review(
     publisher = ReviewPublisher(http, repository=project.repository)
     return compose_review_dispatch(
         project, ledger, worker, publisher, current=current, enqueue=enqueue, deadlines=deadlines,
-        workspace=window.workspace, model=binding.model,
+        workspace=window.workspace, model=binding.model, structured=structured, worker_context=worker_context,
+        expected_event=expected_event,
     )

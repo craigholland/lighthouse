@@ -33,5 +33,6 @@ This documentation change starts no T03 assignment or live operation.
 - [Dormant T07 runtime bindings](development/runtime-bindings.md): concrete private adapters, read-only status and activation limits.
 - [Dot delivery assessment](development/dot-delivery-assessment.md): supported surfaces,
   the missing worker-claim operation and the recommended manual handoff.
+- [T07 foreground review runner](development/review-runner.md): private selection, exact outcomes and holds.
 - [Decision register](decisions/open-questions.md): adopted choices, approval
   history and future execution/evidence gates.

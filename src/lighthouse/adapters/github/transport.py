@@ -22,6 +22,7 @@ class Scope:
     repository: str
     read_identity: int
     ready_label: str
+    comments: frozenset[int] = frozenset()
 
     def target(self, url: str) -> str:
         """Validate destination and endpoint-specific query before any send."""
@@ -36,8 +37,10 @@ class Scope:
                 or not parsed.path.startswith(root)
                 or not re.fullmatch(
                     r"(?:|/issues(?:/[1-9][0-9]*(?:/events)?)?"
-                    r"|/pulls(?:/[1-9][0-9]*(?:/reviews)?)?)", suffix,
+                    r"|/issues/comments/[1-9][0-9]{0,18}|/pulls(?:/[1-9][0-9]*(?:/reviews)?)?)", suffix,
                 )):
+            raise Held("destination")
+        if suffix.startswith("/issues/comments/") and int(suffix.rsplit("/", 1)[1]) not in self.comments:
             raise Held("destination")
         try:
             pairs = parse_qsl(parsed.query, strict_parsing=True, max_num_fields=4)

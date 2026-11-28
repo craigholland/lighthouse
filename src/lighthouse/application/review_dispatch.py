@@ -119,6 +119,7 @@ class Attempt:
     marker: str = ""
     review_id: int = 0
     lifecycle: Lifecycle = Lifecycle()
+    event: str = "COMMENT"
 
     def valid(self) -> bool:
         identity = bool(_REF.fullmatch(self.thread) and _REF.fullmatch(self.turn))
@@ -134,6 +135,8 @@ class Attempt:
         has_marker = self.stage in {Stage.PUBLISHING, Stage.COMMENTED}
         return bool(
             self.target.valid() and _HEX.fullmatch(self.fingerprint) and phase_identity
+            and self.event in {"COMMENT", "APPROVE", "REQUEST_CHANGES"}
+            and (has_output or self.event == "COMMENT")
             and self.stage not in {Stage.PENDING, Stage.HELD}
             and (bool(_HEX.fullmatch(self.output)) if has_output else not self.output)
             and (bool(_HEX.fullmatch(self.marker)) if has_marker else not self.marker)
@@ -167,6 +170,7 @@ class Completion:
     turn: str
     comment: str = field(repr=False)
     owned_cleanup: bool
+    event: str = "COMMENT"
 
 
 class Executor(Protocol):
@@ -184,9 +188,12 @@ class ReviewDispatch:
 
     def __init__(
         self, project: Project, attempts: Attempts, executor: Executor, comment: Comment,
-        current: Callable[[Target], bool],
+        current: Callable[[Target], bool], *,
+        formal_submit: Callable[[Attempt, str], int | None] | None = None,
+        formal_lookup: Callable[[Attempt], int | None] | None = None,
     ) -> None:
         self.project = project
+        self._formal_submit, self._formal_lookup = formal_submit, formal_lookup
         self._attempts, self._executor, self._comment, self._current = attempts, executor, comment, current
 
     def _is_current(self, target: Target) -> bool:
@@ -268,12 +275,12 @@ class ReviewDispatch:
         if result.owned_cleanup is not True:
             return self.hold(dispatch, result.fingerprint, Stage.CLEANUP_UNCONFIRMED, result.thread, result.turn,
                              lifecycle=Lifecycle(Remote.COMPLETED, Cleanup.UNCONFIRMED))
-        if (not result.comment.strip() or len(result.comment.encode("utf-8", errors="replace")) > 16384
+        if (result.event not in {"COMMENT", "APPROVE", "REQUEST_CHANGES"} or not result.comment.strip() or len(result.comment.encode("utf-8", errors="replace")) > 16384
                 or any(ord(char) < 32 and char not in "\r\n\t" for char in result.comment)):
             return self.hold(dispatch, result.fingerprint, Stage.EXECUTION_UNKNOWN, result.thread, result.turn,
                              lifecycle=Lifecycle(Remote.COMPLETED, Cleanup.CONFIRMED))
         self._attempts.advance_review(prior, replace(
-            prior, stage=Stage.COMPLETED, output=digest(result.comment),
+            prior, stage=Stage.COMPLETED, output=digest(result.comment), event=result.event,
             lifecycle=Lifecycle(Remote.COMPLETED, Cleanup.CONFIRMED),
         ))
         return self.status(dispatch)
@@ -289,17 +296,23 @@ class ReviewDispatch:
             if not self._is_current(old.target):
                 self._attempts.advance_review(old, replace(old, stage=Stage.STALE))
                 return self.status(dispatch)
-            pending = replace(old, stage=Stage.PUBLISHING, marker=digest((old.fingerprint, old.output)))
+            pending = replace(old, stage=Stage.PUBLISHING, marker=digest((old.fingerprint, old.event, old.output)))
             if not self._attempts.advance_review(old, pending):
                 return self.status(dispatch)
             try:
-                review_id = self._comment.submit(pending.target, pending.marker, text)
+                if pending.event == "COMMENT":
+                    review_id = self._comment.submit(pending.target, pending.marker, text)
+                else:
+                    review_id = self._formal_submit(pending, text) if self._formal_submit else None
             except Exception:
                 review_id = None
         else:
             pending = old
             try:
-                review_id = self._comment.lookup(pending.target, pending.marker, pending.output)
+                if pending.event == "COMMENT":
+                    review_id = self._comment.lookup(pending.target, pending.marker, pending.output)
+                else:
+                    review_id = self._formal_lookup(pending) if self._formal_lookup else None
             except Exception:
                 review_id = None
         if type(review_id) is int and review_id > 0:

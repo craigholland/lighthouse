@@ -46,10 +46,10 @@ class HTTPSReviewClient:
 
     def create_review(self, repository: str, number: int, *, head: str, event: str, body: str) -> object:
         target = self._target(repository, number)
-        if (event != "COMMENT" or not _HEAD.fullmatch(head) or not body.strip()
+        if (event not in {"COMMENT", "APPROVE", "REQUEST_CHANGES"} or not _HEAD.fullmatch(head) or not body.strip()
                 or len(body) > 16640 or len(body.encode(errors="replace")) > 16640):
             raise PublicationHeld("review action not allowed")
-        payload = json.dumps({"commit_id": head, "event": "COMMENT", "body": body}).encode()
+        payload = json.dumps({"commit_id": head, "event": event, "body": body}).encode()
         return self._request("POST", target + "/reviews", payload)
 
     def list_reviews(self, repository: str, number: int, *, limit: int) -> object:
