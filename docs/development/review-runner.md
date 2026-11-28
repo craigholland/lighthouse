@@ -99,7 +99,12 @@ up only that attempt. It cannot start the model again or issue another POST.
 Ambiguous provider output or unconfirmed local cleanup is not approval.
 
 A matched formal review can change the observed workflow disposition. COMMENT
-does not approve. Approval alone does not establish a verification receipt
+does not approve. Receipt reconciliation uses the local UTC time after bounded
+authoritative collection, not the provider timestamp as its clock. If the
+receipt is still future-dated or the local clock moved backwards during
+collection, immediate status reports an observation hold for the owner. A
+later observation cannot rerun the worker or repost the review.
+Approval alone does not establish a verification receipt
 or authorize merge; a missing receipt remains a hold. See the existing
 [read-only status and binding limits](runtime-bindings.md).
 
