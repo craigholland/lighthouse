@@ -26,7 +26,7 @@ from lighthouse.adapters.sqlite.ledger import SQLiteLedger
 from lighthouse.application.coordinator import Bundle, Coordinator, Cycle
 from lighthouse.application.ledger import Intent
 from lighthouse.application.review_dispatch import ReviewInput, Stage, Target
-from lighthouse.configuration import load_configuration
+from lighthouse.configuration import load_configuration, profile_fingerprint
 from lighthouse.domain.workflow import Execution, Outcome, Project, State, Workflow
 from lighthouse.operator_status import render_status
 from lighthouse.runtime_bindings import PrivateRuntimeBinding, bind_review
@@ -76,10 +76,12 @@ def run_review(settings: Path, dispatch: str, *, resolve: Callable[[str], str] =
     } or type(raw["version"]) is not int or raw["version"] != 1:
         raise ValueError("invalid settings")
     issue, pr, ready_id = (_number(raw[k]) for k in ("issue", "pr", "readiness_event"))
-    profile, = load_configuration(_path(raw["service"]), [_path(raw["profile"])]).projects
+    configuration = load_configuration(_path(raw["service"]), [_path(raw["profile"])])
+    profile, = configuration.projects
     if profile.repository != raw["repository"] or profile.project != raw["profile_id"]:
         raise ValueError("profile mismatch")
-    project = Project(profile.repository, profile.integration, profile.project, profile.actors.owner,
+    project = Project(profile.repository, profile.integration, profile_fingerprint(configuration.service, profile),
+                      profile.actors.owner,
                       profile.actors.lead, profile.actors.implementer)
     ledger_path, cache_path = _path(raw["ledger"]), _path(raw["cache"])
     if ledger_path.resolve() in {cache_path.resolve(), settings.resolve()}:

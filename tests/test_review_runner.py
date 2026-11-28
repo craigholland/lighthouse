@@ -3,21 +3,27 @@
 import json
 import subprocess
 import sys
+from dataclasses import replace
 from hashlib import sha256
 from pathlib import Path
 
 import pytest
-from test_coordinator import accept
-from test_github import HEAD, PRE, PROJECT, REPO, pull, resources, review
+from test_coordinator import CYCLE, ready, with_pull
+from test_github import CONTEXT, HEAD, PRE, PROJECT, REPO, pull, resources, review
+from test_github_collection import Fake
 from test_review_http import Response
-from test_t07_dispatch import commit_review
 from test_t07_stdio import ACK, DONE, ENTER, FakeSession, notify
 
 from lighthouse.adapters.codex import windows_session
 from lighthouse.adapters.codex.stdio import ReviewRequest
 from lighthouse.adapters.github import review_http
+from lighthouse.adapters.github.facts import ReadinessBinding
+from lighthouse.adapters.github.observation_source import GitHubObservationSource
 from lighthouse.adapters.sqlite.ledger import SQLiteLedger
+from lighthouse.application.coordinator import Coordinator
 from lighthouse.cli import main
+from lighthouse.configuration import load_configuration, profile_fingerprint
+from lighthouse.domain.workflow import Outcome, Workflow
 
 
 def test_installed_review_help_and_missing_settings_are_inert(tmp_path: Path) -> None:
@@ -37,14 +43,13 @@ def test_installed_review_help_and_missing_settings_are_inert(tmp_path: Path) ->
         assert not missing.exists()
 
 
-@pytest.mark.parametrize(("event", "phase"), [
-    ("COMMENT", "review"), ("REQUEST_CHANGES", "revise"), ("APPROVE", "hold"),
+@pytest.mark.parametrize(("event", "phase", "drift"), [
+    ("COMMENT", "review", ""), ("REQUEST_CHANGES", "revise", ""), ("APPROVE", "hold", ""),
+    ("APPROVE", "", "owner"), ("APPROVE", "", "verification"), ("APPROVE", "", "workspace"),
 ])
-def test_explicit_foreground_composition(tmp_path: Path, monkeypatch, capsys, event: str, phase: str) -> None:
+def test_explicit_foreground_composition(tmp_path: Path, monkeypatch, capsys, event: str, phase: str, drift: str) -> None:
     ledger_path = tmp_path / "ledger"
     ledger = SQLiteLedger.initialize(ledger_path)
-    accept(tmp_path, ledger)
-    req = commit_review(tmp_path, ledger).target
     workspace, home = tmp_path / "review", tmp_path / "home"
     workspace.mkdir()
     home.mkdir()
@@ -65,6 +70,30 @@ def test_explicit_foreground_composition(tmp_path: Path, monkeypatch, capsys, ev
         ("workspaces", dict(implementation=str(tmp_path / "writer"), review=str(workspace))),
         ("verification", dict(directory=".", commands=["python -m pytest"])),
     ))
+    configured = load_configuration(service, [profile])
+    fingerprint = profile_fingerprint(configured.service, configured.projects[0])
+    admitted_project = replace(PROJECT, profile=fingerprint)
+    assert CONTEXT.readiness is not None
+    admitted_binding = replace(CONTEXT.readiness.binding, profile=fingerprint)
+    admitted_context = replace(CONTEXT, project=admitted_project,
+                               readiness=ReadinessBinding(4, 100, admitted_binding))
+    fake = Fake()
+
+
+    # Use the configured profile fingerprint at the independent admission boundary.
+    from lighthouse.adapters.github.cache import Cache
+    from lighthouse.adapters.github.collection import GitHubCollector
+
+    collector = GitHubCollector(fake, Cache(tmp_path / "profile-cache"), admitted_project, CONTEXT.labels, "checks")
+    coordinator = Coordinator(Workflow(admitted_project), ledger, GitHubObservationSource(
+        collector, lambda state: {4: replace(admitted_context, work=state.work)},
+    ))
+    ready(fake)
+    assert coordinator.reconcile(CYCLE).phase is Outcome.IMPLEMENT
+    with_pull(fake, discover=True)
+    selected = coordinator.reconcile(replace(CYCLE, revision="captured-review", version=2))
+    assert selected.phase is Outcome.REVIEW
+    req, = [i for i in selected.intents if i.operation == "review"]
     origin = f"https://api.github.com/repos/{REPO}"
     pr = pull(url=f"{origin}/pulls/8")
     available = resources()
@@ -74,13 +103,41 @@ def test_explicit_foreground_composition(tmp_path: Path, monkeypatch, capsys, ev
                           ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     write(settings, dict(version=1, service=str(service), profile=str(profile), profile_id=PROJECT.profile,
                          ledger=str(ledger_path), cache=str(tmp_path / "run-cache"), repository=REPO,
-                         order=req.order, issue=req.issue, pr=req.pr, head=req.head, readiness_event=100,
+                         order=req.order, issue=4, pr=req.pr, head=req.head, readiness_event=100,
                          verification="checks", runtime=str(executable),
                          runtime_sha256=sha256(executable.read_bytes()).hexdigest(), git=str(git),
                          codex_home=str(home), model="fixture-model.1", intake_ref="FIXTURE_READ", expected_event=event,
                          publisher_ref="FIXTURE_PUBLISH", dependencies=[],
                          evidence_sha256=sha256(evidence.encode()).hexdigest()),
           (("environment", dict(SystemRoot=str(tmp_path), TEMP=str(tmp_path))),))
+    if drift:
+        content = profile.read_text(encoding="utf-8")
+        changes = {
+            "owner": (f"owner = {PROJECT.owner}", "owner = 99"),
+            "verification": ('commands = ["python -m pytest"]', 'commands = ["python -m unittest"]'),
+            "workspace": (json.dumps(str(workspace)), json.dumps(str(tmp_path / "other-review"))),
+        }
+        old, new = changes[drift]
+        assert old in content
+        profile.write_text(content.replace(old, new), encoding="utf-8")
+
+        def forbidden(*_args, **_kwargs):
+            pytest.fail("profile drift reached credentials, Git, HTTP or child work")
+
+        monkeypatch.setattr(windows_session.subprocess, "run", forbidden)
+        monkeypatch.setattr(review_http.http.client, "HTTPSConnection", forbidden)
+        monkeypatch.setattr(windows_session.WindowsReviewOwner, "__init__", forbidden)
+        # Resolve would raise KeyError unless the exact input gate worked first.
+        from lighthouse.review_runner import run_review
+
+        before = ledger_path.read_bytes()
+        with pytest.raises(ValueError, match="selection is not a committed review"):
+            run_review(settings, req.dispatch_id, resolve=forbidden)
+        with pytest.raises(SystemExit) as held:
+            main(["review", "--settings", str(settings), "--dispatch", req.dispatch_id])
+        assert held.value.code == 2
+        assert ledger_path.read_bytes() == before and not (tmp_path / "run-cache").exists()
+        return
     monkeypatch.setenv("FIXTURE_READ", "synthetic-read")
     monkeypatch.setenv("FIXTURE_PUBLISH", "synthetic-write")
 
@@ -183,9 +240,9 @@ def test_explicit_foreground_composition(tmp_path: Path, monkeypatch, capsys, ev
             return FakeResponse(200, choices[route.removeprefix(prefix)])
 
     monkeypatch.setattr(review_http.http.client, "HTTPSConnection", Link)
-    assert main(["review", "--settings", str(settings), "--dispatch", req.dispatch]) == 0
+    assert main(["review", "--settings", str(settings), "--dispatch", req.dispatch_id]) == 0
     reported = json.loads(capsys.readouterr().out)
     assert reported["review_event"] == event and reported["phase"] == phase, (reported, launched, len(posts), wire.sent)
     assert reported["review"] == 90 and len(launched) == len(posts) == 1
-    assert main(["review", "--settings", str(settings), "--dispatch", req.dispatch]) == 0
+    assert main(["review", "--settings", str(settings), "--dispatch", req.dispatch_id]) == 0
     assert len(launched) == len(posts) == 1

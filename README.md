@@ -109,5 +109,7 @@ the test, lint, and type checks and the clean-room install procedure.
 
 The Python configuration boundary validates shared service settings and explicit
 project TOML profiles offline. See the [schema and examples](docs/development/configuration.md).
-The [T07 foreground review entry](docs/development/review-runner.md) selects one existing committed review with explicit private settings. Automatic discovery or activation
-is implemented.
+The [T07 foreground review entry](docs/development/review-runner.md) selects
+one already committed review with explicit private settings and captured
+authority. There is no automatic discovery or activation. Operational use
+requires separate exact owner approval.

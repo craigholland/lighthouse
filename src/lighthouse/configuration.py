@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import json
 import ntpath
 import re
 import tomllib
 from collections.abc import Iterable
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
+from hashlib import sha256
 from pathlib import Path, PureWindowsPath
 from typing import cast
 
@@ -78,6 +80,18 @@ class Configuration:
 
     service: ServiceSettings
     projects: tuple[ProjectProfile, ...]
+
+
+def profile_fingerprint(service: ServiceSettings, profile: ProjectProfile) -> str:
+    """Identify the parsed policy captured at admission, not the TOML path or slug."""
+    values = asdict(profile)
+    values["implementation_workspace"] = profile.implementation_workspace.as_posix()
+    values["review_workspace"] = profile.review_workspace.as_posix()
+    canonical = json.dumps(
+        {"format": "lighthouse-profile-v1", "service": asdict(service), "project": values},
+        ensure_ascii=True, sort_keys=True, separators=(",", ":"),
+    )
+    return sha256(canonical.encode("ascii")).hexdigest()
 
 
 def _read(path: Path) -> _TABLE:

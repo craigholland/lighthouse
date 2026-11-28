@@ -16,8 +16,13 @@ private input evidence and checkout paths outside the repository. Set
 
 - `service`, `profile`, `profile_id`, `ledger`, `cache` and `repository`.
   Name the existing ledger, separate cache, and validated service/project
-  TOML files. The project's numerical actors and dedicated review checkout
-  must match the operation. The command does not initialize a ledger.
+  TOML files. The slug selects the profile definition, but cannot authorize
+  review. Its canonical `lighthouse-profile-v1` fingerprint, captured at
+  admission from the validated service switches, numerical actors, workspaces,
+  branches, labels, credential reference name and verification definition, must
+  equal the existing work binding. TOML formatting is not authority. Profile
+  drift or an earlier slug-only binding holds; use normal reconciliation rather
+  than migrating an existing reservation. The command does not initialize a ledger.
 - `order`, `issue`, `pr`, `head`, `readiness_event` and `verification`.
   All match the accepted binding, original audit and exact committed REVIEW.
   Issue and PR are numeric and the head is a full lowercase SHA.
