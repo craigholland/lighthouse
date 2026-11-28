@@ -46,6 +46,7 @@ def test_installed_review_help_and_missing_settings_are_inert(tmp_path: Path) ->
 @pytest.mark.parametrize(("event", "phase", "drift"), [
     ("COMMENT", "review", ""), ("REQUEST_CHANGES", "revise", ""), ("APPROVE", "hold", ""),
     ("APPROVE", "", "owner"), ("APPROVE", "", "verification"), ("APPROVE", "", "workspace"),
+    ("APPROVE", "", "artifact-fit"), ("APPROVE", "", "artifact-large"), ("APPROVE", "", "artifact-digest"),
 ])
 def test_explicit_foreground_composition(tmp_path: Path, monkeypatch, capsys, event: str, phase: str, drift: str) -> None:
     ledger_path = tmp_path / "ledger"
@@ -110,6 +111,73 @@ def test_explicit_foreground_composition(tmp_path: Path, monkeypatch, capsys, ev
                          publisher_ref="FIXTURE_PUBLISH", dependencies=[],
                          evidence_sha256=sha256(evidence.encode()).hexdigest()),
           (("environment", dict(SystemRoot=str(tmp_path), TEMP=str(tmp_path))),))
+    if drift.startswith("artifact-"):
+        pinned_size = 407_421_232
+        bound = 536_870_912
+        size = bound + 1 if drift == "artifact-large" else pinned_size
+        chunk = b"a" * 1_048_576
+        expected = sha256()
+        if drift == "artifact-fit":
+            full, tail = divmod(size, len(chunk))
+            for _ in range(full):
+                expected.update(chunk)
+            expected.update(chunk[:tail])
+        inert_digest = expected.hexdigest()
+        original_text = settings.read_text(encoding="utf-8")
+        assert sha256(executable.read_bytes()).hexdigest() in original_text
+        settings.write_text(original_text.replace(sha256(executable.read_bytes()).hexdigest(), inert_digest),
+                            encoding="utf-8")
+        remaining = size
+
+        class Artifact:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_args):
+                pass
+
+            def read(self, count):
+                nonlocal remaining
+                assert 0 < count <= len(chunk)
+                take = min(count, remaining)
+                remaining -= take
+                return chunk[:take]
+
+        real_open = Path.open
+
+        def open_fixture(path, mode="r", *args, **kwargs):
+            if path == executable and mode == "rb":
+                return Artifact()
+            return real_open(path, mode, *args, **kwargs)
+
+        reached = []
+
+        def stop_before_activation(*_args, **_kwargs):
+            reached.append(True)
+            raise RuntimeError("fixture stopped before activation")
+
+        def forbidden(*_args, **_kwargs):
+            pytest.fail("artifact fixture touched credentials, Git or HTTP")
+
+        monkeypatch.setattr(Path, "open", open_fixture)
+        monkeypatch.setattr(windows_session.WindowsReviewOwner, "__init__", stop_before_activation)
+        monkeypatch.setattr(windows_session.subprocess, "run", forbidden)
+        monkeypatch.setattr(review_http.http.client, "HTTPSConnection", forbidden)
+        from lighthouse.review_runner import run_review
+
+        errors = {
+            "artifact-fit": (RuntimeError, "fixture stopped before activation"),
+            "artifact-large": (ValueError, "runtime binding limit"),
+            "artifact-digest": (ValueError, "runtime binding changed"),
+        }
+        before = ledger_path.read_bytes()
+        error, message = errors[drift]
+        with pytest.raises(error, match=message):
+            run_review(settings, req.dispatch_id, resolve=forbidden)
+        assert remaining == 0
+        assert reached == ([True] if drift == "artifact-fit" else [])
+        assert ledger_path.read_bytes() == before and not (tmp_path / "run-cache").exists()
+        return
     if drift:
         content = profile.read_text(encoding="utf-8")
         changes = {
