@@ -14,6 +14,7 @@ from uuid import uuid4
 
 from lighthouse.adapters.codex.stdio import ReviewRequest
 from lighthouse.adapters.codex.windows_session import (
+    MAX_RUNTIME_ARTIFACT_BYTES,
     PrivateWindowsReview,
     WindowsReviewOwner,
 )
@@ -123,7 +124,7 @@ def run_review(settings: Path, dispatch: str, *, resolve: Callable[[str], str] =
     )
     windows.inputs()
     digest = sha256()
-    maximum = 128 * 1024 * 1024
+    maximum = MAX_RUNTIME_ARTIFACT_BYTES
     if windows.executable.resolve(strict=True) != windows.executable or not windows.codex_home.is_dir():
         raise ValueError("runtime binding unavailable")
     with windows.executable.open("rb") as image:

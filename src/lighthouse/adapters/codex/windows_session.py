@@ -15,6 +15,7 @@ from typing import Protocol
 from lighthouse.adapters.codex._win32 import WinChild
 from lighthouse.adapters.codex.stdio import RUNTIME, ReviewRequest, Shutdown
 
+MAX_RUNTIME_ARTIFACT_BYTES = 512 * 1024 * 1024
 _FRAME = 1_048_576
 _SEND = 4_194_304
 _FIXED_ENV = {"SystemRoot", "WINDIR", "TEMP", "TMP", "PATH"}
@@ -206,7 +207,7 @@ class WindowsReviewOwner:
             with s.executable.open("rb") as file:
                 while block := file.read(1_048_576):
                     total += len(block)
-                    if total > 512 * _FRAME or monotonic() >= deadline:
+                    if total > MAX_RUNTIME_ARTIFACT_BYTES or monotonic() >= deadline:
                         raise TimeoutError
                     digest.update(block)
             if digest.hexdigest() != s.executable_sha256:

@@ -28,7 +28,8 @@ private input evidence and checkout paths outside the repository. Set
   Issue and PR are numeric and the head is a full lowercase SHA.
 - `runtime`, `runtime_sha256`, `git`, `codex_home`, `model`, and
   `[environment]`: exact local paths, pinned hash, separately managed runtime
-  home and fixed model. Environment contains only the existing allowlist;
+  home and fixed model. Preflight and the session owner stream and verify the
+  executable against the same 512 MiB cap. Environment uses the existing allowlist;
   `SystemRoot` and `TEMP` are required. The binding uses a 90-second worker
   cutoff and separate five-second cleanup interval. Keep the publisher
   credential away from Codex and the checkout.
