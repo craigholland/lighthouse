@@ -16,7 +16,17 @@ import pytest
 from test_coordinator import CYCLE, accept, assemble, with_pull
 from test_github import HEAD, PROJECT, REPO
 from test_github_collection import Fake
-from test_t07_stdio import ACK, DONE, ENTER, EXIT, FakeSession, Shutdown, notify
+from test_t07_stdio import (
+    ACK,
+    DONE,
+    ENTER,
+    EXIT,
+    TURN_ACK,
+    FakeSession,
+    Shutdown,
+    final_answer,
+    notify,
+)
 
 from lighthouse.adapters.codex.stdio import ReviewRequest, StdioReviewWorker
 from lighthouse.adapters.github.review_publisher import ReviewPublisher
@@ -388,8 +398,7 @@ def test_explicit_outcome_reopens_without_reposting(tmp_path: Path, event: str, 
     request = commit_review(tmp_path, ledger)
     edges = Edges(path)
     edges.lose_ack = True
-    item = {"type": "exitedReviewMode", "review": json.dumps({"event": event, "body": "Synthetic review."})}
-    edges.frames = (ENTER, notify("item/completed", {"item": item}), DONE, ACK)
+    edges.frames = (final_answer(json.dumps({"event": event, "body": "Synthetic review."})), DONE, TURN_ACK)
     runner = edges.build(structured=True)
     runner.start(request)
     edges.queue.pop()()
@@ -411,6 +420,11 @@ def test_structured_worker_does_not_promote_free_prose(tmp_path: Path) -> None:
     accept(tmp_path, ledger)
     request = commit_review(tmp_path, ledger)
     edges = Edges(path)
+    prose = ("Review could not be completed: read-only commands to inspect the exact authorized commit "
+             "were blocked by execution policy. No defects are established, but the patch cannot be approved "
+             "from the supplied summary alone; the correctness verdict reflects this verification limitation.")
+    edges.frames = (ENTER, notify("item/completed", {"item": {"type": "exitedReviewMode", "review": prose}}),
+                    DONE, TURN_ACK)
     runner = edges.build(structured=True)
     runner.start(request)
     edges.queue.pop()()

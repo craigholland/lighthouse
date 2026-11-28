@@ -99,6 +99,7 @@ class Pull:
     head: str
     is_open: bool = True
     draft: bool = False
+    base_revision: str | None = None
 
 
 @dataclass(frozen=True)

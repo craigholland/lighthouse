@@ -159,6 +159,32 @@ class WindowsReviewOwner:
         self._settings, self._child = settings, child
         self._settings.inputs()
 
+    def evidence_git(self, deadline: float, *args: str) -> bytes:
+        """Run fixed read-only local snapshot queries, without external helpers or fetch."""
+        s = self._settings
+        left = deadline - monotonic()
+        if left <= 0:
+            raise TimeoutError
+        quiet = "--quiet" in args
+        try:
+            result = subprocess.run(
+                [str(s.git), "--no-optional-locks", "--no-replace-objects",
+                 "-c", "core.fsmonitor=false", *args], cwd=s.workspace, capture_output=True,
+                check=False, timeout=min(left, 2),
+                env={k: v for k, v in s.inputs().items() if k != "CODEX_HOME"}
+                | {"GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": "NUL", "GIT_NO_LAZY_FETCH": "1"},
+                creationflags=0x08000000,
+            )
+        except subprocess.SubprocessError:
+            raise OSError("snapshot Git unavailable") from None
+        if len(result.stdout) > 220_000 or monotonic() >= deadline:
+            raise OSError("snapshot output budget")
+        if quiet and result.returncode in (0, 1) and not result.stdout and not result.stderr:
+            return str(result.returncode).encode()
+        if result.returncode != 0 or quiet or result.stderr:
+            raise OSError("snapshot Git unavailable")
+        return result.stdout
+
     def checkout_matches(self, request: ReviewRequest, deadline: float) -> bool:
         s = self._settings
         if (

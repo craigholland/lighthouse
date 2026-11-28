@@ -42,6 +42,21 @@ private input evidence and checkout paths outside the repository. Set
   ordered lexicographically with no supplemental spaces or ASCII escaping.
   This is a private input, checked against freshly selected normalized evidence;
   unstable or changed scope or review context holds.
+- The exact snapshot binding is required for a new review. `base_revision` is the complete base commit
+  from the same fresh PR selection, not just the branch name. `changed_paths`
+  enumerates all changed paths; `context_paths` enumerates AGENTS.md and the source
+  and guidance needed by this specific review, chosen by trusted preparation.
+  `snapshot_sha256` is the SHA-256 of the local snapshot captured from the exact
+  base/head objects by `lighthouse.review_evidence.capture`. It binds the repository, both
+  revisions, the unique merge base, the full unified diff and complete context
+  files. Lists have at most 24 simple repository-relative paths each; the
+  runner rejects omitted or unchanged change paths, links, binary and non-UTF-8
+  content, more than 100,000 examined blob bytes, more than 200,000 diff bytes,
+  or more than 300,000 canonical snapshot bytes. Existing request and frame
+  caps still apply; no incomplete or oversized source is truncated. The exact
+  approval must bind the snapshot in addition to selected Issue/PR evidence.
+  Old records can report or reconcile an existing publication without a snapshot;
+  old settings cannot initiate a new attempt.
 - `dependencies` is an array of independently captured resolution rows, each
   with `dependency`, `comment`, `actor`, `revision` (the exact source
   `updated_at`), `body_sha256` (exact comment UTF-8 bytes) and `provenance`.
@@ -66,6 +81,18 @@ Set the private run's `expected_event` to the separately approved exact event. A
 with an event and nonempty review body can reach the separate publisher:
 `APPROVE`, `REQUEST_CHANGES`, or `COMMENT`. The expected GitHub receipt is
 bound to the exact event, body, PR, commit and numerical Lead identity.
+The structured route uses the pinned public [TurnStartParams](https://github.com/openai/codex/blob/rust-v0.171.0/codex-rs/app-server-protocol/schema/json/v2/TurnStartParams.json)
+`outputSchema`, passed into `final_output_json_schema` by the [turn processor](https://github.com/openai/codex/blob/rust-v0.171.0/codex-rs/app-server/src/request_processors/turn_processor.rs).
+The completed [agent message](https://github.com/openai/codex/blob/rust-v0.171.0/codex-rs/app-server-protocol/schema/json/v2/ItemCompletedNotification.json)
+must be the single explicitly final answer with the exact thread and turn.
+The pinned [terminal producer](https://github.com/openai/codex/blob/rust-v0.171.0/codex-rs/app-server/src/bespoke_event_handling.rs)
+can attach a last-message summary; any supplied summary must agree with the
+separately completed item. Require successful completion and no contradiction
+through shutdown drain. Tool items cannot support publication on this route. Native review prose,
+missing final-answer phase, zero findings and a normal exit are not a verdict.
+The worker receives the exact evidence and does not depend on shell access to
+review it. Repository content remains untrusted data.
+
 Historical records without an event decode as COMMENT; they cannot be
 upgraded. If the POST acknowledgement is missing, a later invocation can look
 up only that attempt. It cannot start the model again or issue another POST.

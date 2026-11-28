@@ -30,6 +30,8 @@ from lighthouse.application.review_dispatch import ReviewInput, Stage, Target
 from lighthouse.configuration import load_configuration, profile_fingerprint
 from lighthouse.domain.workflow import Execution, Outcome, Project, State, Workflow
 from lighthouse.operator_status import render_status
+from lighthouse.review_evidence import capture, paths
+from lighthouse.review_evidence import digest as snapshot_digest
 from lighthouse.runtime_bindings import PrivateRuntimeBinding, bind_review
 
 _ID = re.compile(r"[0-9a-f]{64}")
@@ -69,12 +71,14 @@ def run_review(settings: Path, dispatch: str, *, resolve: Callable[[str], str] =
     if not _ID.fullmatch(dispatch):
         raise ValueError("invalid dispatch")
     raw = tomllib.loads(_read(settings, 32768))
-    if raw.keys() != {
+    snapshot_fields = {"base_revision", "snapshot_sha256", "changed_paths", "context_paths"}
+    present = raw.keys() & snapshot_fields
+    if raw.keys() - snapshot_fields != {
         "version", "service", "profile", "profile_id", "ledger", "cache", "repository",
         "order", "issue", "pr", "head", "readiness_event", "verification",
         "runtime", "runtime_sha256", "git", "codex_home", "model",
         "environment", "intake_ref", "publisher_ref", "dependencies", "evidence_sha256", "expected_event",
-    } or type(raw["version"]) is not int or raw["version"] != 1:
+    } or (present and present != snapshot_fields) or type(raw["version"]) is not int or raw["version"] != 1:
         raise ValueError("invalid settings")
     issue, pr, ready_id = (_number(raw[k]) for k in ("issue", "pr", "readiness_event"))
     configuration = load_configuration(_path(raw["service"]), [_path(raw["profile"])])
@@ -153,9 +157,13 @@ def run_review(settings: Path, dispatch: str, *, resolve: Callable[[str], str] =
     # Content, runtime, model and independently captured evidence bind the attempt.
     # Exact raw review evidence is supplied below for a new dispatch only.
     proof = raw["evidence_sha256"]
+    context_binding = (
+        {k: raw[k] for k in sorted(snapshot_fields)} if present else {}
+    )
     context_identity = json.dumps(
                 {"runtime": windows.executable_sha256, "model": model, "evidence": proof, "instructions": context,
-         "event": event, "dependencies": [asdict(item) for item in dependencies], "profile": asdict(project)},
+         "event": event, "dependencies": [asdict(item) for item in dependencies], "profile": asdict(project),
+         **context_binding},
         ensure_ascii=False, sort_keys=True,
     )
 
@@ -172,6 +180,24 @@ def run_review(settings: Path, dispatch: str, *, resolve: Callable[[str], str] =
         view.state.outcome is not Outcome.REVIEW or view.attempt.event == "COMMENT"
     ):
         return render_status(ledger_path, project.repository, dispatch)
+    snapshot = ""
+    base_revision = raw.get("base_revision")
+    if present and (
+        not isinstance(base_revision, str) or re.fullmatch(r"[0-9a-f]{40}", base_revision) is None
+        or not isinstance(raw["snapshot_sha256"], str) or not _ID.fullmatch(raw["snapshot_sha256"])
+    ):
+        raise ValueError("invalid snapshot binding")
+    if view.attempt is None:
+        if not present or base_revision is None:
+            raise ValueError("exact review snapshot required")
+        cutoff = monotonic() + 8
+        snapshot = capture(
+            lambda *args: owner.evidence_git(cutoff, *args), repository=project.repository,
+            head=target.head, base=base_revision, changed=paths(raw["changed_paths"]),
+            context=paths(raw["context_paths"], guidance=True),
+        )
+        if snapshot_digest(snapshot) != raw["snapshot_sha256"]:
+            raise ValueError("exact review snapshot changed")
     intake, publisher = resolve(ref1), resolve(ref2)
     if (intake == publisher or not intake or not publisher
             or any(not re.fullmatch(r"[!-~]{1,512}", value) for value in (intake, publisher))):
@@ -201,6 +227,7 @@ def run_review(settings: Path, dispatch: str, *, resolve: Callable[[str], str] =
             and candidate.binding == target.binding and pull is not None and pull.is_open and not pull.draft
             and (pull.repository, pull.issue, pull.order, pull.number, pull.head, pull.author, pull.base)
             == (project.repository, issue, work.order, pr, target.head, project.implementer, project.base)
+            and (base_revision is None or pull.base_revision == base_revision)
             and facts.review is None and facts.merge is None
         )
 
@@ -218,7 +245,10 @@ def run_review(settings: Path, dispatch: str, *, resolve: Callable[[str], str] =
     dispatch_service = bind_review(
         project, ledger, PrivateRuntimeBinding(target, windows, model, publisher),
         current_authority=current, current_lead=lead, enqueue=lambda action: action(), structured=True,
-        worker_context=(_INSTRUCTIONS, json.dumps({"checkout_guidance": context, "review": execution_input})), expected_event=event,
+        worker_context=(_INSTRUCTIONS, json.dumps(
+            {"request": execution_input, "snapshot": json.loads(snapshot) if snapshot else None},
+            ensure_ascii=False, separators=(",", ":"),
+        )), expected_event=event,
     )
     if view.attempt is not None and view.attempt.stage is Stage.PUBLISHING:
         dispatch_service.publish(dispatch)  # Lookup only for the original PUBLISHING record.
@@ -245,7 +275,8 @@ def run_review(settings: Path, dispatch: str, *, resolve: Callable[[str], str] =
                 return Bundle(
                     (facts.candidate,) if facts.candidate is not None else (),
                     facts.pull, review, facts.merge, accepted.work != work or
-                    facts.hold is not None or sha256(refreshed.encode()).hexdigest() != proof or not matches,
+                    facts.hold is not None or sha256(refreshed.encode()).hexdigest() != proof or not matches
+                    or (base_revision is not None and (facts.pull is None or facts.pull.base_revision != base_revision)),
                 )
         latest = ledger.operator_snapshot(project.repository, dispatch)
         if (latest.state.work == work and latest.state.outcome is Outcome.REVIEW
