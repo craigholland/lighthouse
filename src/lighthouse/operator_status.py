@@ -45,6 +45,8 @@ def render_status(path: Path, repository: str, dispatch: str | None) -> str:
             status=("published-review" if stage is Stage.COMMENTED and attempt.event != "COMMENT" else stage),
             review_event=attempt.event if attempt.review_id else None, remote=attempt.lifecycle.remote, local_cleanup=attempt.lifecycle.cleanup,
             approval_required=attempt.lifecycle.approval, causes=attempt.lifecycle.causes,
+            startup_reason=attempt.startup.reason if attempt.startup else "unknown",
+            startup_progress=attempt.startup.progress if attempt.startup else "unknown",
             thread=attempt.thread or None, turn=attempt.turn or None,
             review=attempt.review_id or None, dispatch_next_actor="owner" if owner else "lead",
         )

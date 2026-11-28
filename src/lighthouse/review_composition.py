@@ -22,6 +22,7 @@ from lighthouse.application.review_dispatch import (
     ReviewDispatch,
     ReviewInput,
     Stage,
+    StartupDiagnostic,
     Target,
     digest,
 )
@@ -153,7 +154,10 @@ def compose_review_dispatch(
                     Cleanup.UNCONFIRMED if result.session_started else Cleanup.NOT_NEEDED,
                     result.hold_reason == "permission-attention",
                 )
-                service.hold(target.dispatch, fingerprint, stage, old.thread, old.turn, lifecycle=lifecycle)
+                service.hold(
+                    target.dispatch, fingerprint, stage, old.thread, old.turn, lifecycle=lifecycle,
+                    startup=StartupDiagnostic.from_worker(result.hold_reason, result.startup_progress),
+                )
 
             enqueue(run)
 

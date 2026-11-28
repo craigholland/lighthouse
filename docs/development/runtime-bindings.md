@@ -58,6 +58,14 @@ When that same action remains current, its assignee is the next actor even
 though the latest observation issued no new recommendation. It cannot create, reset, migrate,
 queue, dispatch or publish. Help, version and ordinary imports are inert.
 
+Failed attempts can retain an allowlisted `startup_reason` and the last
+positively observed `startup_progress` checkpoint. These fields survive
+reopening the ledger; old attempts without diagnostics report `unknown`.
+Only fixed codes are retained, never exception text, paths, account details,
+credentials or provider content. Diagnostics do not establish remote
+completion, local cleanup, approval or a right to retry. The original failed
+operational attempt remains undiagnosed; its allowance remains consumed.
+
 ## Verification and activation boundary
 
 Ordinary tests exercise synthetic process/HTTP edges and temporary ledgers.

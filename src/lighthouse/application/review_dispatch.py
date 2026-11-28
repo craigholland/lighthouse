@@ -60,6 +60,48 @@ class ReviewInput:
         return digest(asdict(self))
 
 
+class StartupProgress(StrEnum):
+    """Last positively witnessed startup checkpoint, never completion evidence."""
+
+    NOT_STARTED = "not-started"
+    CHECKOUT_VERIFIED = "checkout-verified"
+    SESSION_OPENED = "session-opened"
+    RUNTIME_VERIFIED = "runtime-verified"
+    ACCOUNT_VERIFIED = "account-verified"
+    THREAD_VERIFIED = "thread-verified"
+    CHECKOUT_REVERIFIED = "checkout-reverified"
+
+
+_STARTUP_REASONS = frozenset({
+    "ack-invalid", "account-unverified", "checkout-unverified", "cleanup-deadline-elapsed",
+    "cleanup-unconfirmed", "deadline-elapsed", "event-budget", "event-order-invalid", "frame-budget",
+    "frame-invalid", "identity-mismatch", "output-invalid", "permission-attention", "policy-unverified",
+    "provider-interrupted", "request-budget", "request-invalid", "response-mismatch", "runtime-unverified",
+    "second-dispatch", "server-error", "terminal-conflict", "terminal-failed", "terminal-invalid",
+    "thread-unverified", "transport-lost",
+})
+
+
+@dataclass(frozen=True)
+class StartupDiagnostic:
+    """Small durable operator evidence, isolated from stage and lifecycle."""
+
+    reason: str
+    progress: StartupProgress
+
+    def valid(self) -> bool:
+        return isinstance(self.reason, str) and self.reason in _STARTUP_REASONS and isinstance(
+            self.progress, StartupProgress,
+        )
+
+    @classmethod
+    def from_worker(cls, reason: object, progress: object) -> StartupDiagnostic | None:
+        if not isinstance(reason, str) or not isinstance(progress, StartupProgress):
+            return None
+        result = cls(reason, progress)
+        return result if result.valid() else None
+
+
 class Stage(StrEnum):
     PENDING = "pending"
     CLAIMED = "claimed"
@@ -120,6 +162,7 @@ class Attempt:
     review_id: int = 0
     lifecycle: Lifecycle = Lifecycle()
     event: str = "COMMENT"
+    startup: StartupDiagnostic | None = None
 
     def valid(self) -> bool:
         identity = bool(_REF.fullmatch(self.thread) and _REF.fullmatch(self.turn))
@@ -137,6 +180,10 @@ class Attempt:
             self.target.valid() and _HEX.fullmatch(self.fingerprint) and phase_identity
             and self.event in {"COMMENT", "APPROVE", "REQUEST_CHANGES"}
             and (has_output or self.event == "COMMENT")
+            and (self.startup is None or (self.startup.valid() and self.stage in {
+                Stage.UNAVAILABLE, Stage.EXECUTION_UNKNOWN, Stage.CLEANUP_UNCONFIRMED,
+                Stage.UNKNOWN_AND_CLEANUP, Stage.APPROVAL_REQUIRED,
+            }))
             and self.stage not in {Stage.PENDING, Stage.HELD}
             and (bool(_HEX.fullmatch(self.output)) if has_output else not self.output)
             and (bool(_HEX.fullmatch(self.marker)) if has_marker else not self.marker)
@@ -256,6 +303,7 @@ class ReviewDispatch:
     def hold(
         self, dispatch: str, fingerprint: str, stage: Stage, thread: str = "", turn: str = "", *,
         lifecycle: Lifecycle | None = None,
+        startup: StartupDiagnostic | None = None,
     ) -> Status:
         prior = self._attempts.review_attempt(self.project.repository, dispatch)
         if (prior is not None and prior.fingerprint == fingerprint
@@ -263,7 +311,9 @@ class ReviewDispatch:
                 and prior.stage in {Stage.CLAIMED, Stage.STARTING, Stage.ACCEPTED}
                 and stage in {Stage.EXECUTION_UNKNOWN, Stage.CLEANUP_UNCONFIRMED,
                               Stage.APPROVAL_REQUIRED, Stage.UNAVAILABLE, Stage.UNKNOWN_AND_CLEANUP}):
-            self._attempts.advance_review(prior, replace(prior, stage=stage, lifecycle=lifecycle or prior.lifecycle))
+            self._attempts.advance_review(prior, replace(
+                prior, stage=stage, lifecycle=lifecycle or prior.lifecycle, startup=startup,
+            ))
         return self.status(dispatch)
 
     def complete(self, dispatch: str, result: Completion) -> Status:
@@ -281,7 +331,7 @@ class ReviewDispatch:
                              lifecycle=Lifecycle(Remote.COMPLETED, Cleanup.CONFIRMED))
         self._attempts.advance_review(prior, replace(
             prior, stage=Stage.COMPLETED, output=digest(result.comment), event=result.event,
-            lifecycle=Lifecycle(Remote.COMPLETED, Cleanup.CONFIRMED),
+            lifecycle=Lifecycle(Remote.COMPLETED, Cleanup.CONFIRMED), startup=None,
         ))
         return self.status(dispatch)
 

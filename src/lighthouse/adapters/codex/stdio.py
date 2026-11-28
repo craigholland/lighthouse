@@ -12,6 +12,8 @@ from pathlib import Path
 from typing import Protocol
 from urllib.parse import unquote
 
+from lighthouse.application.review_dispatch import StartupProgress
+
 RUNTIME = "0.171.0"
 _FRAME_LIMIT = 1_048_576
 _REQUEST_LIMIT = 4_194_304
@@ -65,6 +67,7 @@ class ReviewResult:
     acceptance_unknown: bool = False
     session_started: bool = False
     remote_completed: bool = False
+    startup_progress: StartupProgress = StartupProgress.NOT_STARTED
 
 
 @dataclass(frozen=True, repr=False)
@@ -386,24 +389,31 @@ class StdioReviewWorker:
         cleanup = False
         remote_completed = False
         dispatched = accepted = launch_started = False
+        progress = StartupProgress.NOT_STARTED
         try:
             parameters, target = _inputs(request)
             if not self._verify(request, deadline) or not self._clock() < deadline:
                 raise _Hold("checkout-unverified")
+            progress = StartupProgress.CHECKOUT_VERIFIED
             launch_started = True
             session = self._open(request, deadline)
+            progress = StartupProgress.SESSION_OPENED
             wire = _Wire(session, self._clock, deadline)
             _runtime(wire.request("initialize", {
                 "clientInfo": {"name": "lighthouse_t07", "title": "Lighthouse T07", "version": "0.1.0"},
                 "capabilities": {"experimentalApi": False},
             }))
+            progress = StartupProgress.RUNTIME_VERIFIED
             wire.initialized()
             account = wire.request("account/read", {"refreshToken": False})
             if account.get("account") is None or _object(account["account"]).get("type") != "chatgpt":
                 raise _Hold("account-unverified")
+            progress = StartupProgress.ACCOUNT_VERIFIED
             thread_id = _thread(wire.request("thread/start", parameters), request)
+            progress = StartupProgress.THREAD_VERIFIED
             if not self._verify(request, deadline) or not self._clock() < deadline:
                 raise _Hold("checkout-unverified")
+            progress = StartupProgress.CHECKOUT_REVERIFIED
             ack = wire.request("review/start", _review_payload(thread_id, target), capture=True)
             turn = _object(ack.get("turn"))
             if ack.get("reviewThreadId") != thread_id or turn.get("status") != "inProgress":
@@ -457,4 +467,5 @@ class StdioReviewWorker:
         return ReviewResult(
             thread_id, turn_id, comment if reason is None else None,
             reason, cleanup, unknown, session_started=launch_started, remote_completed=remote_completed,
+            startup_progress=progress,
         )
