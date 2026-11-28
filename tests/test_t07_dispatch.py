@@ -436,6 +436,7 @@ def test_structured_worker_does_not_promote_free_prose(tmp_path: Path) -> None:
 
 
 @pytest.mark.parametrize(("failure", "reason", "progress", "local", "stage"), [
+    ("tool", "unexpected-review-item", "checkout-reverified", "owned-cleanup-confirmed", "execution-unknown"),
     ("runtime", "runtime-unverified", "session-opened", "owned-cleanup-confirmed", "unavailable"),
     ("account", "account-unverified", "runtime-verified", "owned-cleanup-confirmed", "unavailable"),
     ("policy", "policy-unverified", "account-verified", "owned-cleanup-confirmed", "unavailable"),
@@ -454,7 +455,10 @@ def test_startup_diagnostic_persists_without_replay(
     edges.startup_failure = failure
     if failure == "transport":
         edges.cleanup = Shutdown(True, False)
-    service = edges.build()
+    if failure == "tool":
+        tool = notify("item/started", {"item": {"type": "commandExecution", "id": "synthetic"}})
+        edges.frames = (TURN_ACK, tool)
+    service = edges.build(structured=failure == "tool")
     service.start(request)
     edges.queue.pop()()
     command = [sys.executable, "-I", "-m", "lighthouse", "status", "--ledger", str(path),
@@ -463,10 +467,11 @@ def test_startup_diagnostic_persists_without_replay(
     observed = subprocess.run(command, cwd=tmp_path, capture_output=True, text=True, timeout=10, check=True)
     data = json.loads(observed.stdout)
     assert (data["startup_reason"], data["startup_progress"]) == (reason, progress)
-    assert (data["remote"], data["local_cleanup"], data["status"]) == ("not-started", local, stage)
+    remote = Remote.UNKNOWN.value if failure == "tool" else Remote.NOT_STARTED.value
+    assert (data["remote"], data["local_cleanup"], data["status"]) == (remote, local, stage)
     assert data["approval_required"] == (failure == "permission")
     assert "synthetic-private-data" not in observed.stdout and str(tmp_path) not in observed.stdout
-    reopened = edges.build()
+    reopened = edges.build(structured=failure == "tool")
     reopened.start(request)
     reopened.publish(request.target.dispatch)
     assert len(edges.sessions) == 1 and not edges.queue and not edges.posts
